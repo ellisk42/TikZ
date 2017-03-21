@@ -1,47 +1,36 @@
 # from matplotlib import pyplot as plot
+import sys
 import numpy as np
 import tensorflow as tf
 import os
+from PIL import Image
+import pickle
 
+learning_rate = 0.001
 
-learning_rate = 0.1
+def loadImages(filenames):
+    def processPicture(p):
+        p = p.convert('L')
+        (w,h) = p.size
+        return 1.0 - np.array(list(p.getdata())).reshape((h,w))/255.0
+    return [ processPicture(Image.open(n)) for n in filenames ]
 
-def loadPictures(filenames):
-    q = tf.train.string_input_producer(filenames)
-    reader = tf.WholeFileReader()
-    _, image_file = reader.read(q)
-    image = tf.image.decode_png(image_file,channels = 1)
-    pictures = []
-    with tf.Session() as session:
-        tf.initialize_all_variables().run()
+def loadPrograms(filenames):
+    return [ pickle.load(open(n,'rb')) for n in filenames ]
 
-        coordinate = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord = coordinate)
+def loadExamples(numberOfExamples):
+    def oneHot(n):
+        vector = [0.0]*10
+        vector[n] = 1.0
+        return vector
+    images = loadImages([ "syntheticTrainingData/individualCircle-%d.png"%j
+                          for j in range(numberOfExamples) ])
+    programs = loadPrograms([ "syntheticTrainingData/individualCircle-%d.p"%j
+                              for j in range(numberOfExamples) ])
+    targetX = [oneHot(p.center.x) for p in programs ]
+    targetY = [oneHot(p.center.y) for p in programs ]
 
-        for _ in range(len(filenames)):
-            image_tensor = ((255.0 - session.run([image])[0])/255.0).reshape((100,100))
-            pictures.append(image_tensor)        
-
-        coordinate.request_stop()
-        coordinate.join(threads)
-
-    print "Loaded",len(filenames),"pictures."
-    return pictures
-
-
-
-
-def loadTrainingData():
-    lines = loadPictures([ "generateOutput/lines/%d.png" % j for j in range(1000) ])
-    rectangles = loadPictures(["generateOutput/rectangles/%d.png" % j for j in range(1000) ])
-    circles = loadPictures(["generateOutput/circles/%d.png" % j for j in range(1000) ])
-    xs = lines + rectangles + circles
-    ys = [[1,0,0]]*len(lines) + [[0,1,0]]*len(rectangles) + [[0,0,1]]*len(circles)
-
-    print "xs = ",np.array(xs)
-    return np.array(xs),np.array(ys)
-
-
+    return np.array(images), np.array(targetX), np.array(targetY)
 
 
 def convolutionLayer(x, w, b, strides = 1):
@@ -58,60 +47,73 @@ def downsample(x, k):
                           padding='SAME')
 
 
-def makeModel(x, w, b):
-    x = tf.reshape(x, [-1, 100, 100, 1])
-#    x = downsample(x, 3) # x is now 100x100
+def makeModel(x,w,b):
+    x = tf.reshape(x, [-1, 300, 300, 1])
 
-    x = convolutionLayer(x, w['c1'], b['c1'])
+    print x
 
-    # x: [None,100,100,20]
-    x = tf.reduce_sum(x, [1,2])
+    x = convolutionLayer(x, w['c1'], b['c1'], strides = 10)
 
-    x = tf.reshape(x, [-1, 20])
+    print x
 
-    x = fullyConnectedLayer(x, w['f1'], b['f1'])
-    return tf.sigmoid(x)
+    # decoder
     
-    # x = downsample(x, 10)
+    x = tf.reshape(x, [-1, 900])
 
-    # x = convolutionLayer(x, w['c2'], b['c2'])
-    # x = downsample(x, 10)
+    # now we have two separate predictions: one for the X and one for the Y
+    predictionX = fullyConnectedLayer(x, w['X'], b['X'])
+    predictionY = fullyConnectedLayer(x, w['Y'], b['Y'])
 
-    # x = tf.reshape(x, [-1, 45])
 
-    # x = fullyConnectedLayer(x, w['f1'], b['f1'])
-    
-    # return tf.sigmoid(x)
-    
+    print predictionX
+    print predictionY
+
+    return predictionX,predictionY
 
 w = {
-    # 10x10 window size, 3 channels in, 20 output images
-    'c1': tf.Variable(tf.random_normal([10, 10, 1, 20])),
-#    'c2': tf.Variable(tf.random_normal([5, 5, 20, 5])),
-    'f1': tf.Variable(tf.random_normal([20, 3]))
+    # 10x10 window size, 3 channels in, 1 output images
+    'c1': tf.Variable(tf.random_normal([10, 10, 1, 1])),
+
+    'X': tf.Variable(tf.random_normal([900, 10])),
+    'Y': tf.Variable(tf.random_normal([900, 10]))
 }
 b = {
-    'c1': tf.Variable(tf.random_normal([20])),
-#    'c2': tf.Variable(tf.random_normal([5])),
-    'f1': tf.Variable(tf.random_normal([3]))
+    'c1': tf.Variable(tf.random_normal([1])),
+
+    'X': tf.Variable(tf.random_normal([10])),
+    'Y': tf.Variable(tf.random_normal([10]))
 }
 
-x = tf.placeholder(tf.float32, [None, 100, 100])
-y = tf.placeholder(tf.float32, [None, 3])
-predict = makeModel(x,w,b)
+# tensor flow variable for the input images
+x = tf.placeholder(tf.float32, [None, 300, 300])
 
-# calculate log likelihood
-epsilon = 0.0001
-loss = tf.mul(y, tf.log(predict + epsilon))
-loss += tf.mul(1 - y, tf.log(1 - predict + epsilon))
-loss = - tf.reduce_mean(loss)
+# target variables have a one hot representation
+# tensor flow variable for the target output (1)
+t1 = tf.placeholder(tf.float32, [None,10])
+# tensor flow variable for the target output (2)
+t2 = tf.placeholder(tf.float32, [None,10])
+
+
+predictX,predictY = makeModel(x,w,b)
+
+
+
+loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
+loss += tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
+print loss
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-xs,ys = loadTrainingData()
-print xs[0]
-# plot.imshow(xs[2009], cmap = 'Greys')
-# plot.show()
+images,targetX,targetY = loadExamples(100)
+
+print images.shape
+print images[0].min(),images[0].max()
+print images[0]
+print targetX
+print targetY
+
+
+
 initializer = tf.initialize_all_variables()
 
 class BatchIterator():
@@ -133,16 +135,24 @@ class BatchIterator():
         return batch
 
 
-iterator = BatchIterator(100,(xs,ys))
+#iterator = BatchIterator(100,(xs,ys))
 saver = tf.train.Saver()
 
-with tf.Session() as s:
-    s.run(initializer)
-    for i in range(5000):
-        bx,by = iterator.next()
-        _,l = s.run([optimizer, loss], feed_dict = {x: bx, y: by})
-        if i%1 == 0:
-            print i,l
-        if i%100 == 0:
-            print "Saving checkpoint: %s" % saver.save(s, "/tmp/model.checkpoint")
-            
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == 'test':
+        with tf.Session() as s:
+            saver.restore(s,"/tmp/model.checkpoint")
+            px,py = s.run([predictX,predictY],feed_dict = {x: images, t1:targetX, t2:targetY})
+            for j in range(5):
+                print px[j],"\n",py[j]
+                print ""
+    else:
+        with tf.Session() as s:
+            s.run(initializer)
+            for i in range(5000):
+                _,l = s.run([optimizer, loss], feed_dict = {x: images, t1:targetX, t2:targetY})
+                if i%1 == 0:
+                    print i,l
+                if i%100 == 0:
+                    print "Saving checkpoint: %s" % saver.save(s, "/tmp/model.checkpoint")
+

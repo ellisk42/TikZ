@@ -13,4 +13,4 @@ def makeSyntheticData(sample, prefix, k = 1000):
         pickle.dump(programs[j], open("%s-%d.p"%(prefix,j),'wb'))
 
 
-makeSyntheticData(Circle.sample, "syntheticTrainingData/individualCircle.png", 1000) 
+makeSyntheticData(Circle.sample, "syntheticTrainingData/individualCircle", 1000) 
