@@ -28,7 +28,8 @@ def loadExamples(numberOfExamples, filePrefix):
     # get one example from each line of each program
     for j,program in enumerate(programs):
         for k,l in enumerate(program.lines):
-            [s,e] = loadImages(["%s-%d-%d-starting"%(filePrefix, j, k), "%s-%d-%d-ending"%(filePrefix, j, k)])
+            [s,e] = loadImages(["%s-%d-%d-starting.png"%(filePrefix, j, k),
+                                "%s-%d-%d-ending.png"%(filePrefix, j, k)])
             x,y = l.center.x,l.center.y
             startingExamples.append(s)
             endingExamples.append(e)
@@ -57,8 +58,8 @@ def makeModel(x):
     x = tf.reshape(x, [-1, 900])
 
     # now we have two separate predictions: one for the X and one for the Y
-    predictionX = tf.layers.dense(x, 10, activation = None) #fullyConnectedLayer(x, w['X'], b['X'])
-    predictionY = tf.layers.dense(x, 10, activation = None) #fullyConnectedLayer(x, w['Y'], b['Y'])
+    predictionX = tf.layers.dense(x, 10, activation = None)
+    predictionY = tf.layers.dense(x, 10, activation = None)
 
 
     print predictionX
@@ -87,7 +88,7 @@ print loss
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-partialImages,images,targetX,targetY = loadExamples(13,"syntheticTrainingData/individualCircle")
+partialImages,images,targetX,targetY = loadExamples(100,"syntheticTrainingData/doubleCircle")
 images = np.stack([partialImages,images],3)
 print images.shape
 print images[0].min(),images[0].max()
@@ -105,7 +106,7 @@ if __name__ == '__main__':
         with tf.Session() as s:
             saver.restore(s,"/tmp/model.checkpoint")
             px,py = s.run([predictX,predictY],feed_dict = {x: images, t1:targetX, t2:targetY})
-            for j in range(5):
+            for j in range(10):
                 print px[j],"\n",py[j]
                 print ""
     else:
