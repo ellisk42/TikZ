@@ -157,6 +157,7 @@ class Sequence():
     def __eq__(self,o): return str(self) == str(o)
     def __ne__(self,o): return str(self) != str(o)
     def __hash__(self): return hash(str(self))
+    def __len__(self): return len(self.lines)
 
     def mutate(self):
         r = random()

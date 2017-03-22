@@ -18,40 +18,28 @@ def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
 def loadExamples(numberOfExamples):
-    def oneHot(n):
-        vector = [0.0]*10
-        vector[n] = 1.0
-        return vector
-    images = loadImages([ "syntheticTrainingData/individualCircle-%d.png"%j
+    images = loadImages([ "syntheticTrainingData/individualCircle-%d-0-ending.png"%j
                           for j in range(numberOfExamples) ])
+    partialImages = [np.zeros(images[0].shape)]*numberOfExamples
     programs = loadPrograms([ "syntheticTrainingData/individualCircle-%d.p"%j
                               for j in range(numberOfExamples) ])
-    targetX = [oneHot(p.center.x) for p in programs ]
-    targetY = [oneHot(p.center.y) for p in programs ]
+    targetX = [p.lines[0].center.x for p in programs ]
+    targetY = [p.lines[0].center.y for p in programs ]
 
-    return np.array(images), np.array(targetX), np.array(targetY)
-
-
-def convolutionLayer(x, w, b, strides = 1):
-    x = tf.nn.conv2d(x, w, strides = [1,strides,strides,1], padding='SAME')
-    x = tf.nn.bias_add(x, b)
-    x = tf.nn.relu(x)
-    return x
-
-def fullyConnectedLayer(x, w, b):
-    return tf.add(tf.matmul(x, w), b)
-
-def downsample(x, k):
-    return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1],
-                          padding='SAME')
+    return np.array(partialImages), np.array(images), np.array(targetX), np.array(targetY)
 
 
-def makeModel(x,w,b):
-    x = tf.reshape(x, [-1, 300, 300, 1])
+def makeModel(x):
+    x = tf.reshape(x, [-1, 300, 300, 2])
 
     print x
 
-    x = convolutionLayer(x, w['c1'], b['c1'], strides = 10)
+    x = tf.layers.conv2d(inputs = x,
+                         filters = 1,
+                         kernel_size = [10,10],
+                         padding = "same",
+                         activation = tf.nn.relu,
+                         strides = 10)
 
     print x
 
@@ -60,8 +48,8 @@ def makeModel(x,w,b):
     x = tf.reshape(x, [-1, 900])
 
     # now we have two separate predictions: one for the X and one for the Y
-    predictionX = fullyConnectedLayer(x, w['X'], b['X'])
-    predictionY = fullyConnectedLayer(x, w['Y'], b['Y'])
+    predictionX = tf.layers.dense(x, 10, activation = None) #fullyConnectedLayer(x, w['X'], b['X'])
+    predictionY = tf.layers.dense(x, 10, activation = None) #fullyConnectedLayer(x, w['Y'], b['Y'])
 
 
     print predictionX
@@ -69,68 +57,35 @@ def makeModel(x,w,b):
 
     return predictionX,predictionY
 
-w = {
-    # 10x10 window size, 3 channels in, 1 output images
-    'c1': tf.Variable(tf.random_normal([10, 10, 1, 1])),
-
-    'X': tf.Variable(tf.random_normal([900, 10])),
-    'Y': tf.Variable(tf.random_normal([900, 10]))
-}
-b = {
-    'c1': tf.Variable(tf.random_normal([1])),
-
-    'X': tf.Variable(tf.random_normal([10])),
-    'Y': tf.Variable(tf.random_normal([10]))
-}
 
 # tensor flow variable for the input images
-x = tf.placeholder(tf.float32, [None, 300, 300])
+x = tf.placeholder(tf.float32, [None, 300, 300, 2])
 
 # target variables have a one hot representation
 # tensor flow variable for the target output (1)
-t1 = tf.placeholder(tf.float32, [None,10])
+t1 = tf.placeholder(tf.int32, [None])
 # tensor flow variable for the target output (2)
-t2 = tf.placeholder(tf.float32, [None,10])
+t2 = tf.placeholder(tf.int32, [None])
 
 
-predictX,predictY = makeModel(x,w,b)
+predictX,predictY = makeModel(x)
 
 
 
-loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
-loss += tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
+loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
+loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
 print loss
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-images,targetX,targetY = loadExamples(100)
-
+partialImages,images,targetX,targetY = loadExamples(13)
+images = np.stack([partialImages,images],3)
 print images.shape
 print images[0].min(),images[0].max()
-print targetX
-print targetY
 
 
+initializer = tf.global_variables_initializer()
 
-initializer = tf.initialize_all_variables()
-
-class BatchIterator():
-    def __init__(self, batchSize, tensors):
-        # side-by-side shuffle of the data
-        permutation = np.random.permutation(range(xs.shape[0]))
-        self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in tensors ]
-        self.batchSize = batchSize
-        
-        self.startingIndex = 0
-        self.trainingSetSize = tensors[0].shape[0]
-    def next(self):
-        endingIndex = self.startingIndex + self.batchSize
-        if endingIndex > self.trainingSetSize:
-            endingIndex = self.trainingSetSize
-        batch = tuple([ t[self.startingIndex:endingIndex,...] for t in self.tensors ])
-        self.startingIndex = endingIndex
-        if self.startingIndex == self.trainingSetSize: self.startingIndex = 0
-        return batch
 
 
 #iterator = BatchIterator(100,(xs,ys))
@@ -149,7 +104,7 @@ if __name__ == '__main__':
             s.run(initializer)
             for i in range(5000):
                 _,l = s.run([optimizer, loss], feed_dict = {x: images, t1:targetX, t2:targetY})
-                if i%1 == 0:
+                if i%50 == 0:
                     print i,l
                 if i%100 == 0:
                     print "Saving checkpoint: %s" % saver.save(s, "/tmp/model.checkpoint")
