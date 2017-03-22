@@ -1,4 +1,3 @@
-# from matplotlib import pyplot as plot
 import sys
 import numpy as np
 import tensorflow as tf
@@ -108,7 +107,6 @@ images,targetX,targetY = loadExamples(100)
 
 print images.shape
 print images[0].min(),images[0].max()
-print images[0]
 print targetX
 print targetY
 
