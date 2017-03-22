@@ -17,16 +17,25 @@ def loadImages(filenames):
 def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
-def loadExamples(numberOfExamples):
-    images = loadImages([ "syntheticTrainingData/individualCircle-%d-0-ending.png"%j
-                          for j in range(numberOfExamples) ])
-    partialImages = [np.zeros(images[0].shape)]*numberOfExamples
-    programs = loadPrograms([ "syntheticTrainingData/individualCircle-%d.p"%j
+def loadExamples(numberOfExamples, filePrefix):
+    programs = loadPrograms([ "%s-%d.p"%(filePrefix,j)
                               for j in range(numberOfExamples) ])
-    targetX = [p.lines[0].center.x for p in programs ]
-    targetY = [p.lines[0].center.y for p in programs ]
+    startingExamples = []
+    endingExamples = []
+    targetX = []
+    targetY = []
 
-    return np.array(partialImages), np.array(images), np.array(targetX), np.array(targetY)
+    # get one example from each line of each program
+    for j,program in enumerate(programs):
+        for k,l in enumerate(program.lines):
+            [s,e] = loadImages(["%s-%d-%d-starting"%(filePrefix, j, k), "%s-%d-%d-ending"%(filePrefix, j, k)])
+            x,y = l.center.x,l.center.y
+            startingExamples.append(s)
+            endingExamples.append(e)
+            targetX.append(x)
+            targetY.append(y)
+    
+    return np.array(startingExamples), np.array(endingExamples), np.array(targetX), np.array(targetY)
 
 
 def makeModel(x):
@@ -78,7 +87,7 @@ print loss
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-partialImages,images,targetX,targetY = loadExamples(13)
+partialImages,images,targetX,targetY = loadExamples(13,"syntheticTrainingData/individualCircle")
 images = np.stack([partialImages,images],3)
 print images.shape
 print images[0].min(),images[0].max()
