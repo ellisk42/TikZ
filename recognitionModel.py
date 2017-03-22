@@ -1,3 +1,5 @@
+from batch import BatchIterator
+
 import sys
 import numpy as np
 import tensorflow as tf
@@ -84,11 +86,11 @@ predictX,predictY = makeModel(x)
 
 loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
 loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
-print loss
+
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-partialImages,images,targetX,targetY = loadExamples(100,"syntheticTrainingData/doubleCircle")
+partialImages,images,targetX,targetY = loadExamples(500,"syntheticTrainingData/doubleCircle")
 images = np.stack([partialImages,images],3)
 print images.shape
 print images[0].min(),images[0].max()
@@ -98,7 +100,7 @@ initializer = tf.global_variables_initializer()
 
 
 
-#iterator = BatchIterator(100,(xs,ys))
+iterator = BatchIterator(50,(images, targetX, targetY))
 saver = tf.train.Saver()
 
 if __name__ == '__main__':
@@ -113,7 +115,9 @@ if __name__ == '__main__':
         with tf.Session() as s:
             s.run(initializer)
             for i in range(5000):
-                _,l = s.run([optimizer, loss], feed_dict = {x: images, t1:targetX, t2:targetY})
+                xs,t1s,t2s = iterator.next()
+                
+                _,l = s.run([optimizer, loss], feed_dict = {x: xs, t1:t1s, t2:t2s})
                 if i%50 == 0:
                     print i,l
                 if i%100 == 0:

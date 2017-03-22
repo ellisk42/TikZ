@@ -37,5 +37,5 @@ def doubleCircle():
 def singleCircle():
     return Sequence([Circle.sample()])
         
-makeSyntheticData(singleCircle, "syntheticTrainingData/individualCircle", 100)
-makeSyntheticData(doubleCircle, "syntheticTrainingData/doubleCircle", 100)
+makeSyntheticData(singleCircle, "syntheticTrainingData/individualCircle", 1000)
+makeSyntheticData(doubleCircle, "syntheticTrainingData/doubleCircle", 1000)
