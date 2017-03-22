@@ -57,7 +57,7 @@ def makeModel(x):
 
     # decoder
     
-    x = tf.reshape(x, [-1, 900])
+    #x = tf.reshape(x, [-1, 900])
 
     # now we have two separate predictions: one for the X and one for the Y
     predictionX = tf.layers.dense(x, 10, activation = None)
