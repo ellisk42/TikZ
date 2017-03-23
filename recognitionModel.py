@@ -110,7 +110,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         with tf.Session() as s:
             saver.restore(s,"/tmp/model.checkpoint")
-            px,py = s.run([hardX,hardY],feed_dict = {x: images, t1:targetX, t2:targetY})
+            px,py = s.run([hardX,hardY],feed_dict = {x: images})
             for j in range(10):
                 print px[j],"\n",py[j]
                 print ""
