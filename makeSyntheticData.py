@@ -16,23 +16,15 @@ def makeSyntheticData(sample, filePrefix, k = 1000):
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j),'wb'))
         for k in range(len(programs[j])):
-            startingPoint = pixels[programPrefixes[j][k]]
             endingPoint = pixels[programPrefixes[j][k+1]]
-            startingPoint.save("%s-%d-%d-starting.png"%(filePrefix,j,k))
-            endingPoint.save("%s-%d-%d-ending.png"%(filePrefix,j,k))
+            endingPoint.save("%s-%d-%d.png"%(filePrefix,j,k))
             
-
+def canonicalOrdering(circles):
+    # sort the circles so that there are always drawn in a canonical order
+    return sorted(circles, key = lambda c: (c.center.x, c.center.y))
 
 def doubleCircle():
-    while True:
-        c1 = Circle.sample()
-        if c1.center.x < 5:
-            break
-    while True:
-        c2 = Circle.sample()
-        if c2.center.x > 6:
-            break
-    return Sequence([c1,c2])
+    return Sequence(canonicalOrdering([Circle.sample(),Circle.sample()]))
 
 def singleCircle():
     return Sequence([Circle.sample()])

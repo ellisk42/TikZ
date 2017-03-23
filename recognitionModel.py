@@ -29,14 +29,16 @@ def loadExamples(numberOfExamples, filePrefix):
 
     # get one example from each line of each program
     for j,program in enumerate(programs):
+        trace = loadImages([ "%s-%d-%d.png"%(filePrefix, j, k) for k in range(len(program)) ])
+        targetImage = trace[-1]
+        currentImage = np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
-            [s,e] = loadImages(["%s-%d-%d-starting.png"%(filePrefix, j, k),
-                                "%s-%d-%d-ending.png"%(filePrefix, j, k)])
             x,y = l.center.x,l.center.y
-            startingExamples.append(s)
-            endingExamples.append(e)
+            startingExamples.append(currentImage)
+            endingExamples.append(targetImage)
             targetX.append(x)
             targetY.append(y)
+            currentImage = trace[k]
     
     return np.array(startingExamples), np.array(endingExamples), np.array(targetX), np.array(targetY)
 
@@ -57,7 +59,7 @@ def makeModel(x):
 
     # decoder
     
-    #x = tf.reshape(x, [-1, 900])
+    x = tf.reshape(x, [-1, 900])
 
     # now we have two separate predictions: one for the X and one for the Y
     predictionX = tf.layers.dense(x, 10, activation = None)
@@ -81,7 +83,8 @@ t2 = tf.placeholder(tf.int32, [None])
 
 
 predictX,predictY = makeModel(x)
-
+hardX,hardY = tf.argmax(predictX,dimension = 1),tf.argmax(predictY,dimension = 1)
+print hardX,hardY
 
 
 loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
@@ -90,7 +93,7 @@ loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-partialImages,images,targetX,targetY = loadExamples(500,"syntheticTrainingData/doubleCircle")
+partialImages,images,targetX,targetY = loadExamples(100,"syntheticTrainingData/doubleCircle")
 images = np.stack([partialImages,images],3)
 print images.shape
 print images[0].min(),images[0].max()
@@ -107,14 +110,14 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         with tf.Session() as s:
             saver.restore(s,"/tmp/model.checkpoint")
-            px,py = s.run([predictX,predictY],feed_dict = {x: images, t1:targetX, t2:targetY})
+            px,py = s.run([hardX,hardY],feed_dict = {x: images, t1:targetX, t2:targetY})
             for j in range(10):
                 print px[j],"\n",py[j]
                 print ""
     else:
         with tf.Session() as s:
             s.run(initializer)
-            for i in range(5000):
+            for i in range(1000):
                 xs,t1s,t2s = iterator.next()
                 
                 _,l = s.run([optimizer, loss], feed_dict = {x: xs, t1:t1s, t2:t2s})
