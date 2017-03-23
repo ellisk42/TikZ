@@ -23,11 +23,17 @@ def canonicalOrdering(circles):
     # sort the circles so that there are always drawn in a canonical order
     return sorted(circles, key = lambda c: (c.center.x, c.center.y))
 
-def doubleCircle():
-    return Sequence(canonicalOrdering([Circle.sample(),Circle.sample()]))
+def multipleCircles(n):
+    def sampler():
+        while True:
+            p = [Circle.sample() for _ in range(n) ]
+            if all([ a == b or (a.center.x-b.center.x)**2 + (a.center.y-b.center.y)**2 > 4
+                    for a in p
+                    for b in p ]):
+                return Sequence(canonicalOrdering(p))
+    return sampler
 
-def singleCircle():
-    return Sequence([Circle.sample()])
         
-makeSyntheticData(singleCircle, "syntheticTrainingData/individualCircle", 1000)
-makeSyntheticData(doubleCircle, "syntheticTrainingData/doubleCircle", 1000)
+makeSyntheticData(multipleCircles(1), "syntheticTrainingData/individualCircle", 1000)
+makeSyntheticData(multipleCircles(2), "syntheticTrainingData/doubleCircle", 1000)
+makeSyntheticData(multipleCircles(3), "syntheticTrainingData/tripleCircle", 1000)

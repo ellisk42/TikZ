@@ -1,5 +1,6 @@
 from batch import BatchIterator
 
+import matplotlib.pyplot as plot
 import sys
 import numpy as np
 import tensorflow as tf
@@ -83,9 +84,11 @@ t2 = tf.placeholder(tf.int32, [None])
 
 
 predictX,predictY = makeModel(x)
-hardX,hardY = tf.argmax(predictX,dimension = 1),tf.argmax(predictY,dimension = 1)
+hardX,hardY = tf.cast(tf.argmax(predictX,dimension = 1),tf.int32), tf.cast(tf.argmax(predictY,dimension = 1),tf.int32)
+print "hard stuff"
 print hardX,hardY
-
+print tf.logical_and(tf.equal(hardX,t1), tf.equal(hardY,t2))
+averageAccuracy = tf.reduce_mean(tf.cast(tf.logical_and(tf.equal(hardX,t1), tf.equal(hardY,t2)), tf.float32))
 
 loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
 loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
@@ -93,10 +96,8 @@ loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2
 
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-partialImages,images,targetX,targetY = loadExamples(100,"syntheticTrainingData/doubleCircle")
-images = np.stack([partialImages,images],3)
-print images.shape
-print images[0].min(),images[0].max()
+partialImages,targetImages,targetX,targetY = loadExamples(10,"syntheticTrainingData/tripleCircle")
+images = np.stack([partialImages,targetImages],3)
 
 
 initializer = tf.global_variables_initializer()
@@ -110,9 +111,15 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         with tf.Session() as s:
             saver.restore(s,"/tmp/model.checkpoint")
-            px,py = s.run([hardX,hardY],feed_dict = {x: images})
-            for j in range(10):
-                print px[j],"\n",py[j]
+            px,py,accuracy = s.run([hardX,hardY,averageAccuracy],feed_dict = {x: images, t1:targetX,t2:targetY})
+            print "Average accuracy:",accuracy
+            for j in range(5):
+                plot.imshow(partialImages[j],cmap = 'gray')
+                plot.show()
+                plot.imshow(targetImages[j],cmap = 'gray')
+                plot.show()
+                print px[j],py[j]
+                print targetX[j],targetY[j]
                 print ""
     else:
         with tf.Session() as s:
@@ -120,9 +127,9 @@ if __name__ == '__main__':
             for i in range(1000):
                 xs,t1s,t2s = iterator.next()
                 
-                _,l = s.run([optimizer, loss], feed_dict = {x: xs, t1:t1s, t2:t2s})
+                _,l,accuracy = s.run([optimizer, loss, averageAccuracy], feed_dict = {x: xs, t1:t1s, t2:t2s})
                 if i%50 == 0:
-                    print i,l
+                    print i,accuracy,l
                 if i%100 == 0:
                     print "Saving checkpoint: %s" % saver.save(s, "/tmp/model.checkpoint")
 
