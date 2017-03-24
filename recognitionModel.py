@@ -43,75 +43,72 @@ def loadExamples(numberOfExamples, filePrefix):
     
     return np.array(startingExamples), np.array(endingExamples), np.array(targetX), np.array(targetY)
 
+class RecognitionModel():
+    def __init__(self):
+        self.inputPlaceholder = tf.placeholder(tf.float32, [None, 300, 300, 2])
+        self.targetPlaceholder1 = tf.placeholder(tf.int32, [None])
+        self.targetPlaceholder2 = tf.placeholder(tf.int32, [None])
 
-def makeModel(x):
-    x = tf.reshape(x, [-1, 300, 300, 2])
+        c1 = tf.layers.conv2d(inputs = self.inputPlaceholder,
+                              filters = 1,
+                              kernel_size = [10,10],
+                              padding = "same",
+                              activation = tf.nn.relu,
+                              strides = 10)
 
-    print x
+        f1 = tf.reshape(c1, [-1, 900])
 
-    x = tf.layers.conv2d(inputs = x,
-                         filters = 1,
-                         kernel_size = [10,10],
-                         padding = "same",
-                         activation = tf.nn.relu,
-                         strides = 10)
+        self.prediction1 = tf.layers.dense(f1, 10, activation = None)
+        self.prediction2 = tf.layers.dense(f1, 10, activation = None)
 
-    print x
+        self.hard1 = tf.cast(tf.argmax(self.prediction1,dimension = 1),tf.int32)
+        self.hard2 = tf.cast(tf.argmax(self.prediction2,dimension = 1),tf.int32)
+        
+        self.averageAccuracy = tf.reduce_mean(tf.cast(tf.logical_and(tf.equal(self.hard1,self.targetPlaceholder1),
+                                                                     tf.equal(self.hard2,self.targetPlaceholder2)), tf.float32))
 
-    # decoder
-    
-    x = tf.reshape(x, [-1, 900])
+        self.loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder1,logits = self.prediction1))
+        self.loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder2,logits = self.prediction2))
 
-    # now we have two separate predictions: one for the X and one for the Y
-    predictionX = tf.layers.dense(x, 10, activation = None)
-    predictionY = tf.layers.dense(x, 10, activation = None)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(self.loss)
 
+    def train(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
+        partialImages,targetImages,targetX,targetY = loadExamples(numberOfExamples,
+                                                                  "syntheticTrainingData/"+exampleType)
+        images = np.stack([partialImages,targetImages],3)
 
-    print predictionX
-    print predictionY
+        initializer = tf.global_variables_initializer()
+        iterator = BatchIterator(50,(images, targetX, targetY))
+        saver = tf.train.Saver()
 
-    return predictionX,predictionY
-
-
-# tensor flow variable for the input images
-x = tf.placeholder(tf.float32, [None, 300, 300, 2])
-
-# target variables have a one hot representation
-# tensor flow variable for the target output (1)
-t1 = tf.placeholder(tf.int32, [None])
-# tensor flow variable for the target output (2)
-t2 = tf.placeholder(tf.int32, [None])
-
-
-predictX,predictY = makeModel(x)
-hardX,hardY = tf.cast(tf.argmax(predictX,dimension = 1),tf.int32), tf.cast(tf.argmax(predictY,dimension = 1),tf.int32)
-print "hard stuff"
-print hardX,hardY
-print tf.logical_and(tf.equal(hardX,t1), tf.equal(hardY,t2))
-averageAccuracy = tf.reduce_mean(tf.cast(tf.logical_and(tf.equal(hardX,t1), tf.equal(hardY,t2)), tf.float32))
-
-loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t1,logits = predictX))
-loss += tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = t2,logits = predictY))
-
-
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
-
-partialImages,targetImages,targetX,targetY = loadExamples(10,"syntheticTrainingData/tripleCircle")
-images = np.stack([partialImages,targetImages],3)
-
-
-initializer = tf.global_variables_initializer()
-
-
-
-iterator = BatchIterator(50,(images, targetX, targetY))
-saver = tf.train.Saver()
-
-if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == 'test':
         with tf.Session() as s:
-            saver.restore(s,"/tmp/model.checkpoint")
-            px,py,accuracy = s.run([hardX,hardY,averageAccuracy],feed_dict = {x: images, t1:targetX,t2:targetY})
+            s.run(initializer)
+            for i in range(1000):
+                xs,t1s,t2s = iterator.next()
+                
+                _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
+                                     feed_dict = {self.inputPlaceholder: xs,
+                                                  self.targetPlaceholder1:t1s,
+                                                  self.targetPlaceholder2:t2s})
+                if i%50 == 0:
+                    print i,accuracy,l
+                if i%100 == 0:
+                    print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+
+    def test(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
+        partialImages,targetImages,targetX,targetY = loadExamples(numberOfExamples,
+                                                                  "syntheticTrainingData/"+exampleType)
+        images = np.stack([partialImages,targetImages],3)
+
+        initializer = tf.global_variables_initializer()
+        saver = tf.train.Saver()
+
+        with tf.Session() as s:
+            saver.restore(s,checkpoint)
+            px,py,accuracy = s.run([self.hard1,self.hard2,self.averageAccuracy],
+                                   feed_dict = {self.inputPlaceholder: images,
+                                                self.targetPlaceholder1:targetX,
+                                                self.targetPlaceholder2:targetY})
             print "Average accuracy:",accuracy
             for j in range(5):
                 plot.imshow(partialImages[j],cmap = 'gray')
@@ -121,15 +118,9 @@ if __name__ == '__main__':
                 print px[j],py[j]
                 print targetX[j],targetY[j]
                 print ""
-    else:
-        with tf.Session() as s:
-            s.run(initializer)
-            for i in range(1000):
-                xs,t1s,t2s = iterator.next()
-                
-                _,l,accuracy = s.run([optimizer, loss, averageAccuracy], feed_dict = {x: xs, t1:t1s, t2:t2s})
-                if i%50 == 0:
-                    print i,accuracy,l
-                if i%100 == 0:
-                    print "Saving checkpoint: %s" % saver.save(s, "/tmp/model.checkpoint")
 
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == 'test':
+        RecognitionModel().test(100, "doubleCircle")
+    else:
+        RecognitionModel().train(1000, "tripleCircle")
