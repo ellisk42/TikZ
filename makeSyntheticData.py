@@ -33,7 +33,21 @@ def multipleCircles(n):
                 return Sequence(canonicalOrdering(p))
     return sampler
 
-        
+def circlesAndLine(n,k):
+    getCircles = multipleCircles(n)
+    def sampler():
+        p = getCircles()
+
+        linePoints = [AbsolutePoint.sample(),AbsolutePoint.sample()]
+        linePoints.sort(key = lambda p: (p.x,p.y))
+
+        return Sequence(p.lines + [Line(linePoints)])
+    return sampler
+
+
+makeSyntheticData(circlesAndLine(2,1), "syntheticTrainingData/doubleCircleLine", 1000)
+assert False
 makeSyntheticData(multipleCircles(1), "syntheticTrainingData/individualCircle", 1000)
 makeSyntheticData(multipleCircles(2), "syntheticTrainingData/doubleCircle", 1000)
 makeSyntheticData(multipleCircles(3), "syntheticTrainingData/tripleCircle", 1000)
+
