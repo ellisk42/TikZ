@@ -12,6 +12,11 @@ import pickle
 
 learning_rate = 0.001
 
+TOKENS = range(3)
+STOP = TOKENS[0]
+CIRCLE = TOKENS[1]
+LINE = TOKENS[2]
+
 def loadImages(filenames):
     def processPicture(p):
         p = p.convert('L')
@@ -31,7 +36,7 @@ def loadExamples(numberOfExamples, filePrefix):
                               for j in range(numberOfExamples) ])
     startingExamples = []
     endingExamples = []
-    target = [[],[],[],[]]
+    target = [[],[],[],[],[]]
 
 
     # get one example from each line of each program
@@ -45,24 +50,34 @@ def loadExamples(numberOfExamples, filePrefix):
             currentImage = trace[k]
             if isinstance(l,Circle):
                 x,y = l.center.x,l.center.y
-                target[0].append(x)
-                target[1].append(y)
-                target[2].append(0)
+                target[0].append(CIRCLE)
+                target[1].append(x)
+                target[2].append(y)
                 target[3].append(0)
+                target[4].append(0)
             elif isinstance(l,Line):
-                target[0].append(l.points[0].x)
-                target[1].append(l.points[0].y)
-                target[2].append(l.points[1].x)
-                target[3].append(l.points[1].y)
+                target[0].append(LINE)
+                target[1].append(l.points[0].x)
+                target[2].append(l.points[0].y)
+                target[3].append(l.points[1].x)
+                target[4].append(l.points[1].y)
             else:
                 raise Exception('Unhandled line:'+str(l))
+        # end of program
+        startingExamples.append(targetImage)
+        endingExamples.append(targetImage)
+        target[0].append(STOP)
+        target[1].append(0)
+        target[2].append(0)
+        target[3].append(0)
+        target[4].append(0)
             
     targetVectors = [np.array(t) for t in target ]
     
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
 # we output 4 categorical distributions over ten choices
-OUTPUTDIMENSIONS = [10,10,10,10]
+OUTPUTDIMENSIONS = [len(TOKENS),10,10,10,10]
 
 class RecognitionModel():
     def __init__(self):
@@ -160,20 +175,20 @@ class RecognitionModel():
                     hardDecisions = s.run(self.hard,
                                           feed_dict = feed)
 
-                    if hardDecisions[2] == 0 and hardDecisions[3] == 0:
-                        currentProgram.append(Circle(AbsolutePoint(hardDecisions[0], hardDecisions[1]),1))
-                    else:
-                        currentProgram.append(Line([AbsolutePoint(hardDecisions[0], hardDecisions[1]),
-                                                    AbsolutePoint(hardDecisions[2], hardDecisions[3])]))
-
+                    if hardDecisions[0] == CIRCLE:
+                        currentProgram.append(Circle(AbsolutePoint(hardDecisions[1], hardDecisions[2]),1))
+                    elif hardDecisions[0] == LINE:
+                        currentProgram.append(Line([AbsolutePoint(hardDecisions[1], hardDecisions[2]),
+                                                    AbsolutePoint(hardDecisions[3], hardDecisions[4])]))
+                    elif hardDecisions[1] == STOP:
+                        break
+                    
                     p = str(Sequence(currentProgram))
                     print p,"\n"
                     currentImage = 1.0 - render([p],yieldsPixels = True)[0]
                     currentImage = np.reshape(currentImage, targetImage.shape)
                     showImage(currentImage[0])
 
-                    if len(currentProgram) > 2:
-                        break
                     
 
 if __name__ == '__main__':
