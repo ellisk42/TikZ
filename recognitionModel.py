@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import os
 from PIL import Image
+from time import time
 import pickle
 
 learning_rate = 0.001
@@ -17,12 +18,14 @@ STOP = TOKENS[0]
 CIRCLE = TOKENS[1]
 LINE = TOKENS[2]
 
-def loadImages(filenames):
+def loadImage(n):
+    if n == "blankImage": return np.zeros((300,300))
     def processPicture(p):
         p = p.convert('L')
         (w,h) = p.size
         return 1.0 - np.array(list(p.getdata())).reshape((h,w))/255.0
-    return [ processPicture(Image.open(n)) for n in filenames ]
+    return processPicture(Image.open(n))
+def loadImages(ns): return map(loadImage,ns)
 
 def showImage(image):
     plot.imshow(image,cmap = 'gray')
@@ -31,19 +34,21 @@ def showImage(image):
 def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
-def loadExamples(numberOfExamples, filePrefix):
+def loadExamples(numberOfExamples, filePrefix, dummyImages = True):
     programs = loadPrograms([ "%s-%d.p"%(filePrefix,j)
                               for j in range(numberOfExamples) ])
     startingExamples = []
     endingExamples = []
     target = [[],[],[],[],[]]
 
-
+    startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
-        trace = loadImages([ "%s-%d-%d.png"%(filePrefix, j, k) for k in range(len(program)) ])
+        trace = [ "%s-%d-%d.png"%(filePrefix, j, k) for k in range(len(program)) ]
+        if not dummyImages:
+            trace = loadImages(trace)
         targetImage = trace[-1]
-        currentImage = np.zeros(targetImage.shape)
+        currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
             startingExamples.append(currentImage)
             endingExamples.append(targetImage)
@@ -73,6 +78,8 @@ def loadExamples(numberOfExamples, filePrefix):
         target[4].append(0)
             
     targetVectors = [np.array(t) for t in target ]
+
+    print "loaded images in",(time() - startTime),"s"
     
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
@@ -81,14 +88,19 @@ OUTPUTDIMENSIONS = [len(TOKENS),10,10,10,10]
 
 class RecognitionModel():
     def __init__(self):
-        self.inputPlaceholder = tf.placeholder(tf.float32, [None, 300, 300, 2])
+        # current and goal images
+        self.currentPlaceholder = tf.placeholder(tf.float32, [None, 300, 300])
+        self.goalPlaceholder = tf.placeholder(tf.float32, [None, 300, 300])
         # what is the target category?
         self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in OUTPUTDIMENSIONS ]
         # do we actually care about the prediction made?
         #self.targetMaskPlaceholder = [ tf.placeholder(tf.float32, [None]) for _ in OUTPUTDIMENSIONS ]
 
+        imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
+        print "imageInput",imageInput
+
         numberOfFilters = [5]
-        c1 = tf.layers.conv2d(inputs = self.inputPlaceholder,
+        c1 = tf.layers.conv2d(inputs = imageInput,
                               filters = numberOfFilters[0],
                               kernel_size = [10,10],
                               padding = "same",
@@ -113,40 +125,41 @@ class RecognitionModel():
     def train(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
                                                                 "syntheticTrainingData/"+exampleType)
-        images = np.stack([partialImages,targetImages],3)
-
         initializer = tf.global_variables_initializer()
-        iterator = BatchIterator(50,tuple([images] + targetVectors))
+        iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
+                                 loadImage)
         saver = tf.train.Saver()
 
         with tf.Session() as s:
             s.run(initializer)
             for i in range(1000):
                 batchData = iterator.next()
-                feed = {self.inputPlaceholder: batchData[0]}
-                for placeholder,vector in zip(self.targetPlaceholder,batchData[1:]):
+                feed = {self.currentPlaceholder: batchData[0],
+                        self.goalPlaceholder: batchData[1]}
+                for placeholder,vector in zip(self.targetPlaceholder,batchData[2:]):
                     feed[placeholder] = vector
                 
                 _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                      feed_dict = feed)
                 if i%50 == 0:
-                    print i,accuracy,l
+                    print "Iteration %d (%f passes over the data): accuracy = %f, loss = %f"%(i,float(i)*iterator.batchSize/numberOfExamples,accuracy,l)
                 if i%100 == 0:
                     print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def test(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
-                                                                "syntheticTrainingData/"+exampleType)
-        images = np.stack([partialImages,targetImages],3)
-
+                                                                "syntheticTrainingData/"+exampleType,
+                                                                dummyImages = False)
         saver = tf.train.Saver()
         with tf.Session() as s:
             saver.restore(s,checkpoint)
-            feed = {self.inputPlaceholder:images}
+            feed = {self.currentPlaceholder: partialImages,
+                    self.goalPlaceholder: targetImages}
             for placeholder,vector in zip(self.targetPlaceholder,targetVectors):
                 feed[placeholder] = vector
+                
             outputs = s.run([self.averageAccuracy] + self.hard,
-                                   feed_dict = feed)
+                            feed_dict = feed)
             accuracy = outputs[0]
             predictions = outputs[1:]
             print "Average accuracy:",accuracy
@@ -171,7 +184,8 @@ class RecognitionModel():
                 currentProgram = []
 
                 while True:
-                    feed = {self.inputPlaceholder:np.stack([currentImage,targetImage],3)}
+                    feed = {self.currentPlaceholder:currentImage,
+                            self.goalPlaceholder: targetImage}
                     hardDecisions = s.run(self.hard,
                                           feed_dict = feed)
 
@@ -196,4 +210,4 @@ if __name__ == '__main__':
 #        RecognitionModel().test(100, "doubleCircleLine")
         RecognitionModel().draw(["syntheticTrainingData/doubleCircleLine-0-2.png"])
     else:
-        RecognitionModel().train(100, "doubleCircleLine")
+        RecognitionModel().train(1000, "randomObjects")

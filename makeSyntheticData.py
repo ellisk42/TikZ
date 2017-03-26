@@ -3,6 +3,7 @@ from language import *
 from render import render
 from PIL import Image
 import pickle
+from random import choice
 
 def makeSyntheticData(sample, filePrefix, k = 1000):
     """sample should return a program"""
@@ -44,9 +45,22 @@ def circlesAndLine(n,k):
         return Sequence(p.lines + [Line(linePoints)])
     return sampler
 
+def randomObjects(n):
+    def sample():
+        nl = choice([0,1,2])
+        nc = n - nl
+        p = multipleCircles(nc)()
 
+        lines = [ Line(sorted([AbsolutePoint.sample(),AbsolutePoint.sample()],
+                              key = lambda p: (p.x,p.y))) for _ in range(nl) ]
+        lines.sort(key = lambda l: (l.points[0].x,l.points[0].y))
+
+        return Sequence(p.lines + lines)
+    return sample
+
+
+makeSyntheticData(randomObjects(4), "syntheticTrainingData/randomObjects", 1000)
 makeSyntheticData(circlesAndLine(2,1), "syntheticTrainingData/doubleCircleLine", 1000)
-assert False
 makeSyntheticData(multipleCircles(1), "syntheticTrainingData/individualCircle", 1000)
 makeSyntheticData(multipleCircles(2), "syntheticTrainingData/doubleCircle", 1000)
 makeSyntheticData(multipleCircles(3), "syntheticTrainingData/tripleCircle", 1000)
