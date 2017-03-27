@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 
-def render(sources, showImage = False, output = None, yieldsPixels = False, canvas = (10,10), resolution = 256):
+def render(sources, showImage = False, output = None, yieldsPixels = False, canvas = (8,8), resolution = 256):
     # definitely do not try to render too much at once - I think this causes memory problems
     if len(sources) > 100:
         prefix = render(sources[:100], showImage, output, yieldsPixels, canvas, resolution)

@@ -41,9 +41,11 @@ def showImage(image):
 def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
-def loadExamples(numberOfExamples, filePrefix, dummyImages = True):
-    programs = loadPrograms([ "%s-%d.p"%(filePrefix,j)
-                              for j in range(numberOfExamples) ])
+def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
+    programNames = [ "syntheticTrainingData/%s-%d.p"%(filePrefix,j)
+                     for j in range(numberOfExamples)
+                     for filePrefix in filePrefixes ]
+    programs = loadPrograms(programNames)
     startingExamples = []
     endingExamples = []
     target = [[],[],[],[],[]]
@@ -51,7 +53,7 @@ def loadExamples(numberOfExamples, filePrefix, dummyImages = True):
     startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
-        trace = [ "%s-%d-%d.png"%(filePrefix, j, k) for k in range(len(program)) ]
+        trace = [ "%s-%d.png"%(programNames[j][:-2], k) for k in range(len(program)) ]
         if not dummyImages:
             trace = loadImages(trace)
         else:
@@ -106,9 +108,15 @@ class RecognitionModel():
         #self.targetMaskPlaceholder = [ tf.placeholder(tf.float32, [None]) for _ in OUTPUTDIMENSIONS ]
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
-        print "imageInput",imageInput
 
-        numberOfFilters = [1]
+        smallerInput = tf.layers.max_pooling2d(inputs = imageInput,
+                                               pool_size = 2,
+                                               strides = 2,
+                                               padding = "same")
+
+        print "smallerInput",smallerInput
+
+        numberOfFilters = [2]
         c1 = tf.layers.conv2d(inputs = imageInput,
                               filters = numberOfFilters[0],
                               kernel_size = [8,8],
@@ -120,7 +128,7 @@ class RecognitionModel():
                                      strides = 2,
                                      padding = "same")
         c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
-        print c1d
+        print "fully connected input dimensionality:",c1d
         
         f1 = tf.reshape(c1, [-1, c1d])
 
@@ -139,7 +147,7 @@ class RecognitionModel():
 
     def train(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
-                                                                "syntheticTrainingData/"+exampleType)
+                                                                exampleType)
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
                                  testingFraction = 0.1, stringProcessor = loadImage)
@@ -148,7 +156,7 @@ class RecognitionModel():
 
         with tf.Session() as s:
             s.run(initializer)
-            for i in range(100):
+            for i in range(1000):
                 _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                      feed_dict = iterator.nextFeed())
                 if i%50 == 0:
@@ -197,4 +205,4 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         RecognitionModel().draw(["syntheticTrainingData/doubleCircleLine-0-2.png"])
     else:
-        cProfile.run('RecognitionModel().train(1000, "doubleCircleLine")')
+        RecognitionModel().train(1000, ["doubleCircleLine"])

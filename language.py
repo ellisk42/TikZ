@@ -1,6 +1,6 @@
 from random import random,choice
 
-MAXIMUMCOORDINATE = 10
+MAXIMUMCOORDINATE = 8
 
 def makeLabel(j): return 'L'+str(j)
 LABELS = [ makeLabel(j) for j in range(4) ]
