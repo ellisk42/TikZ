@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plot
 from distanceMetrics import HausdorffDist
 from GA import GeneticAlgorithm
 from render import render,animateMatrices
@@ -10,13 +11,15 @@ t = str(time())
 seed(t)
 print "seed:",t
 
-testProgram = '''
-\\node(b)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (3,5) {};
-\\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
-\\draw[ultra thick] (4,5) -- (6,5);
-'''
-#render([testProgram],showImage = True)
-#assert False
+if False:
+    testProgram = '''
+    \\node(b)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (3,5) {};
+    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (9,5) {};
+    \\draw[ultra thick] (4,5) -- (6,5);
+    '''
+    plot.imshow(render([testProgram],showImage = False,yieldsPixels = True, resolution = 256)[0],cmap = 'gray')
+    plot.show()
+    assert False
 
 class InverseRender(GeneticAlgorithm):
     def __init__(self):

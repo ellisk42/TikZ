@@ -1,3 +1,4 @@
+import sys
 import os
 from language import *
 from render import render
@@ -5,7 +6,7 @@ from PIL import Image
 import pickle
 from random import choice
 
-def makeSyntheticData(sample, filePrefix, k = 1000):
+def makeSyntheticData(filePrefix, sample, k = 1000):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
     programPrefixes = [ [ Sequence(p.lines[:j]) for j in range(len(p)+1) ] for p in programs ]
@@ -24,6 +25,19 @@ def canonicalOrdering(circles):
     # sort the circles so that there are always drawn in a canonical order
     return sorted(circles, key = lambda c: (c.center.x, c.center.y))
 
+def horizontalOrVerticalLine():
+    x1 = randomCoordinate()
+    y1 = randomCoordinate()
+    if choice([True,False]):
+        y2 = y1
+        while y2 == y1: y2 = randomCoordinate()
+        points = [AbsolutePoint(x1,y1),AbsolutePoint(x1,y2)]
+    else:
+        x2 = x1
+        while x2 == x1: x2 = randomCoordinate()
+        points = [AbsolutePoint(x1,y1),AbsolutePoint(x2,y1)]
+    return Line(list(sorted(points, key = lambda p: (p.x,p.y))))
+
 def multipleCircles(n):
     def sampler():
         while True:
@@ -32,17 +46,14 @@ def multipleCircles(n):
                     for a in p
                     for b in p ]):
                 return Sequence(canonicalOrdering(p))
-    return sampler
+    return sampler            
 
 def circlesAndLine(n,k):
     getCircles = multipleCircles(n)
     def sampler():
         p = getCircles()
 
-        linePoints = [AbsolutePoint.sample(),AbsolutePoint.sample()]
-        linePoints.sort(key = lambda p: (p.x,p.y))
-
-        return Sequence(p.lines + [Line(linePoints)])
+        return Sequence(p.lines + [horizontalOrVerticalLine() for _ in range(k) ])
     return sampler
 
 def randomObjects(n):
@@ -59,9 +70,12 @@ def randomObjects(n):
     return sample
 
 
-makeSyntheticData(randomObjects(4), "syntheticTrainingData/randomObjects", 1000)
-makeSyntheticData(circlesAndLine(2,1), "syntheticTrainingData/doubleCircleLine", 1000)
-makeSyntheticData(multipleCircles(1), "syntheticTrainingData/individualCircle", 1000)
-makeSyntheticData(multipleCircles(2), "syntheticTrainingData/doubleCircle", 1000)
-makeSyntheticData(multipleCircles(3), "syntheticTrainingData/tripleCircle", 1000)
+if __name__ == '__main__':
+    generators = {"randomObjects": randomObjects(4),
+                  "individualCircle": multipleCircles(1),
+                  "doubleCircleLine": circlesAndLine(2,1),
+                  "doubleCircle": multipleCircles(2),
+                  "tripleCircle": multipleCircles(3)}
+    n = sys.argv[1]
+    makeSyntheticData("syntheticTrainingData/"+n, generators[n])
 
