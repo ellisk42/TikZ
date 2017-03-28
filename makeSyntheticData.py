@@ -47,7 +47,7 @@ def canonicalOrdering(circles):
 def horizontalOrVerticalLine():
     x1 = randomCoordinate()
     y1 = randomCoordinate()
-    if choice([True,False]) or True:
+    if choice([True,False]):
         y2 = y1
         while y2 == y1: y2 = randomCoordinate()
         points = [AbsolutePoint(x1,y1),AbsolutePoint(x1,y2)]
@@ -98,6 +98,16 @@ def randomObjects(n):
 
 
 if __name__ == '__main__':
+    #}challenge program
+    challenge = '''
+    \\node(b)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (5,2) {};
+    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (5,6) {};
+    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,6) {};
+    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,2) {};
+    \\draw[ultra thick] (5,3) -- (5,5);
+    '''
+    Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
+    
     generators = {"randomObjects": randomObjects(4),
                   "individualCircle": multipleCircles(1),
                   "doubleCircleLine": circlesAndLine(2,1),

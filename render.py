@@ -52,9 +52,14 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
         for temporaryImage in temporaryImages:
             im = Image.open(temporaryImage).convert('L')
             (width, height) = im.size
+            if width != resolution or height != resolution:
+                # print "Got a bad resolution:",im.size
+                # print source
+                # assert False
+                im = im.resize((resolution,resolution))
             greyscale_map = list(im.getdata())
             greyscale_map = np.array(greyscale_map)
-            greyscale_map = greyscale_map.reshape((height, width))
+            greyscale_map = greyscale_map.reshape((resolution, resolution))
             returnValue.append(greyscale_map/255.0)
 
 
@@ -77,8 +82,9 @@ def animateMatrices(matrices):
     plot.show()
 
 if __name__ == "__main__":
-    inputFile = sys.argv[1]
-    outputFile = sys.argv[2]
-    i = sys.stdin if inputFile == '-' else open(inputFile, "r")
-    source = i.read()
-    render(source, outputFile)
+    render([challenge],showImage = True,yieldsPixels = True)[0]
+    # inputFile = sys.argv[1]
+    # outputFile = sys.argv[2]
+    # i = sys.stdin if inputFile == '-' else open(inputFile, "r")
+    # source = i.read()
+    # render(source, outputFile)

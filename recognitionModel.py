@@ -42,6 +42,7 @@ def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
 def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
+    print "Loading examples from these prefixes: %s"%(" ".join(filePrefixes))
     programNames = [ "syntheticTrainingData/%s-%d.p"%(filePrefix,j)
                      for j in range(numberOfExamples)
                      for filePrefix in filePrefixes ]
@@ -109,14 +110,14 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        smallerInput = tf.layers.max_pooling2d(inputs = imageInput,
-                                               pool_size = 2,
-                                               strides = 2,
-                                               padding = "same")
+        # smallerInput = tf.layers.max_pooling2d(inputs = imageInput,
+        #                                        pool_size = 2,
+        #                                        strides = 2,
+        #                                        padding = "same")
 
-        print "smallerInput",smallerInput
+        # print "smallerInput",smallerInput
 
-        numberOfFilters = [2]
+        numberOfFilters = [3]
         c1 = tf.layers.conv2d(inputs = imageInput,
                               filters = numberOfFilters[0],
                               kernel_size = [8,8],
@@ -167,7 +168,7 @@ class RecognitionModel():
                     print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def draw(self, targetImages, checkpoint = "/tmp/model.checkpoint"):
-        targetImages = [np.reshape(i,(1,300,300)) for i in loadImages(targetImages) ]
+        targetImages = [np.reshape(i,(1,256,256)) for i in loadImages(targetImages) ]
         saver = tf.train.Saver()
         with tf.Session() as s:
             saver.restore(s,checkpoint)
@@ -190,9 +191,14 @@ class RecognitionModel():
                     elif hardDecisions[0] == LINE:
                         currentProgram.append(Line([AbsolutePoint(hardDecisions[1], hardDecisions[2]),
                                                     AbsolutePoint(hardDecisions[3], hardDecisions[4])]))
-                    elif hardDecisions[1] == STOP:
+                    elif hardDecisions[0] == STOP:
+                        print "STOP"
                         break
-                    
+
+                    if len(currentProgram) > 5:
+                        print "program got too long"
+                        break
+                                        
                     p = str(Sequence(currentProgram))
                     print p,"\n"
                     currentImage = 1.0 - render([p],yieldsPixels = True)[0]
@@ -203,6 +209,6 @@ class RecognitionModel():
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().draw(["syntheticTrainingData/doubleCircleLine-0-2.png"])
+        RecognitionModel().draw(["challenge.png"])
     else:
-        RecognitionModel().train(1000, ["doubleCircleLine"])
+        RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle"])
