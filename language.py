@@ -22,6 +22,9 @@ class AbsolutePoint():
     def sample():
         return AbsolutePoint(randomCoordinate(), randomCoordinate())
 
+    def __eq__(self,o):
+        return self.x == o.x and self.y == o.y
+
     def __str__(self):
         return "(%d,%d)"%(self.x,self.y)
 
@@ -82,6 +85,11 @@ class Line():
         return Line([samplePoint(),samplePoint()], random() > 0.5)
     def isValid(self, parents):
         return all([p.isValid(parents) for p in self.points ])
+
+    @staticmethod
+    def absolute(x1,y1,x2,y2):
+        return Line([AbsolutePoint(x1,y1),
+                     AbsolutePoint(x2,y2)])
 
 class Rectangle():
     def __init__(self, p1, p2):

@@ -22,6 +22,14 @@ def lineIntersectsCircle(l,c):
     else:
         raise Exception('arbitrary lines not yet supported')
 
+def lineIntersectsLine(p,q):
+    def ccw(A,B,C):
+        return (C.y-A.y) * (B.x-A.x) > (B.y-A.y) * (C.x-A.x)
+    overlapping = ccw(p.points[0],q.points[0],q.points[1]) != ccw(p.points[1],q.points[0],q.points[1]) and ccw(p.points[0],p.points[1],q.points[0]) != ccw(p.points[0],p.points[1],q.points[1])
+    touching = p.points[0] == q.points[0] or p.points[1] == q.points[0] or p.points[0] == q.points[1] or p.points[1] == q.points[1]
+    return overlapping or touching
+
+
 def makeSyntheticData(filePrefix, sample, k = 1000):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
@@ -70,17 +78,24 @@ def multipleCircles(n):
 def circlesAndLine(n,k):
     getCircles = multipleCircles(n)
     def sampler():
-        p = getCircles()
-        while len(p) < n + k:
+        cs = getCircles().lines
+        ls = []
+        while len(ls) < k:
             l = horizontalOrVerticalLine()
             # check to intersect any of the circles
             failure = False
-            for c in p.lines:
-                if isinstance(c,Circle) and lineIntersectsCircle(l,c):
+            for c in cs:
+                if lineIntersectsCircle(l,c):
                     failure = True
                     break
-            if not failure: p = Sequence(p.lines + [l])
-        return p
+            for c in ls:
+                if lineIntersectsLine(c,l):
+                    failure = True
+                    break
+                
+            if not failure: ls.append(l)
+        ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y))
+        return Sequence(cs + ls)
     return sampler
 
 def randomObjects(n):
@@ -105,12 +120,14 @@ if __name__ == '__main__':
     \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,6) {};
     \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,2) {};
     \\draw[ultra thick] (5,3) -- (5,5);
+    \\draw[ultra thick] (2,3) -- (2,5);
     '''
     Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
     
     generators = {"randomObjects": randomObjects(4),
                   "individualCircle": multipleCircles(1),
                   "doubleCircleLine": circlesAndLine(2,1),
+                  "doubleLine": circlesAndLine(0,2),
                   "doubleCircle": multipleCircles(2),
                   "tripleCircle": multipleCircles(3)}
     n = sys.argv[1]

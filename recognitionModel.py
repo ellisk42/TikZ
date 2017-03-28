@@ -136,6 +136,7 @@ class RecognitionModel():
         self.prediction = [ tf.layers.dense(f1, dimension, activation = None) for dimension in OUTPUTDIMENSIONS ]
 
         self.hard = [ tf.cast(tf.argmax(p,dimension = 1),tf.int32) for p in self.prediction ]
+        self.logSoft = [ tf.nn.log_softmax(p) for p in self.prediction ]
 
         self.averageAccuracy = reduce(tf.logical_and,
                                       [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)])
@@ -157,7 +158,7 @@ class RecognitionModel():
 
         with tf.Session() as s:
             s.run(initializer)
-            for i in range(1000):
+            for i in range(10000):
                 _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                      feed_dict = iterator.nextFeed())
                 if i%50 == 0:
@@ -167,48 +168,77 @@ class RecognitionModel():
                 if i%100 == 0:
                     print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
-    def draw(self, targetImages, checkpoint = "/tmp/model.checkpoint"):
-        targetImages = [np.reshape(i,(1,256,256)) for i in loadImages(targetImages) ]
+    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
+        targetImage = loadImage(targetImage)
+        targetImage = np.reshape(targetImage,(256,256))
+        beam = [{'program': [],
+                 'output': np.zeros(targetImage.shape),
+                 'logLikelihood': 0.0}]
+        # once a program is finished we wrap it up in a sequence object
+        def finished(x): return isinstance(x['program'], Sequence)
+        
         saver = tf.train.Saver()
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for targetImage in targetImages:
-                showImage(targetImage[0])
+            for iteration in range(7):
+                feed = {self.currentPlaceholder: np.array([x['output'] for x in beam ]),
+                        self.goalPlaceholder: np.array([targetImage for _ in beam ])}
+                decisions = s.run(self.logSoft,
+                                  feed_dict = feed)
 
-                currentImage = np.zeros(targetImage.shape)
-                
-                currentProgram = []
+                children = []
+                for j,n in enumerate(beam):
+                    if finished(n): continue
+                    
+                    p1 = [ (decisions[1][j][x] + decisions[2][j][y], (x,y))
+                           for x in range(OUTPUTDIMENSIONS[1])
+                           for y in range(OUTPUTDIMENSIONS[2]) ]
+                    p2 = [ (decisions[3][j][x] + decisions[4][j][y], (x,y))
+                           for x in range(OUTPUTDIMENSIONS[3])
+                           for y in range(OUTPUTDIMENSIONS[4]) ]
+                    command = [ (decisions[0][j][c], c)
+                                for c in range(OUTPUTDIMENSIONS[0]) ]
 
-                while True:
-                    feed = {self.currentPlaceholder:currentImage,
-                            self.goalPlaceholder: targetImage}
-                    hardDecisions = s.run(self.hard,
-                                          feed_dict = feed)
+                    lineChildren = [{'program': n['program'] + [Line.absolute(x1,y1,x2,y2)],
+                                     'logLikelihood': n['logLikelihood'] + ll1 + ll2 + ll3}
+                                     for (ll1,c) in command
+                                    for (ll2,(x1,y1)) in p1
+                                    for (ll3,(x2,y2)) in p2
+                                    if c == LINE ]
 
-                    if hardDecisions[0] == CIRCLE:
-                        currentProgram.append(Circle(AbsolutePoint(hardDecisions[1], hardDecisions[2]),1))
-                    elif hardDecisions[0] == LINE:
-                        currentProgram.append(Line([AbsolutePoint(hardDecisions[1], hardDecisions[2]),
-                                                    AbsolutePoint(hardDecisions[3], hardDecisions[4])]))
-                    elif hardDecisions[0] == STOP:
-                        print "STOP"
-                        break
+                    circleChildren = [{'program': n['program'] + [Circle(AbsolutePoint(x1,y1),1)],
+                                     'logLikelihood': n['logLikelihood'] + ll1 + ll2 + ll3}
+                                     for (ll1,c) in command
+                                    for (ll2,(x1,y1)) in p1
+                                    for (ll3,(x2,y2)) in p2
+                                    if c == CIRCLE and x2 == 0 and y2 == 0 ]
 
-                    if len(currentProgram) > 5:
-                        print "program got too long"
-                        break
-                                        
-                    p = str(Sequence(currentProgram))
-                    print p,"\n"
-                    currentImage = 1.0 - render([p],yieldsPixels = True)[0]
-                    currentImage = np.reshape(currentImage, targetImage.shape)
-                    showImage(currentImage[0])
+                    stopChildren = [{'program': Sequence(n['program']),
+                                     'logLikelihood': n['logLikelihood'] + ll1}
+                                     for (ll1,c) in command
+                                    if c == STOP ]
+
+                    children += (lineChildren + circleChildren + stopChildren)
+                beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
+                outputs = render([ str(n['program'] if finished(n) else Sequence(n['program']))
+                                   for n in beam ],
+                                 yieldsPixels = True)
+                for n,o in zip(beam,outputs): n['output'] = 1.0 - o
+
+                # Show all of the finished programs
+                for n in beam:
+                    if finished(n):
+                        print "Finished program:"
+                        print n['program']
+                        print ""
+                        showImage(n['output'])
+                        
 
                     
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().draw(["challenge.png"])
+        RecognitionModel().beam("challenge.png",beamSize = 10)
     else:
-        RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle"])
+        RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle","doubleLine"])
