@@ -66,7 +66,7 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
     os.system("rm %s*" % temporaryPrefix)
     if returnValue != []: return returnValue
 
-def animateMatrices(matrices):
+def animateMatrices(matrices,outputFilename = None):
     fig = plot.figure() # make figure
     im = plot.imshow(matrices[0], cmap=plot.get_cmap('bone'), vmin=0.0, vmax=1.0)
 
@@ -79,6 +79,8 @@ def animateMatrices(matrices):
     # kick off the animation
     ani = animation.FuncAnimation(fig, updatefig, frames=range(len(matrices)), 
                               interval=50, blit=True)
+    if outputFilename != None:
+        ani.save(outputFilename, dpi = 80,writer = 'imagemagick')
     plot.show()
 
 if __name__ == "__main__":

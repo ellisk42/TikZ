@@ -23,6 +23,7 @@ class AbsolutePoint():
         return AbsolutePoint(randomCoordinate(), randomCoordinate())
 
     def __eq__(self,o):
+        if not isinstance(o,AbsolutePoint): return False
         return self.x == o.x and self.y == o.y
 
     def __str__(self):

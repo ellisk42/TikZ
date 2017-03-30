@@ -48,7 +48,7 @@ class GeneticAlgorithm():
                 bestHistory.append(bestIndividual)
             population = [ individual[1] for individual in population ]
 
-            if bestFitness > 0.1:
+            if bestFitness > -1.0:
                 print "Terminating early"
                 break
             

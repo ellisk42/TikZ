@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plot
+from utilities import *
 from distanceMetrics import HausdorffDist
 from GA import GeneticAlgorithm
 from render import render,animateMatrices
@@ -23,16 +24,18 @@ if False:
 
 class InverseRender(GeneticAlgorithm):
     def __init__(self):
-        self.originalProgram = Sequence([Circle(AbsolutePoint(3,3),1),
-                                         Circle(AbsolutePoint(8,3),1),
-                                         Circle(AbsolutePoint(3,6),1),
-                                         Circle(AbsolutePoint(8,6),1),
-                                         Line([AbsolutePoint(4,3),AbsolutePoint(7,3)], True)])
-        self.target = render([str(self.originalProgram)], showImage = True, yieldsPixels = True)[0]
-        self.targetPoints = np.column_stack(np.where(self.target < 0.5))
+        # self.originalProgram = Sequence([Circle(AbsolutePoint(3,3),1),
+        #                                  Circle(AbsolutePoint(8,3),1),
+        #                                  Circle(AbsolutePoint(3,6),1),
+        #                                  Circle(AbsolutePoint(8,6),1),
+        #                                  Line([AbsolutePoint(4,3),AbsolutePoint(7,3)], True)])
+        # self.target = render([str(self.originalProgram)], showImage = True, yieldsPixels = True)[0]
+        self.target = loadImage("challenge.png")
+        showImage(self.target)
+        self.targetPoints = np.column_stack(np.where(self.target > 0.5))
         self.history = {}
 
-        print "Program that we are trying to match:",self.originalProgram
+        #print "Program that we are trying to match:",self.originalProgram
 
         self.cumulativeRenderTime = 0.0
 
@@ -48,7 +51,7 @@ class InverseRender(GeneticAlgorithm):
         if toRender != []:
             renders = render(toRender, yieldsPixels = True)
             for r,p in zip(renders, toRender):
-                self.history[p] = r
+                self.history[p] = 1.0 - r
         return [self.history[p] for p in programs ]
 
     def mapFitness(self, programs):
@@ -60,8 +63,8 @@ class InverseRender(GeneticAlgorithm):
         print "Got pixels, calculating distance"
 
         def f(x): # fitness
-            if False:
-                points = np.column_stack(np.where(x < 0.5))
+            if True:
+                points = np.column_stack(np.where(x > 0.5))
                 if len(points) > 0:
                     return -HausdorffDist(points, self.targetPoints)
                 else:
@@ -75,5 +78,5 @@ class InverseRender(GeneticAlgorithm):
 r = InverseRender()
 _,history = r.beam(100, 5, 10)
 print "Rendered",len(r.history),"images in",(r.cumulativeRenderTime),"seconds."
-animateMatrices([ render([str(x)], yieldsPixels = True)[0] for x in history ])
+animateMatrices([ render([str(x)], yieldsPixels = True)[0] for x in history ],"stochasticHausdorffDist.gif")
 

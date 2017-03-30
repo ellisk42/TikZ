@@ -1,16 +1,13 @@
 from batch import BatchIterator
 from language import *
-from render import render
+from render import render,animateMatrices
+from utilities import *
 
-import matplotlib.pyplot as plot
 import sys
-import numpy as np
 import tensorflow as tf
 import os
-from PIL import Image
 from time import time
 import pickle
-import io
 import cProfile
 
 learning_rate = 0.001
@@ -20,23 +17,6 @@ STOP = TOKENS[0]
 CIRCLE = TOKENS[1]
 LINE = TOKENS[2]
 
-IMAGEBYTES = {}
-def loadImage(n):
-    if n == "blankImage": return np.zeros((256,256))
-    def processPicture(p):
-        # most of the time is spent in here for some reason
-        p = p.convert('L')
-        (w,h) = p.size
-        return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
-    if not n in IMAGEBYTES:
-        with open(n,'rb') as handle:
-            IMAGEBYTES[n] = handle.read()
-    return processPicture(Image.open(io.BytesIO(IMAGEBYTES[n])))
-def loadImages(ns): return map(loadImage,ns)
-
-def showImage(image):
-    plot.imshow(image,cmap = 'gray')
-    plot.show()
 
 def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
@@ -96,7 +76,7 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
 # we output 4 categorical distributions over ten choices
-OUTPUTDIMENSIONS = [len(TOKENS),10,10,10,10]
+OUTPUTDIMENSIONS = [len(TOKENS),8,8,8,8]
 
 class RecognitionModel():
     def __init__(self):
@@ -169,6 +149,7 @@ class RecognitionModel():
                     print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
+        totalNumberOfRenders = 0
         targetImage = loadImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [{'program': [],
@@ -224,15 +205,19 @@ class RecognitionModel():
                 outputs = render([ str(n['program'] if finished(n) else Sequence(n['program']))
                                    for n in beam ],
                                  yieldsPixels = True)
+                totalNumberOfRenders += len(beam)
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
+                print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
                 # Show all of the finished programs
                 for n in beam:
                     if finished(n):
                         print "Finished program:"
                         print n['program']
+                        print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                         print ""
-                        showImage(n['output'])
+                        trace = [str(Sequence(n['program'].lines[:j])) for j in range(len(n['program'])+1) ]
+                        animateMatrices(render(trace,yieldsPixels = True),"neuralAnimation.gif")
                         
 
                     
