@@ -3,6 +3,7 @@ from language import *
 from render import render,animateMatrices
 from utilities import *
 
+
 import sys
 import tensorflow as tf
 import os
@@ -60,10 +61,8 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
     
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
-class CircleDecoder():
-    def __init__(self, imageRepresentation):
-        self.outputDimensions = [8,8] # x,y
-
+class StandardPrimitiveDecoder():
+    def makeNetwork(self,imageRepresentation):
         self.prediction = []
         self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in self.outputDimensions ]
         predictionInputs = imageRepresentation
@@ -81,66 +80,65 @@ class CircleDecoder():
     def accuracyVector(self):
         return reduce(tf.logical_and,
                       [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)])
-        
-    def token(self): return CIRCLE
     def placeholders(self): return self.targetPlaceholder
 
-    def beam(self, session, feed):
-        def enumerateTraces(j):
-            traces = []
-            if j == len(self.outputDimensions): return [(0,[])]
-            distribution = session.run(self.soft[j], feed_dict = feed)[0]
-            for x,s in enumerate(distribution):
-                feed[self.targetPlaceholder[j]] = np.array([x])
-                for suffixScore,suffix in enumerateTraces(j+1):
-                    traces.append((s + suffixScore, [x]+suffix))
-            del feed[self.targetPlaceholder[j]]
-            return traces
+    def beamTrace(self, session, feed, beamSize):
+        originalFeed = feed
+        feed = dict([(k,feed[k]) for k in feed])
+        
+        traces = [(0.0,[])]
+        for j in range(len(self.outputDimensions)):
+            for k in range(j):
+                feed[self.targetPlaceholder[k]] = np.array([ t[1][k] for t in traces ])
+            for p in originalFeed:
+                feed[p] = np.repeat(originalFeed[p], len(traces), axis = 0)
+            soft = session.run(self.soft[j], feed_dict = feed)
+            traces = [(s + coordinateScore, trace + [coordinateIndex])
+                  for traceIndex,(s,trace) in enumerate(traces)
+                  for coordinateIndex,coordinateScore in enumerate(soft[traceIndex]) ]
+            traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
+        return traces
+            
+
+
+class CircleDecoder(StandardPrimitiveDecoder):
+    def __init__(self, imageRepresentation):
+        self.outputDimensions = [8,8] # x,y
+        self.makeNetwork(imageRepresentation)
+            
+    def token(self): return CIRCLE
+
+    def beam(self, session, feed, beamSize):
         return [(s, Circle(AbsolutePoint(x,y),1))
-                for s,[x,y] in enumerateTraces(0) ]
+                for s,[x,y] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
     def extractTargets(l):
         if isinstance(l,Circle): return [l.center.x,l.center.y]
         return [0,0]
 
-class LineDecoder():
+class LineDecoder(StandardPrimitiveDecoder):
     def __init__(self, imageRepresentation):
         self.outputDimensions = [8,8,8,8] # x,y for beginning and end
+        self.makeNetwork(imageRepresentation)
 
-        self.prediction = []
-        self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in self.outputDimensions ]
-        predictionInputs = imageRepresentation
-        for j,d in enumerate(self.outputDimensions):
-            self.prediction.append(tf.layers.dense(predictionInputs, d, activation = None))
-            predictionInputs = tf.concat([predictionInputs,
-                                          tf.one_hot(self.targetPlaceholder[j], d)],
-                                         axis = 1)
-        self.hard = [ tf.cast(tf.argmax(p,dimension = 1),tf.int32) for p in self.prediction ]
-        self.soft = [tf.nn.log_softmax(p) for p in self.prediction ]
-
-    def loss(self):
-        return sum([ tf.nn.sparse_softmax_cross_entropy_with_logits(labels = l, logits = p)
-                     for l,p in zip(self.targetPlaceholder, self.prediction) ])
-    def accuracyVector(self):
-        return reduce(tf.logical_and,
-                      [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)])
     def token(self): return LINE
-    def placeholders(self): return self.targetPlaceholder
-    def beam(self, session, feed):
-        def enumerateTraces(j):
-            traces = []
-            if j == len(self.outputDimensions): return [(0,[])]
-            distribution = session.run(self.soft[j], feed_dict = feed)[0]
-            for x,s in enumerate(distribution):
-                feed[self.targetPlaceholder[j]] = np.array([x])
-                for suffixScore,suffix in enumerateTraces(j+1):
-                    traces.append((s + suffixScore, [x]+suffix))
-            del feed[self.targetPlaceholder[j]]
-            return traces
-        
+    def beam(self, session, feed, beamSize):
+        # def enumerateTraces(j):
+        #     traces = []
+        #     if j == len(self.outputDimensions): return [(0,[])]
+        #     distribution = session.run(self.soft[j], feed_dict = feed)[0]
+        #     for x,s in enumerate(distribution):
+        #         feed[self.targetPlaceholder[j]] = np.array([x])
+        #         for suffixScore,suffix in enumerateTraces(j+1):
+        #             traces.append((s + suffixScore, [x]+suffix))
+        #     del feed[self.targetPlaceholder[j]]
+        #     return traces
+
         return [(s, Line.absolute(x1,y1,x2,y2))
-                for s,[x1,y1,x2,y2] in enumerateTraces(0) ]
+                for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize) ]
+        # return [(s, Line.absolute(x1,y1,x2,y2))
+        #         for s,[x1,y1,x2,y2] in enumerateTraces(0) ]
 
     @staticmethod
     def extractTargets(l):
@@ -203,13 +201,13 @@ class PrimitiveDecoder():
         if isinstance(l,Line): t = [LINE]
         return t + CircleDecoder.extractTargets(l) + LineDecoder.extractTargets(l)
 
-    def beam(self, session, feed):
+    def beam(self, session, feed, beamSize):
         tokenScores = session.run(self.soft, feed_dict = feed)[0]
         b = [(tokenScores[STOP], None)] # STOP
         for d in self.decoders:
             if d.token() == STOP: continue
             b += [ (s + tokenScores[d.token()], program)
-                   for (s, program) in d.beam(session, feed) ]
+                   for (s, program) in d.beam(session, feed, beamSize) ]
         return b
 
 class RecognitionModel():
@@ -286,7 +284,7 @@ class RecognitionModel():
                             self.goalPlaceholder: np.array([targetImage])}
 
                     
-                    for childScore,suffix in self.decoder.beam(s, feed):
+                    for childScore,suffix in self.decoder.beam(s, feed, beamSize):
                         if suffix == None:
                             k = Sequence(parent['program'])
                         else:
@@ -302,8 +300,6 @@ class RecognitionModel():
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
-                print "Best program so far:"
-                print beam[0]['program']
                 # Show all of the finished programs
                 for n in beam:
                     if finished(n):
@@ -319,6 +315,6 @@ class RecognitionModel():
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().beam("challenge.png",beamSize = 10)
+        RecognitionModel().beam("challenge.png",beamSize = 1)
     else:
         RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle","doubleLine"])
