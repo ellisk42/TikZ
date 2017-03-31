@@ -39,6 +39,16 @@ class BatchIterator():
     def nextFeed(self):
         return dict(zip(self.placeholders, self.next()))
 
+    def epochFeeds(self):
+        while True:
+            yield self.nextFeed()
+            if self.startingIndex == 0:
+                # rerandomize
+                permutation = np.random.permutation(range(self.tensors[0].shape[0]))
+                self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in self.tensors ]
+                break
+            
+
     def testingExamples(self):
         return tuple([ self.processTensor(t) for t in self.testingTensors ])
 

@@ -119,7 +119,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
 
 class LineDecoder(StandardPrimitiveDecoder):
     def __init__(self, imageRepresentation):
-        self.outputDimensions = [8,8,8,8] # x,y for beginning and end
+        self.outputDimensions = [8,8,8,8,2,2] # x,y for beginning and end; arrow/-
         self.makeNetwork(imageRepresentation)
 
     def token(self): return LINE
@@ -135,10 +135,8 @@ class LineDecoder(StandardPrimitiveDecoder):
         #     del feed[self.targetPlaceholder[j]]
         #     return traces
 
-        return [(s, Line.absolute(x1,y1,x2,y2))
-                for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize) ]
-        # return [(s, Line.absolute(x1,y1,x2,y2))
-        #         for s,[x1,y1,x2,y2] in enumerateTraces(0) ]
+        return [(s, Line.absolute(x1,y1,x2,y2,arrow = arrow,solid = solid))
+                for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
     def extractTargets(l):
@@ -146,8 +144,10 @@ class LineDecoder(StandardPrimitiveDecoder):
             return [l.points[0].x,
                     l.points[0].y,
                     l.points[1].x,
-                    l.points[1].y]
-        return [0]*4
+                    l.points[1].y,
+                    int(l.arrow),
+                    int(l.solid)]
+        return [0]*6
 
 class StopDecoder():
     def __init__(self, imageRepresentation):
@@ -218,7 +218,7 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        numberOfFilters = [3]
+        numberOfFilters = [5]
         c1 = tf.layers.conv2d(inputs = imageInput,
                               filters = numberOfFilters[0],
                               kernel_size = [8,8],
@@ -253,14 +253,18 @@ class RecognitionModel():
 
         with tf.Session() as s:
             s.run(initializer)
-            for i in range(10000):
-                _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
-                                     feed_dict = iterator.nextFeed())
-                if i%50 == 0:
-                    print "Iteration %d (%f passes over the data): accuracy = %f, loss = %f"%(i,float(i)*iterator.batchSize/numberOfExamples,accuracy,l)
-                    print "\tTesting accuracy = %f"%(s.run(self.averageAccuracy,
-                                                           feed_dict = iterator.testingFeed()))
-                if i%100 == 0:
+            for e in range(100):
+                epicLoss = []
+                epicAccuracy = []
+                for feed in iterator.epochFeeds():
+                    _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
+                                         feed_dict = feed)
+                    epicLoss.append(l)
+                    epicAccuracy.append(accuracy)
+                print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
+                print "\tTesting accuracy = %f"%(s.run(self.averageAccuracy,
+                                                       feed_dict = iterator.testingFeed()))
+                if e%10 == 0:
                     print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):

@@ -63,13 +63,15 @@ def horizontalOrVerticalLine():
         x2 = x1
         while x2 == x1: x2 = randomCoordinate()
         points = [AbsolutePoint(x1,y1),AbsolutePoint(x2,y1)]
-    return Line(list(sorted(points, key = lambda p: (p.x,p.y))))
+    return Line(list(sorted(points, key = lambda p: (p.x,p.y))),
+                solid = random() > 0.5,
+                arrow = random() > 0.5)
 
 def multipleCircles(n):
     def sampler():
         while True:
             p = [Circle.sample() for _ in range(n) ]
-            if all([ a == b or (a.center.x-b.center.x)**2 + (a.center.y-b.center.y)**2 > 4
+            if all([ a == b or (a.center.x-b.center.x)**2 + (a.center.y-b.center.y)**2 > (a.radius+b.radius)**2
                     for a in p
                     for b in p ]):
                 return Sequence(canonicalOrdering(p))
@@ -100,6 +102,7 @@ def circlesAndLine(n,k):
 
 def randomObjects(n):
     def sample():
+        assert False
         nl = choice([0,1,2])
         nc = n - nl
         p = multipleCircles(nc)()
@@ -119,8 +122,8 @@ if __name__ == '__main__':
     \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (5,6) {};
     \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,6) {};
     \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,2) {};
-    \\draw[ultra thick] (5,3) -- (5,5);
-    \\draw[ultra thick] (2,3) -- (2,5);
+    \\draw[ultra thick,dashed] (5,3) -- (5,5);
+    \\draw[ultra thick,->] (2,3) -- (2,5);
     '''
     Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
     
@@ -130,6 +133,7 @@ if __name__ == '__main__':
                   "doubleLine": circlesAndLine(0,2),
                   "doubleCircle": multipleCircles(2),
                   "tripleCircle": multipleCircles(3)}
-    n = sys.argv[1]
-    makeSyntheticData("syntheticTrainingData/"+n, generators[n])
+    for n in sys.argv[1:]:
+        print n
+        makeSyntheticData("syntheticTrainingData/"+n, generators[n])
 

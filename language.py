@@ -65,13 +65,17 @@ def samplePoint():
 
 
 class Line():
-    def __init__(self, points, arrow = False):
+    def __init__(self, points, arrow = False, solid = True):
         self.points = points
         self.arrow = arrow
+        self.solid = solid
         
     def __str__(self):
-        a = ",->" if self.arrow else ""
-        return "\\draw [ultra thick%s] %s;" % (a," -- ".join([str(p) for p in self.points ]))
+        attributes = ["ultra thick"]
+        if self.arrow: attributes += ["->"]
+        if not self.solid: attributes += ["dashed"]
+        a = ",".join(attributes)
+        return "\\draw [%s] %s;" % (a," -- ".join([str(p) for p in self.points ]))
     
     def mutate(self):
         if random() < 0.2: return Line(self.points, not self.arrow)
@@ -88,9 +92,11 @@ class Line():
         return all([p.isValid(parents) for p in self.points ])
 
     @staticmethod
-    def absolute(x1,y1,x2,y2):
+    def absolute(x1,y1,x2,y2, arrow = False, solid = True):
         return Line([AbsolutePoint(x1,y1),
-                     AbsolutePoint(x2,y2)])
+                     AbsolutePoint(x2,y2)],
+                    arrow = arrow,
+                    solid = solid)
 
 class Rectangle():
     def __init__(self, p1, p2):
