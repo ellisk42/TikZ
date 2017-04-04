@@ -5,9 +5,16 @@ Created on Mon Jun 16 23:56:41 2014
 """
 import numpy as np
 from numpy.core.umath_tests import inner1d
+import cv2
 # A = np.array([[1,2],[3,4],[5,6],[7,8]])
 # B = np.array([[2,3],[4,5],[6,7],[8,9],[10,11]])
 
+
+def blurredDistance(a,b):
+    a = cv2.GaussianBlur(a,(61,61),sigmaX = 15)
+    b = cv2.GaussianBlur(b,(61,61),sigmaX = 15)
+    return -np.sum(np.abs(a - b))
+    
 
 # Hausdorff Distance
 def HausdorffDist(A,B):

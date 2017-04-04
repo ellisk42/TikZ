@@ -109,7 +109,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
     def token(self): return CIRCLE
 
     def beam(self, session, feed, beamSize):
-        return [(s, Circle(AbsolutePoint(x,y),1))
+        return [(s, Circle(AbsolutePoint(Number(x),Number(y)),Number(1)))
                 for s,[x,y] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
@@ -135,7 +135,7 @@ class LineDecoder(StandardPrimitiveDecoder):
         #     del feed[self.targetPlaceholder[j]]
         #     return traces
 
-        return [(s, Line.absolute(x1,y1,x2,y2,arrow = arrow,solid = solid))
+        return [(s, Line.absolute(Number(x1),Number(y1),Number(x2),Number(y2),arrow = arrow,solid = solid))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
@@ -246,7 +246,7 @@ class RecognitionModel():
                                                                 exampleType)
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.1, stringProcessor = loadImage)
+                                 testingFraction = 0.05, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -264,8 +264,7 @@ class RecognitionModel():
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
                 print "\tTesting accuracy = %f"%(s.run(self.averageAccuracy,
                                                        feed_dict = iterator.testingFeed()))
-                if e%10 == 0:
-                    print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+                print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
         totalNumberOfRenders = 0
@@ -297,7 +296,7 @@ class RecognitionModel():
                                          'logLikelihood': parent['logLikelihood'] + childScore})
                 
                 beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
-                outputs = render([ str(n['program'] if finished(n) else Sequence(n['program']))
+                outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
                                    for n in beam ],
                                  yieldsPixels = True)
                 totalNumberOfRenders += len(beam)
@@ -308,10 +307,10 @@ class RecognitionModel():
                 for n in beam:
                     if finished(n):
                         print "Finished program:"
-                        print n['program']
+                        print n['program'].TikZ()
                         print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                         print ""
-                        trace = [str(Sequence(n['program'].lines[:j])) for j in range(len(n['program'])+1) ]
+                        trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
                         animateMatrices(render(trace,yieldsPixels = True),"neuralAnimation.gif")
                         
 
@@ -319,6 +318,6 @@ class RecognitionModel():
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().beam("challenge.png",beamSize = 1)
+        RecognitionModel().beam("challenge.png",beamSize = 10)
     else:
-        RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle","doubleLine"])
+        RecognitionModel().train(1000, ["doubleCircleLine","doubleCircle","tripleCircle","doubleLine","individualCircle"])

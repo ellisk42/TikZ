@@ -6,6 +6,8 @@ from PIL import Image
 import pickle
 from random import choice
 
+CANONICAL = True
+
 # It's the synthetic data should look clean: we want people to check that things are not overlapping
 def lineIntersectsCircle(l,c):
     x2,y2 = l.points[1].x,l.points[1].y
@@ -48,9 +50,13 @@ def makeSyntheticData(filePrefix, sample, k = 1000):
             endingPoint.save("%s-%d-%d.png"%(filePrefix,j,k))
 
             
-def canonicalOrdering(circles):
-    # sort the circles so that there are always drawn in a canonical order
-    return sorted(circles, key = lambda c: (c.center.x, c.center.y))
+def canonicalOrdering(things):
+    if things == [] or not CANONICAL: return things
+    if isinstance(things[0],Circle):
+        # sort the circles so that there are always drawn in a canonical order
+        return sorted(things, key = lambda c: (c.center.x, c.center.y))
+    if isinstance(things[0],Line):
+        return sorted(things, key = lambda l: (l.points[0].x,l.points[0].y))
 
 def horizontalOrVerticalLine():
     x1 = randomCoordinate()
@@ -96,7 +102,7 @@ def circlesAndLine(n,k):
                     break
                 
             if not failure: ls.append(l)
-        ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y))
+        ls = canonicalOrdering(ls)
         return Sequence(cs + ls)
     return sampler
 
@@ -113,6 +119,9 @@ def randomObjects(n):
 
         return Sequence(p.lines + lines)
     return sample
+
+
+    
 
 
 if __name__ == '__main__':

@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plot
 from utilities import *
-from distanceMetrics import HausdorffDist
+from distanceMetrics import HausdorffDist,blurredDistance
 from GA import GeneticAlgorithm
 from render import render,animateMatrices
 from language import *
 from random import random,choice,seed
 from time import time
 import numpy as np
+import cv2
 
 t = str(time())
 seed(t)
@@ -32,6 +33,7 @@ class InverseRender(GeneticAlgorithm):
         # self.target = render([str(self.originalProgram)], showImage = True, yieldsPixels = True)[0]
         self.target = loadImage("challenge.png")
         showImage(self.target)
+        showImage(cv2.GaussianBlur(self.target,(61,61),sigmaX = 15))
         self.targetPoints = np.column_stack(np.where(self.target > 0.5))
         self.history = {}
 
@@ -46,7 +48,7 @@ class InverseRender(GeneticAlgorithm):
         return x.mutate()
 
     def fastPixels(self, programs):
-        programs = map(str,programs)
+        programs = [p.TikZ() for p in programs]
         toRender = list(set([p for p in programs if not (p in self.history) ]))
         if toRender != []:
             renders = render(toRender, yieldsPixels = True)
@@ -64,11 +66,12 @@ class InverseRender(GeneticAlgorithm):
 
         def f(x): # fitness
             if True:
-                points = np.column_stack(np.where(x > 0.5))
-                if len(points) > 0:
-                    return -HausdorffDist(points, self.targetPoints)
-                else:
-                    return float('-inf')
+                # points = np.column_stack(np.where(x > 0.5))
+                # if len(points) > 0:
+                #     return -HausdorffDist(points, self.targetPoints)
+                # else:
+                #     return float('-inf')
+                return blurredDistance(self.target,x)
             else:
                 return -np.sum(np.abs(self.target - x))
 
