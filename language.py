@@ -32,6 +32,8 @@ class Number(Expression):
     def __str__(self): return str(self.n)
     def __eq__(self,o):
         return isinstance(o,Number) and self.n == o.n
+    def __ne__(self,o):
+        return not (self == o)
     def evaluate(self, environment):
         return self.n
     def children(self): return []
@@ -175,24 +177,36 @@ class Line(Program):
                     arrow = arrow,
                     solid = solid)
 
-# class Rectangle():
-#     def __init__(self, p1, p2):
-#         self.p1 = p1
-#         self.p2 = p2
-#     def __str__(self):
-#         return "\\draw [ultra thick] %s rectangle %s;" % (self.p1, self.p2)
-#     def mutate(self):
-#         if random() > 0.5:
-#             return Rectangle(randomPoint(),self.p2)
-#         else:
-#             return Rectangle(self.p1,randomPoint())
-#     @staticmethod
-#     def sample():
-#         while True:
-#             p1 = randomPoint()
-#             p2 = randomPoint()
-#             if p1[0] != p2[0] and p1[1] != p2[1]:
-#                 return Rectangle(p1, p2)
+class Rectangle():
+    def __init__(self, p1, p2):
+        self.p1 = p1
+        self.p2 = p2
+    def children(self): return [self.p1,self.p2]
+    def substitute(self, old, new):
+        return Rectangle(self.p1.substitute(old, new),self.p2.substitute(old, new))
+    @staticmethod
+    def command(p1,p2):
+        return "\\draw [ultra thick] %s rectangle %s;"%(p1,p2)
+
+    def evaluate(self,environment):
+        return ([Rectangle.command(self.p1.evaluate(environment),
+                                   self.p2.evaluate(environment))],
+                environment)
+    def __str__(self):
+        return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
+    def mutate(self):
+        if random() > 0.5:
+            return Rectangle(self.p1.mutate(),self.p2)
+        else:
+            return Rectangle(self.p1,self.p2.mutate())
+    @staticmethod
+    def sample():
+        while True:
+            p1 = AbsolutePoint.sample()
+            p2 = AbsolutePoint.sample()
+            if p1.x != p2.x and p1.y != p2.y:
+                [p1,p2] = sorted([p1,p2],key = lambda p: (p.x.n,p.y.n))
+                return Rectangle(p1, p2)
 
 class Circle():
     def __init__(self, center, radius):

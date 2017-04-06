@@ -37,7 +37,11 @@ def makeSyntheticData(filePrefix, sample, k = 1000):
     programs = [sample() for _ in range(k)]
     print "Sampled %d programs."%k
     programPrefixes = [ [ Sequence(p.lines[:j]) for j in range(len(p)+1) ] for p in programs ]
-    distinctPrograms = list(set([ str(p) for prefix in programPrefixes for p in prefix]))
+    # for p in programPrefixes:
+    #     print "Prefixes:"
+    #     for prefix in p:
+    #         print "PREFIX: %s\n\n"%(prefix.TikZ())
+    distinctPrograms = list(set([ p.TikZ() for prefix in programPrefixes for p in prefix]))
     pixels = render(distinctPrograms, yieldsPixels = True)
     print "Rendered %d images."%len(distinctPrograms)
     pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
@@ -46,7 +50,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000):
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j),'wb'))
         for k in range(len(programs[j])):
-            endingPoint = pixels[programPrefixes[j][k+1]]
+            endingPoint = pixels[programPrefixes[j][k+1].TikZ()]
             endingPoint.save("%s-%d-%d.png"%(filePrefix,j,k))
 
             
@@ -81,7 +85,14 @@ def multipleCircles(n):
                     for a in p
                     for b in p ]):
                 return Sequence(canonicalOrdering(p))
-    return sampler            
+    return sampler
+
+def multipleRectangles(n):
+    def sampler():
+        while True:
+            p = [Rectangle.sample() for _ in range(n) ]
+            return Sequence(p)
+    return sampler
 
 def circlesAndLine(n,k):
     getCircles = multipleCircles(n)
@@ -141,8 +152,9 @@ if __name__ == '__main__':
                   "doubleCircleLine": circlesAndLine(2,1),
                   "doubleLine": circlesAndLine(0,2),
                   "doubleCircle": multipleCircles(2),
-                  "tripleCircle": multipleCircles(3)}
+                  "tripleCircle": multipleCircles(3),
+                  "individualRectangle": multipleRectangles(1)}
     for n in sys.argv[1:]:
         print n
-        makeSyntheticData("syntheticTrainingData/"+n, generators[n])
+        makeSyntheticData("syntheticTrainingData/"+n, generators[n],k = 1000)
 
