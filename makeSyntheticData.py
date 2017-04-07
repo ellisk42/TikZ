@@ -10,8 +10,8 @@ CANONICAL = True
 
 # It's the synthetic data should look clean: we want people to check that things are not overlapping
 def lineIntersectsCircle(l,c):
-    x2,y2 = l.points[1].x,l.points[1].y
-    x1,y1 = l.points[0].x,l.points[0].y
+    x2,y2 = l.points[1].x.n,l.points[1].y.n
+    x1,y1 = l.points[0].x.n,l.points[0].y.n
 
     if x1 == x2: # vertical line
         y1,y2 = min(y1,y2),max(y1,y2)
@@ -26,7 +26,7 @@ def lineIntersectsCircle(l,c):
 
 def lineIntersectsLine(p,q):
     def ccw(A,B,C):
-        return (C.y-A.y) * (B.x-A.x) > (B.y-A.y) * (C.x-A.x)
+        return (C.y.n-A.y.n) * (B.x.n-A.x.n) > (B.y.n-A.y.n) * (C.x.n-A.x.n)
     overlapping = ccw(p.points[0],q.points[0],q.points[1]) != ccw(p.points[1],q.points[0],q.points[1]) and ccw(p.points[0],p.points[1],q.points[0]) != ccw(p.points[0],p.points[1],q.points[1])
     touching = p.points[0] == q.points[0] or p.points[1] == q.points[0] or p.points[0] == q.points[1] or p.points[1] == q.points[1]
     return overlapping or touching
@@ -58,9 +58,9 @@ def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     if isinstance(things[0],Circle):
         # sort the circles so that there are always drawn in a canonical order
-        return sorted(things, key = lambda c: (c.center.x, c.center.y))
+        return sorted(things, key = lambda c: (c.center.x.n, c.center.y.n))
     if isinstance(things[0],Line):
-        return sorted(things, key = lambda l: (l.points[0].x,l.points[0].y))
+        return sorted(things, key = lambda l: (l.points[0].x.n,l.points[0].y.n))
 
 def horizontalOrVerticalLine():
     x1 = randomCoordinate()
@@ -68,12 +68,12 @@ def horizontalOrVerticalLine():
     if choice([True,False]):
         y2 = y1
         while y2 == y1: y2 = randomCoordinate()
-        points = [AbsolutePoint(x1,y1),AbsolutePoint(x1,y2)]
+        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x1),Number(y2))]
     else:
         x2 = x1
         while x2 == x1: x2 = randomCoordinate()
-        points = [AbsolutePoint(x1,y1),AbsolutePoint(x2,y1)]
-    return Line(list(sorted(points, key = lambda p: (p.x,p.y))),
+        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
+    return Line(list(sorted(points, key = lambda p: (p.x.n,p.y.n))),
                 solid = random() > 0.5,
                 arrow = random() > 0.5)
 
@@ -81,7 +81,7 @@ def multipleCircles(n):
     def sampler():
         while True:
             p = [Circle.sample() for _ in range(n) ]
-            if all([ a == b or (a.center.x-b.center.x)**2 + (a.center.y-b.center.y)**2 > (a.radius+b.radius)**2
+            if all([ a == b or (not a.intersects(b))
                     for a in p
                     for b in p ]):
                 return Sequence(canonicalOrdering(p))
@@ -117,24 +117,6 @@ def circlesAndLine(n,k):
         return Sequence(cs + ls)
     return sampler
 
-def randomObjects(n):
-    def sample():
-        assert False
-        nl = choice([0,1,2])
-        nc = n - nl
-        p = multipleCircles(nc)()
-
-        lines = [ Line(sorted([AbsolutePoint.sample(),AbsolutePoint.sample()],
-                              key = lambda p: (p.x,p.y))) for _ in range(nl) ]
-        lines.sort(key = lambda l: (l.points[0].x,l.points[0].y))
-
-        return Sequence(p.lines + lines)
-    return sample
-
-
-    
-
-
 if __name__ == '__main__':
     #}challenge program
     challenge = '''
@@ -147,8 +129,7 @@ if __name__ == '__main__':
     '''
     Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
     
-    generators = {"randomObjects": randomObjects(4),
-                  "individualCircle": multipleCircles(1),
+    generators = {"individualCircle": multipleCircles(1),
                   "doubleCircleLine": circlesAndLine(2,1),
                   "doubleLine": circlesAndLine(0,2),
                   "doubleCircle": multipleCircles(2),

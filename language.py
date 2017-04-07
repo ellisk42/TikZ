@@ -205,7 +205,12 @@ class Rectangle():
             p1 = AbsolutePoint.sample()
             p2 = AbsolutePoint.sample()
             if p1.x != p2.x and p1.y != p2.y:
-                [p1,p2] = sorted([p1,p2],key = lambda p: (p.x.n,p.y.n))
+                x1 = Number(min([p1.x.n,p2.x.n]))
+                x2 = Number(max([p1.x.n,p2.x.n]))
+                y1 = Number(min([p1.y.n,p2.y.n]))
+                y2 = Number(max([p1.y.n,p2.y.n]))
+                p1 = AbsolutePoint(x1,y1)
+                p2 = AbsolutePoint(x2,y2)
                 return Rectangle(p1, p2)
 
 class Circle():
@@ -231,6 +236,10 @@ class Circle():
             c = Circle(self.center.mutate(), self.radius)
             if c.inbounds():
                 return c
+    def intersects(self,o):
+        x1,y1,r1 = self.center.x.n,self.center.y.n,self.radius.n
+        x2,y2,r2 = o.center.x.n,o.center.y.n,o.radius.n
+        return (x1 - x2)**2 + (y1 - y2)**2 < (r1 + r2)**2
     def inbounds(self):
         return inbounds(self.center.x.n + self.radius.n) and inbounds(self.center.x.n - self.radius.n) and inbounds(self.center.y.n + self.radius.n) and inbounds(self.center.y.n - self.radius.n)
     @staticmethod
