@@ -8,50 +8,24 @@ from random import choice
 
 CANONICAL = True
 
-# It's the synthetic data should look clean: we want people to check that things are not overlapping
-def lineIntersectsCircle(l,c):
-    x2,y2 = l.points[1].x.n,l.points[1].y.n
-    x1,y1 = l.points[0].x.n,l.points[0].y.n
-
-    if x1 == x2: # vertical line
-        y1,y2 = min(y1,y2),max(y1,y2)
-        x = x1
-        return x == c.center.x and c.center.y > y2 + c.radius and c.center.y < y1 - c.radius
-    elif y1 == y2: # horizontal line
-        x1,x2 = min(x1,x2),max(x1,x2)
-        y = y1
-        return y == c.center.y and c.center.x + c.radius < x2 and c.center.x - c.radius > x1
-    else:
-        raise Exception('arbitrary lines not yet supported')
-
-def lineIntersectsLine(p,q):
-    def ccw(A,B,C):
-        return (C.y.n-A.y.n) * (B.x.n-A.x.n) > (B.y.n-A.y.n) * (C.x.n-A.x.n)
-    overlapping = ccw(p.points[0],q.points[0],q.points[1]) != ccw(p.points[1],q.points[0],q.points[1]) and ccw(p.points[0],p.points[1],q.points[0]) != ccw(p.points[0],p.points[1],q.points[1])
-    touching = p.points[0] == q.points[0] or p.points[1] == q.points[0] or p.points[0] == q.points[1] or p.points[1] == q.points[1]
-    return overlapping or touching
-
-
-def makeSyntheticData(filePrefix, sample, k = 1000):
+def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
     print "Sampled %d programs."%k
     programPrefixes = [ [ Sequence(p.lines[:j]) for j in range(len(p)+1) ] for p in programs ]
-    # for p in programPrefixes:
-    #     print "Prefixes:"
-    #     for prefix in p:
-    #         print "PREFIX: %s\n\n"%(prefix.TikZ())
-    distinctPrograms = list(set([ p.TikZ() for prefix in programPrefixes for p in prefix]))
+    noisyTargets = [ p.noisyTikZ() for p in programs ]
+    distinctPrograms = list(set([ p.TikZ() for prefix in programPrefixes for p in prefix] + noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
     print "Rendered %d images."%len(distinctPrograms)
     pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
     pixels = dict(zip(distinctPrograms,pixels))
     
     for j in range(len(programs)):
-        pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j),'wb'))
+        pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
+        pixels[noisyTargets[j]].save("%s-%d-noisy.png"%(filePrefix,j + offset))
         for k in range(len(programs[j])):
             endingPoint = pixels[programPrefixes[j][k+1].TikZ()]
-            endingPoint.save("%s-%d-%d.png"%(filePrefix,j,k))
+            endingPoint.save("%s-%d-%d.png"%(filePrefix,j + offset,k))
 
             
 def canonicalOrdering(things):
@@ -61,6 +35,9 @@ def canonicalOrdering(things):
         return sorted(things, key = lambda c: (c.center.x.n, c.center.y.n))
     if isinstance(things[0],Line):
         return sorted(things, key = lambda l: (l.points[0].x.n,l.points[0].y.n))
+    if isinstance(things[0],Rectangle):
+        return sorted(things, key = lambda r: (r.p1.x.n,
+                                               r.p1.y.n))
 
 def horizontalOrVerticalLine():
     x1 = randomCoordinate()
@@ -77,44 +54,68 @@ def horizontalOrVerticalLine():
                 solid = random() > 0.5,
                 arrow = random() > 0.5)
 
-def multipleCircles(n):
+# def multipleCircles(n):
+#     def sampler():
+#         while True:
+#             p = [Circle.sample() for _ in range(n) ]
+#             if all([ a == b or (not a.intersects(b))
+#                     for a in p
+#                     for b in p ]):
+#                 return Sequence(canonicalOrdering(p))
+#     return sampler
+
+# def multipleRectangles(n):
+#     def sampler():
+#         while True:
+#             p = [Rectangle.sample() for _ in range(n) ]
+#             return Sequence(p)
+#     return sampler
+
+# def circlesAndLine(n,k):
+#     getCircles = multipleCircles(n)
+#     def sampler():
+#         cs = getCircles().lines
+#         ls = []
+#         while len(ls) < k:
+#             l = horizontalOrVerticalLine()
+#             # check to intersect any of the circles
+#             failure = False
+#             for c in cs+ls:
+#                 if c.intersects(l)
+#                     failure = True
+#                     break
+#             if not failure: ls.append(l)
+#         ls = canonicalOrdering(ls)
+#         return Sequence(cs + ls)
+#     return sampler
+
+def multipleObjects(rectangles = 0,lines = 0,circles = 0):
     def sampler():
         while True:
-            p = [Circle.sample() for _ in range(n) ]
-            if all([ a == b or (not a.intersects(b))
-                    for a in p
-                    for b in p ]):
-                return Sequence(canonicalOrdering(p))
-    return sampler
-
-def multipleRectangles(n):
-    def sampler():
-        while True:
-            p = [Rectangle.sample() for _ in range(n) ]
-            return Sequence(p)
-    return sampler
-
-def circlesAndLine(n,k):
-    getCircles = multipleCircles(n)
-    def sampler():
-        cs = getCircles().lines
-        ls = []
-        while len(ls) < k:
-            l = horizontalOrVerticalLine()
-            # check to intersect any of the circles
+            cs = canonicalOrdering([ Circle.sample() for _ in range(circles) ])
+            rs = canonicalOrdering([ Rectangle.sample() for _ in range(rectangles) ])
+            ls = canonicalOrdering([ horizontalOrVerticalLine() for _ in range(lines) ])
+            program = cs + rs + ls
             failure = False
-            for c in cs:
-                if lineIntersectsCircle(l,c):
-                    failure = True
-                    break
-            for c in ls:
-                if lineIntersectsLine(c,l):
-                    failure = True
-                    break
-                
-            if not failure: ls.append(l)
-        ls = canonicalOrdering(ls)
-        return Sequence(cs + ls)
+            for p in program:
+                if failure: break
+
+                for q in program:
+                    if p != q and p.intersects(q):
+                        failure = True
+                        break
+            if not failure:
+                return Sequence(program)
+    return sampler
+
+def randomScene(maximumNumberOfObjects):
+    def sampler():
+        n = choice(range(maximumNumberOfObjects)) + 1
+
+        shapeIdentities = [choice(range(3)) for _ in range(n) ]
+        return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
+                               lines = len([x for x in shapeIdentities if x == 1 ]),
+                               circles = len([x for x in shapeIdentities if x == 2 ]))()
     return sampler
 
 if __name__ == '__main__':
@@ -129,13 +130,15 @@ if __name__ == '__main__':
     '''
     Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
     
-    generators = {"individualCircle": multipleCircles(1),
-                  "doubleCircleLine": circlesAndLine(2,1),
-                  "doubleLine": circlesAndLine(0,2),
-                  "doubleCircle": multipleCircles(2),
-                  "tripleCircle": multipleCircles(3),
-                  "individualRectangle": multipleRectangles(1)}
+    generators = {"individualCircle": multipleObjects(circles = 1),
+                  "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
+                  "tripleLine": multipleObjects(lines = 3),
+                  "doubleCircle": multipleObjects(circles = 2),
+                  "randomScene": randomScene(5),
+                  "tripleCircle": multipleObjects(circles = 3),
+                  "individualRectangle": multipleObjects(rectangles = 1)}
+    k = 1000
     for n in sys.argv[1:]:
         print n
-        makeSyntheticData("syntheticTrainingData/"+n, generators[n],k = 1000)
+        makeSyntheticData("syntheticTrainingData/"+n, generators[n],k = k)
 

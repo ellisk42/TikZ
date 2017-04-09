@@ -1,4 +1,6 @@
 from random import random,choice
+import numpy as np
+from utilities import linesIntersect,truncatedNormal
 
 '''
 Programs: evaluator maps environment to (trace, environment)
@@ -23,6 +25,8 @@ def inbounds(p):
 class Program():
     def TikZ(self):
         return "\n".join(self.evaluate([])[0])
+    def noisyTikZ(self):
+        return "\n".join(self.noisyEvaluate([])[0])
 
 class Expression():
     pass
@@ -34,6 +38,8 @@ class Number(Expression):
         return isinstance(o,Number) and self.n == o.n
     def __ne__(self,o):
         return not (self == o)
+    def __gt__(self,o): return self.n > o.n
+    def __lt__(self,o): return self.n < o.n
     def evaluate(self, environment):
         return self.n
     def children(self): return []
@@ -90,6 +96,13 @@ class AbsolutePoint(Expression):
     def evaluate(self, environment):
         return "(%s,%s)"%(str(self.x.evaluate(environment)),
                           str(self.y.evaluate(environment)))
+
+    def noisyEvaluate(self, environment):
+        y = self.y.evaluate(environment)
+        x = self.x.evaluate(environment)
+        x += truncatedNormal(-1,1)*0.5
+        y += truncatedNormal(-1,1)*0.5
+        return "(%.2f,%.2f)"%(x,y)
     
     def mutate(self):
         while True:
@@ -138,6 +151,14 @@ class Line(Program):
     def children(self): return self.points
     def substitute(self, old, new):
         return Line([ p.substitute(old, new) for p in self.points], self.arrow, self.solid)
+    def intersects(self,o):
+        if isinstance(o,Circle): return o.intersects(self)
+        if isinstance(o,Rectangle): return o.intersects(self)
+        if isinstance(o,Line):
+            return linesIntersect(AbsolutePoint(self.points[0].x.n,self.points[0].y.n),
+                                  AbsolutePoint(self.points[1].x.n,self.points[1].y.n),
+                                  AbsolutePoint(o.points[0].x.n,o.points[0].y.n),
+                                  AbsolutePoint(o.points[1].x.n,o.points[1].y.n))
         
     def __str__(self):
         return Line.lineCommand(map(str,self.points), self.arrow, self.solid)
@@ -170,6 +191,12 @@ class Line(Program):
                                   self.solid)],
                 environment)
 
+    def noisyEvaluate(self, environment):
+        return ([Line.lineCommand([ p.noisyEvaluate(environment) for p in self.points ],
+                                  self.arrow,
+                                  self.solid)],
+                environment)
+
     @staticmethod
     def absolute(x1,y1,x2,y2, arrow = False, solid = True):
         return Line([AbsolutePoint(x1,y1),
@@ -184,6 +211,25 @@ class Rectangle():
     def children(self): return [self.p1,self.p2]
     def substitute(self, old, new):
         return Rectangle(self.p1.substitute(old, new),self.p2.substitute(old, new))
+    def constituentLines(self):
+        return [Line([self.p1, AbsolutePoint(self.p2.x,self.p1.y)]),
+                Line([AbsolutePoint(self.p2.x,self.p1.y), self.p2]),
+                Line([self.p2, AbsolutePoint(self.p1.x,self.p2.y)]),
+                Line([AbsolutePoint(self.p1.x,self.p2.y), self.p1])]
+    def intersects(self,o):
+        if isinstance(o,Circle): return o.intersects(self)
+        if isinstance(o,Line):
+            for l in self.constituentLines():
+                if l.intersects(o): return True
+            return False
+        if isinstance(o,Rectangle):
+            for l1 in self.constituentLines():
+                for l2 in o.constituentLines():
+                    if l1.intersects(l2): return True
+            return False
+        raise Exception('rectangle intersection')
+        
+    
     @staticmethod
     def command(p1,p2):
         return "\\draw [ultra thick] %s rectangle %s;"%(p1,p2)
@@ -191,6 +237,10 @@ class Rectangle():
     def evaluate(self,environment):
         return ([Rectangle.command(self.p1.evaluate(environment),
                                    self.p2.evaluate(environment))],
+                environment)
+    def noisyEvaluate(self,environment):
+        return ([Rectangle.command(self.p1.noisyEvaluate(environment),
+                                   self.p2.noisyEvaluate(environment))],
                 environment)
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
@@ -225,8 +275,8 @@ class Circle():
     
     @staticmethod
     def command(center, radius):
-        radius = int(str(radius))
-        return "\\node[draw,circle,inner sep=0pt,minimum size = %dcm,ultra thick] at %s {};"%(radius*2, center)
+        radius = float(str(radius))
+        return "\\node[draw,circle,inner sep=0pt,minimum size = %.2fcm,ultra thick] at %s {};"%(radius*2, center)
     def __str__(self):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
     def labeled(self,label):
@@ -237,9 +287,32 @@ class Circle():
             if c.inbounds():
                 return c
     def intersects(self,o):
-        x1,y1,r1 = self.center.x.n,self.center.y.n,self.radius.n
-        x2,y2,r2 = o.center.x.n,o.center.y.n,o.radius.n
-        return (x1 - x2)**2 + (y1 - y2)**2 < (r1 + r2)**2
+        if isinstance(o,Circle):
+            x1,y1,r1 = self.center.x.n,self.center.y.n,self.radius.n
+            x2,y2,r2 = o.center.x.n,o.center.y.n,o.radius.n
+            return (x1 - x2)**2 + (y1 - y2)**2 < (r1 + r2)**2
+        elif isinstance(o,Line):
+            l = o
+            c = self
+            cx,cy = c.center.x.n,c.center.y.n
+            r2 = c.radius.n*c.radius.n
+            x2,y2 = l.points[1].x.n,l.points[1].y.n
+            x1,y1 = l.points[0].x.n,l.points[0].y.n
+
+            # I guess I should do the quadratic equation, but this is easier to code
+            steps = 10
+            for t in range(steps+1):
+                t = float(t)/steps
+                x = x1*t + x2*(1 - t)
+                y = y1*t + y2*(1 - t)
+                d2 = (x - cx)*(x - cx) + (y - cy)*(y - cy)
+                if d2 < r2: return True
+            return False
+        elif isinstance(o,Rectangle):
+            for l in o.constituentLines():
+                if self.intersects(l): return True
+            return False
+            
     def inbounds(self):
         return inbounds(self.center.x.n + self.radius.n) and inbounds(self.center.x.n - self.radius.n) and inbounds(self.center.y.n + self.radius.n) and inbounds(self.center.y.n - self.radius.n)
     @staticmethod
@@ -254,6 +327,11 @@ class Circle():
     def evaluate(self, environment):
         return ([Circle.command(self.center.evaluate(environment),
                                 self.radius.evaluate(environment))],
+                environment)
+    def noisyEvaluate(self, environment):
+        r = self.radius.evaluate(environment) + truncatedNormal(-1,1)*0.25
+        return ([Circle.command(self.center.noisyEvaluate(environment),
+                                r)],
                 environment)
 
 class Sequence(Program):
@@ -283,7 +361,14 @@ class Sequence(Program):
             cs,e = p.evaluate(environment)
             trace += cs
             environment = e
-        return (trace, environment)        
+        return (trace, environment)
+    def noisyEvaluate(self,environment):
+        trace = []
+        for p in self.lines:
+            cs,e = p.noisyEvaluate(environment)
+            trace += cs
+            environment = e
+        return (trace, environment)
         
     @staticmethod
     def sample(sz = None):
@@ -324,3 +409,11 @@ class Sequence(Program):
 if __name__ == '__main__':
     print Sequence([DefineConstant(Number(1)),
                     Circle(AbsolutePoint(Variable(0),Variable(0)), Number(1))]).TikZ()
+
+    m = Line.absolute(Number(0),Number(0),
+                      Number(5),Number(0))
+    n = Line.absolute(Number(5),Number(0),
+                      Number(5),Number(7))
+    print m
+    print n
+    print m.intersects(n)

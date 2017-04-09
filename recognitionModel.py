@@ -33,21 +33,23 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
     # get one example from each line of each program
     for j,program in enumerate(programs):
         trace = [ "%s-%d.png"%(programNames[j][:-2], k) for k in range(len(program)) ]
+        noisyTarget = "%s-noisy.png"%(programNames[j][:-2])
         if not dummyImages:
             trace = loadImages(trace)
+            noisyTarget = loadImage(noisyTarget)
         else:
-            loadImages(trace) # puts them into IMAGEBYTES
+            loadImages(trace + [noisyTarget]) # puts them into IMAGEBYTES
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
             startingExamples.append(currentImage)
-            endingExamples.append(targetImage)
+            endingExamples.append(noisyTarget)
             currentImage = trace[k]
             for j,t in enumerate(PrimitiveDecoder.extractTargets(l)):
                 target[j] = target.get(j,[]) + [t]
         # end of program
         startingExamples.append(targetImage)
-        endingExamples.append(targetImage)
+        endingExamples.append(noisyTarget)
         for j in target:
             target[j] += [STOP] # should be zero and therefore valid for everyone
             
@@ -266,7 +268,7 @@ class RecognitionModel():
                                                                 exampleType)
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.05, stringProcessor = loadImage)
+                                 testingFraction = 0.025, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -344,7 +346,7 @@ class RecognitionModel():
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().beam("syntheticTrainingData/individualRectangle-0-0.png", #"challenge.png",
+        RecognitionModel().beam("challenge.png", # "syntheticTrainingData/individualRectangle-0-0.png"
                                 beamSize = 10)
     else:
-        RecognitionModel().train(1000, ["individualRectangle","doubleCircleLine","doubleCircle","tripleCircle","doubleLine","individualCircle"])
+        RecognitionModel().train(1000, ["randomScene"])
