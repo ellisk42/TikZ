@@ -54,41 +54,6 @@ def horizontalOrVerticalLine():
                 solid = random() > 0.5,
                 arrow = random() > 0.5)
 
-# def multipleCircles(n):
-#     def sampler():
-#         while True:
-#             p = [Circle.sample() for _ in range(n) ]
-#             if all([ a == b or (not a.intersects(b))
-#                     for a in p
-#                     for b in p ]):
-#                 return Sequence(canonicalOrdering(p))
-#     return sampler
-
-# def multipleRectangles(n):
-#     def sampler():
-#         while True:
-#             p = [Rectangle.sample() for _ in range(n) ]
-#             return Sequence(p)
-#     return sampler
-
-# def circlesAndLine(n,k):
-#     getCircles = multipleCircles(n)
-#     def sampler():
-#         cs = getCircles().lines
-#         ls = []
-#         while len(ls) < k:
-#             l = horizontalOrVerticalLine()
-#             # check to intersect any of the circles
-#             failure = False
-#             for c in cs+ls:
-#                 if c.intersects(l)
-#                     failure = True
-#                     break
-#             if not failure: ls.append(l)
-#         ls = canonicalOrdering(ls)
-#         return Sequence(cs + ls)
-#     return sampler
-
 def multipleObjects(rectangles = 0,lines = 0,circles = 0):
     def sampler():
         while True:
@@ -137,8 +102,15 @@ if __name__ == '__main__':
                   "randomScene": randomScene(5),
                   "tripleCircle": multipleObjects(circles = 3),
                   "individualRectangle": multipleObjects(rectangles = 1)}
-    k = 1000
+    k = 10000
     for n in sys.argv[1:]:
         print n
-        makeSyntheticData("syntheticTrainingData/"+n, generators[n],k = k)
+        startingPoint = 0
+        while startingPoint < k:
+            kp = min(k - startingPoint,1000)
+            makeSyntheticData("syntheticTrainingData/"+n, generators[n],
+                              k = kp,
+                              offset = startingPoint)
+            startingPoint += 1000
+            print "Generated %d training sequences."%kp
 
