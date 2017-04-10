@@ -9,6 +9,9 @@ Expressions: evaluator maps environment to value
 
 MAXIMUMCOORDINATE = 8
 
+RADIUSNOISE = 0.0
+COORDINATENOISE = 0.0
+
 def makeLabel(j): return 'L'+str(j)
 LABELS = [ makeLabel(j) for j in range(4) ]
 
@@ -100,8 +103,8 @@ class AbsolutePoint(Expression):
     def noisyEvaluate(self, environment):
         y = self.y.evaluate(environment)
         x = self.x.evaluate(environment)
-        x += truncatedNormal(-1,1)*0.5
-        y += truncatedNormal(-1,1)*0.5
+        x += truncatedNormal(-1,1)*COORDINATENOISE
+        y += truncatedNormal(-1,1)*COORDINATENOISE
         return "(%.2f,%.2f)"%(x,y)
     
     def mutate(self):
@@ -164,10 +167,11 @@ class Line(Program):
         return Line.lineCommand(map(str,self.points), self.arrow, self.solid)
 
     @staticmethod
-    def lineCommand(points, arrow, solid):
+    def lineCommand(points, arrow, solid, noisy = False):
         attributes = ["ultra thick"]
         if arrow: attributes += ["->"]
         if not solid: attributes += ["dashed"]
+        if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
         return "\\draw [%s] %s;" % (a," -- ".join(points))
     
@@ -194,7 +198,8 @@ class Line(Program):
     def noisyEvaluate(self, environment):
         return ([Line.lineCommand([ p.noisyEvaluate(environment) for p in self.points ],
                                   self.arrow,
-                                  self.solid)],
+                                  self.solid,
+                                  noisy = True)],
                 environment)
 
     @staticmethod
@@ -231,8 +236,11 @@ class Rectangle():
         
     
     @staticmethod
-    def command(p1,p2):
-        return "\\draw [ultra thick] %s rectangle %s;"%(p1,p2)
+    def command(p1,p2, noisy = False):
+        attributes = ["ultra thick"]
+        if noisy: attributes += ["pencildraw"]
+        attributes = ",".join(attributes)
+        return "\\draw [%s] %s rectangle %s;"%(attributes,p1,p2)
 
     def evaluate(self,environment):
         return ([Rectangle.command(self.p1.evaluate(environment),
@@ -240,7 +248,8 @@ class Rectangle():
                 environment)
     def noisyEvaluate(self,environment):
         return ([Rectangle.command(self.p1.noisyEvaluate(environment),
-                                   self.p2.noisyEvaluate(environment))],
+                                   self.p2.noisyEvaluate(environment),
+                                   noisy = True)],
                 environment)
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
@@ -274,9 +283,10 @@ class Circle():
                       self.radius)
     
     @staticmethod
-    def command(center, radius):
+    def command(center, radius, noisy = False):
+        noisy = "pencildraw," if noisy else ""
         radius = float(str(radius))
-        return "\\node[draw,circle,inner sep=0pt,minimum size = %.2fcm,ultra thick] at %s {};"%(radius*2, center)
+        return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,ultra thick] at %s {};"%(noisy,radius*2, center)
     def __str__(self):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
     def labeled(self,label):
@@ -329,9 +339,10 @@ class Circle():
                                 self.radius.evaluate(environment))],
                 environment)
     def noisyEvaluate(self, environment):
-        r = self.radius.evaluate(environment) + truncatedNormal(-1,1)*0.25
+        r = self.radius.evaluate(environment) + truncatedNormal(-1,1)*RADIUSNOISE
         return ([Circle.command(self.center.noisyEvaluate(environment),
-                                r)],
+                                r,
+                                noisy = True)],
                 environment)
 
 class Sequence(Program):

@@ -17,12 +17,15 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
 \draw[fill = white, white] (0,0) rectangle (%d,%d);
 '''%(canvas[0],canvas[1])
 
-    sources = ["\\begin{tikzpicture}\n" + canvas + "\n" + s + "\n\\end{tikzpicture}"
+    preamble = "\\begin{tikzpicture}"
+    preamble += "[pencildraw/.style={black,decorate,decoration={random steps,segment length=2pt,amplitude=0.5pt}}]"
+    preamble += "\n"
+    sources = [preamble + canvas + "\n" + s + "\n\\end{tikzpicture}"
                for s in sources ]
     source = "\n".join(sources)
     source = '''
 \\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
-
+\\usetikzlibrary{decorations.pathmorphing}
 \\begin{document}
 %s
 \\end{document}
@@ -84,6 +87,11 @@ def animateMatrices(matrices,outputFilename = None):
     plot.show()
 
 if __name__ == "__main__":
+    challenge = '''
+    \\node(b)[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (3,5) {};
+    \\node(a)[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
+    \\draw[pencildraw,ultra thick] (4,5) -- (6,5);
+'''
     render([challenge],showImage = True,yieldsPixels = True)[0]
     # inputFile = sys.argv[1]
     # outputFile = sys.argv[2]
