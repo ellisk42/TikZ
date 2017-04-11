@@ -8,9 +8,15 @@ Expressions: evaluator maps environment to value
 '''
 
 MAXIMUMCOORDINATE = 8
-
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
+
+def setRadiusNoise(n):
+    global RADIUSNOISE
+    RADIUSNOISE = n
+def setCoordinateNoise(n):
+    global COORDINATENOISE
+    COORDINATENOISE = n
 
 def makeLabel(j): return 'L'+str(j)
 LABELS = [ makeLabel(j) for j in range(4) ]
@@ -196,11 +202,18 @@ class Line(Program):
                 environment)
 
     def noisyEvaluate(self, environment):
-        return ([Line.lineCommand([ p.noisyEvaluate(environment) for p in self.points ],
-                                  self.arrow,
-                                  self.solid,
-                                  noisy = True)],
-                environment)
+        # short lines should have less noise added to their offsets
+        if self.length() < 3:
+            n = COORDINATENOISE
+            setCoordinateNoise(n*self.length()/4.0*COORDINATENOISE)
+        e = ([Line.lineCommand([ p.noisyEvaluate(environment) for p in self.points ],
+                               self.arrow,
+                               self.solid,
+                               noisy = True)],
+             environment)
+        if self.length() < 3:
+            setCoordinateNoise(n)
+        return e
 
     @staticmethod
     def absolute(x1,y1,x2,y2, arrow = False, solid = True):
@@ -208,6 +221,11 @@ class Line(Program):
                      AbsolutePoint(x2,y2)],
                     arrow = arrow,
                     solid = solid)
+
+    def length(self):
+        [p1,p2] = self.points
+        return ((p1.x.n - p2.x.n)**2 + (p1.y.n - p2.y.n)**2)**(0.5)
+        
 
 class Rectangle():
     def __init__(self, p1, p2):

@@ -240,17 +240,22 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        numberOfFilters = [5]
-        c1 = tf.layers.conv2d(inputs = imageInput,
-                              filters = numberOfFilters[0],
-                              kernel_size = [8,8],
-                              padding = "same",
-                              activation = tf.nn.relu,
-                              strides = 4)
-        c1 = tf.layers.max_pooling2d(inputs = c1,
-                                     pool_size = 4,
-                                     strides = 2,
-                                     padding = "same")
+        numberOfFilters = [8,6]
+        kernelSizes = [8,8]
+        poolSizes = [4,2]
+        nextInput = imageInput
+        for filterCount,kernelSize,poolSize in zip(numberOfFilters,kernelSizes,poolSizes):
+            c1 = tf.layers.conv2d(inputs = nextInput,
+                                  filters = filterCount,
+                                  kernel_size = [kernelSize,kernelSize],
+                                  padding = "same",
+                                  activation = tf.nn.relu,
+                                  strides = kernelSize/2)
+            c1 = tf.layers.max_pooling2d(inputs = c1,
+                                         pool_size = poolSize,
+                                         strides = poolSize/2,
+                                         padding = "same")
+            nextInput = c1
         c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
         print "fully connected input dimensionality:",c1d
         
@@ -349,4 +354,4 @@ if __name__ == '__main__':
         RecognitionModel().beam("challenge.png", # "syntheticTrainingData/individualRectangle-0-0.png"
                                 beamSize = 10)
     else:
-        RecognitionModel().train(1000, ["randomScene"])
+        RecognitionModel().train(2000, ["randomScene"])

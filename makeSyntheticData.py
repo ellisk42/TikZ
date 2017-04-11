@@ -102,6 +102,8 @@ if __name__ == '__main__':
                   "randomScene": randomScene(5),
                   "tripleCircle": multipleObjects(circles = 3),
                   "individualRectangle": multipleObjects(rectangles = 1)}
+    setCoordinateNoise(0.4)
+    setRadiusNoise(0.4)
     k = 10000
     for n in sys.argv[1:]:
         print n
