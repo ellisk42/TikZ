@@ -302,12 +302,14 @@ class RecognitionModel():
                  'logLikelihood': 0.0}]
         # once a program is finished we wrap it up in a sequence object
         def finished(x): return isinstance(x['program'], Sequence)
+
+        finishedPrograms = []
         
         saver = tf.train.Saver()
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(4):
+            for iteration in range(2):
                 children = []
                 for parent in beam:
                     feed = {self.currentPlaceholder: np.array([parent['output']]),
@@ -330,28 +332,32 @@ class RecognitionModel():
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
-                # Show all of the finished programs
-                for n in beam:
-                    if finished(n):
-                        print "Finished program: log likelihood %f"%(n['logLikelihood'])
-                        print n['program'].TikZ()
-                        print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
-                        print ""
-                        trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
-                        animateMatrices(render(trace,yieldsPixels = True),"neuralAnimation.gif")
+                # record all of the finished programs
+                finishedPrograms += [ n for n in beam if finished(n) ]
                 # Remove all of the finished programs
                 beam = [ n for n in beam if not finished(n) ]
                 if beam == []:
                     print "Empty beam."
                     break
-                
+
+            print "Finished programs, sorted by likelihood:"
+            finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
+            for n in finishedPrograms:
+                print "Finished program: log likelihood %f"%(n['logLikelihood'])
+                print n['program'].TikZ()
+                print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
+                print ""
+                trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
+                animateMatrices(render(trace,yieldsPixels = True),"neuralAnimation.gif")            
+
                         
 
                     
 
 if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().beam("drawings/hand3-processed.png", # "syntheticTrainingData/individualRectangle-0-0.png"
-                                beamSize = 100)
+    if len(sys.argv) == 3 and sys.argv[1] == 'test':
+        RecognitionModel().beam(sys.argv[2],
+                                beamSize = 20,
+        )#                                checkpoint = "checkpoints/model.checkpoint")
     else:
-        RecognitionModel().train(2000, ["randomScene"])
+        RecognitionModel().train(2000, ["randomScene"])#, checkpoint = "checkpoints/model.checkpoint")

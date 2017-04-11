@@ -260,14 +260,40 @@ class Rectangle():
         attributes = ",".join(attributes)
         return "\\draw [%s] %s rectangle %s;"%(attributes,p1,p2)
 
+    @staticmethod
+    def noisyLineCommand(p1,p2,p3,p4, noisy = True):
+        attributes = ["ultra thick"]
+        if noisy: attributes += ["pencildraw"]
+        attributes = ",".join(attributes)
+        return "\\draw [%s] %s -- %s -- %s -- %s -- cycle;"%(attributes,
+                                                             p1,p2,p3,p4)
+
     def evaluate(self,environment):
         return ([Rectangle.command(self.p1.evaluate(environment),
                                    self.p2.evaluate(environment))],
                 environment)
     def noisyEvaluate(self,environment):
-        return ([Rectangle.command(self.p1.noisyEvaluate(environment),
-                                   self.p2.noisyEvaluate(environment),
-                                   noisy = True)],
+        (x1,y1) = eval(self.p1.evaluate(environment))
+        (x2,y2) = eval(self.p2.evaluate(environment))
+        # perturb the center
+        def centerNoise():
+            return truncatedNormal(-1,1)*COORDINATENOISE*0.7
+        def vertexNoise():
+            return truncatedNormal(-1,1)*COORDINATENOISE*0.3
+        w = x2 - x1
+        h = y2 - y1
+        cx = (x2 + x1)/2.0 + centerNoise()
+        cy = (y2 + y1)/2.0 + centerNoise()
+        x1 = cx - w/2.0 + vertexNoise()
+        x2 = cx + w/2.0 + vertexNoise()
+        y1 = cy - h/2.0 + vertexNoise()
+        y2 = cy + h/2.0 + vertexNoise()
+        
+        p1 = "(%.2f,%.2f)"%(x1,y1)
+        p2 = "(%.2f,%.2f)"%(x2,y1)
+        p3 = "(%.2f,%.2f)"%(x2,y2)
+        p4 = "(%.2f,%.2f)"%(x1,y2)
+        return ([Rectangle.noisyLineCommand(p1,p2,p3,p4)],
                 environment)
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))

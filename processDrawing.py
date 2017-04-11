@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from PIL import Image
 from utilities import showImage
@@ -21,7 +22,7 @@ def processDrawing(name, export = False):
                     center + 128, 256))
     (w,h) = x.size
     x = np.array(x,np.uint8).reshape((h,w))/255.0
-    x[x > 0.3] = 1
+    x[x > 0.4] = 1
     showImage(x)
 
     if export:
@@ -32,6 +33,6 @@ def processDrawing(name, export = False):
         Image.fromarray(x*255).convert('L').save(exportName)
             
     return x
-processDrawing("drawings/hand1.jpg", export = True)
-processDrawing("drawings/hand2.jpg", export = True)
-processDrawing("drawings/hand3.jpg", export = True)
+
+if __name__ == '__main__':
+    processDrawing(sys.argv[1], export = True)
