@@ -307,7 +307,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(7):
+            for iteration in range(4):
                 children = []
                 for parent in beam:
                     feed = {self.currentPlaceholder: np.array([parent['output']]),
@@ -333,7 +333,7 @@ class RecognitionModel():
                 # Show all of the finished programs
                 for n in beam:
                     if finished(n):
-                        print "Finished program:"
+                        print "Finished program: log likelihood %f"%(n['logLikelihood'])
                         print n['program'].TikZ()
                         print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                         print ""
@@ -351,7 +351,7 @@ class RecognitionModel():
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        RecognitionModel().beam("challenge.png", # "syntheticTrainingData/individualRectangle-0-0.png"
-                                beamSize = 10)
+        RecognitionModel().beam("drawings/hand3-processed.png", # "syntheticTrainingData/individualRectangle-0-0.png"
+                                beamSize = 100)
     else:
         RecognitionModel().train(2000, ["randomScene"])
