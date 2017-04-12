@@ -1,3 +1,4 @@
+from multiprocessing import Pool
 import sys
 import os
 from language import *
@@ -7,6 +8,8 @@ import pickle
 from random import choice
 
 CANONICAL = True
+
+
 
 def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
@@ -39,17 +42,44 @@ def canonicalOrdering(things):
         return sorted(things, key = lambda r: (r.p1.x.n,
                                                r.p1.y.n))
 
-def horizontalOrVerticalLine():
-    x1 = randomCoordinate()
-    y1 = randomCoordinate()
-    if choice([True,False]):
-        y2 = y1
-        while y2 == y1: y2 = randomCoordinate()
-        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x1),Number(y2))]
+def proposeAttachmentLines(objects):
+    attachmentSets = [o.attachmentPoints() for o in objects ]
+
+    for j in range(len(attachmentSets) - 1):
+        for k in range(j + 1,len(attachmentSets)):
+            for (x1,y1) in attachmentSets[j]:
+                for (x2,y2) in attachmentSets[k]:
+                    candidate = None
+                    if x2 == x1 and y1 != y2:
+                        candidate = (x1,min(y1,y2),x1,max(y1,y2))
+                    elif y2 == y1 and x1 != x2:
+                        candidate = (min(x1,x2),y1,max(x1,x2),y1)
+                    if candidate != None:
+                        l = Line.absolute(Number(candidate[0]),
+                                          Number(candidate[1]),
+                                          Number(candidate[2]),
+                                          Number(candidate[3]))
+                        if all([not o.intersects(l) for o in objects ]):
+                            yield candidate
+
+def horizontalOrVerticalLine(attachedLines = []):
+    concentration = 0.0
+    if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
+        (x1,y1,x2,y2) = choice(attachedLines)
+        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
     else:
-        x2 = x1
-        while x2 == x1: x2 = randomCoordinate()
-        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
+        x1 = randomCoordinate()
+        y1 = randomCoordinate()
+        if choice([True,False]):
+            # x1 == x2; y1 != y2
+            y2 = y1
+            while y2 == y1: y2 = randomCoordinate()
+            points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x1),Number(y2))]
+        else:
+            # x1 != x2; y1 == y2
+            x2 = x1
+            while x2 == x1: x2 = randomCoordinate()
+            points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
     return Line(list(sorted(points, key = lambda p: (p.x.n,p.y.n))),
                 solid = random() > 0.5,
                 arrow = random() > 0.5)
@@ -59,7 +89,8 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0):
         while True:
             cs = canonicalOrdering([ Circle.sample() for _ in range(circles) ])
             rs = canonicalOrdering([ Rectangle.sample() for _ in range(rectangles) ])
-            ls = canonicalOrdering([ horizontalOrVerticalLine() for _ in range(lines) ])
+            attachedLines = list(proposeAttachmentLines(cs + rs))
+            ls = canonicalOrdering([ horizontalOrVerticalLine(attachedLines) for _ in range(lines) ])
             program = cs + rs + ls
             failure = False
             for p in program:
@@ -83,18 +114,7 @@ def randomScene(maximumNumberOfObjects):
                                circles = len([x for x in shapeIdentities if x == 2 ]))()
     return sampler
 
-if __name__ == '__main__':
-    #}challenge program
-    challenge = '''
-    \\node(b)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (5,2) {};
-    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (5,6) {};
-    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,6) {};
-    \\node(a)[draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (2,2) {};
-    \\draw[ultra thick,dashed] (5,3) -- (5,5);
-    \\draw[ultra thick,->] (2,3) -- (2,5);
-    '''
-    Image.fromarray(255*render([challenge],showImage = False,yieldsPixels = True, resolution = 256)[0]).convert('L').save('challenge.png')
-    
+def handleGeneration(arguments):
     generators = {"individualCircle": multipleObjects(circles = 1),
                   "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
                   "tripleLine": multipleObjects(lines = 3),
@@ -102,17 +122,21 @@ if __name__ == '__main__':
                   "randomScene": randomScene(5),
                   "tripleCircle": multipleObjects(circles = 3),
                   "individualRectangle": multipleObjects(rectangles = 1)}
-    setCoordinateNoise(0.35)
+    (n,startingPoint,k) = arguments
+    makeSyntheticData("syntheticTrainingData/"+n, generators[n], k = k, offset = startingPoint)
+    print "Generated %d training sequences."%k
+    
+if __name__ == '__main__':
+    setCoordinateNoise(0.4)
     setRadiusNoise(0.4)
     k = 10000
+    os.system('mkdir syntheticTrainingData')
     for n in sys.argv[1:]:
         print n
         startingPoint = 0
+        offsetsAndCounts = []
         while startingPoint < k:
             kp = min(k - startingPoint,1000)
-            makeSyntheticData("syntheticTrainingData/"+n, generators[n],
-                              k = kp,
-                              offset = startingPoint)
+            offsetsAndCounts.append((n,startingPoint,kp))
             startingPoint += 1000
-            print "Generated %d training sequences."%kp
-
+        Pool(5).map(handleGeneration, offsetsAndCounts)

@@ -242,23 +242,26 @@ class RecognitionModel():
 
         numberOfFilters = [8,6]
         kernelSizes = [8,8]
-        poolSizes = [4,2]
+        
+        poolSizes = [8,2]
+        poolStrides = [4,2]
         nextInput = imageInput
-        for filterCount,kernelSize,poolSize in zip(numberOfFilters,kernelSizes,poolSizes):
+        for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
             c1 = tf.layers.conv2d(inputs = nextInput,
                                   filters = filterCount,
                                   kernel_size = [kernelSize,kernelSize],
                                   padding = "same",
                                   activation = tf.nn.relu,
-                                  strides = kernelSize/2)
+                                  strides = 1)
             c1 = tf.layers.max_pooling2d(inputs = c1,
                                          pool_size = poolSize,
-                                         strides = poolSize/2,
+                                         strides = poolStride,
                                          padding = "same")
+            print "Convolution output:",c1
             nextInput = c1
         c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
         print "fully connected input dimensionality:",c1d
-        
+
         f1 = tf.reshape(c1, [-1, c1d])
 
         self.decoder = PrimitiveDecoder(f1)
@@ -280,7 +283,7 @@ class RecognitionModel():
 
         with tf.Session() as s:
             s.run(initializer)
-            for e in range(100):
+            for e in range(20):
                 epicLoss = []
                 epicAccuracy = []
                 for feed in iterator.epochFeeds():
@@ -296,6 +299,7 @@ class RecognitionModel():
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
         totalNumberOfRenders = 0
         targetImage = loadImage(targetImage)
+        showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [{'program': [],
                  'output': np.zeros(targetImage.shape),
@@ -309,7 +313,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(2):
+            for iteration in range(7):
                 children = []
                 for parent in beam:
                     feed = {self.currentPlaceholder: np.array([parent['output']]),
@@ -342,7 +346,7 @@ class RecognitionModel():
 
             print "Finished programs, sorted by likelihood:"
             finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
-            for n in finishedPrograms:
+            for n in finishedPrograms[:3]:
                 print "Finished program: log likelihood %f"%(n['logLikelihood'])
                 print n['program'].TikZ()
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
@@ -358,6 +362,6 @@ if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
                                 beamSize = 20,
-        )#                                checkpoint = "checkpoints/model.checkpoint")
+                                checkpoint = "checkpoints/model.checkpoint")
     else:
         RecognitionModel().train(10000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
