@@ -360,4 +360,4 @@ if __name__ == '__main__':
                                 beamSize = 20,
         )#                                checkpoint = "checkpoints/model.checkpoint")
     else:
-        RecognitionModel().train(2000, ["randomScene"])#, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().train(10000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")

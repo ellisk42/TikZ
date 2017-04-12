@@ -1,7 +1,6 @@
 import io
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plot
 import tensorflow as tf
 
 
@@ -20,6 +19,7 @@ def loadImage(n):
 def loadImages(ns): return map(loadImage,ns)
 
 def showImage(image):
+    import matplotlib.pyplot as plot
     plot.imshow(image,cmap = 'gray')
     plot.show()
 
