@@ -239,6 +239,14 @@ class Rectangle():
                 Line([AbsolutePoint(self.p2.x,self.p1.y), self.p2]),
                 Line([self.p2, AbsolutePoint(self.p1.x,self.p2.y)]),
                 Line([AbsolutePoint(self.p1.x,self.p2.y), self.p1])]
+    def attachmentPoints(self):
+        # all of the edges
+        ps = [ (x, self.p1.y.n) for x in range(self.p1.x.n + 1, self.p2.x.n) ]
+        ps += [ (self.p2.x.n, y) for y in range(self.p1.y.n + 1, self.p2.y.n) ]
+        ps += [ (x, self.p2.y.n) for x in range(self.p1.x.n + 1, self.p2.x.n) ]
+        ps += [ (self.p1.x.n, y) for y in range(self.p1.y.n + 1, self.p2.y.n) ]
+        return ps
+    
     def intersects(self,o):
         if isinstance(o,Circle): return o.intersects(self)
         if isinstance(o,Line):
@@ -325,6 +333,14 @@ class Circle():
     def substitute(self, old, new):
         return Circle(self.center.substitute(old, new),
                       self.radius)
+    def attachmentPoints(self):
+        r = self.radius.n
+        x = self.center.x.n
+        y = self.center.y.n
+        return [(x + r,y),
+                (x - r,y),
+                (x,y + r),
+                (x,y - r)]
     
     @staticmethod
     def command(center, radius, noisy = False):
