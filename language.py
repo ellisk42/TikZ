@@ -81,6 +81,8 @@ class DefineConstant(Program):
 
 class AbsolutePoint(Expression):
     def __init__(self,x,y):
+        # if isinstance(x,int) or isinstance(x,float): x = Number(x)
+        # if isinstance(y,int) or isinstance(y,float): y = Number(y)
         self.x = x
         self.y = y
 
@@ -157,6 +159,9 @@ class Line(Program):
         self.arrow = arrow
         self.solid = solid
 
+        if self.length() == 0.0:
+            raise Exception('Attempt to create line with zero length')
+
     def children(self): return self.points
     def substitute(self, old, new):
         return Line([ p.substitute(old, new) for p in self.points], self.arrow, self.solid)
@@ -221,10 +226,28 @@ class Line(Program):
                      AbsolutePoint(x2,y2)],
                     arrow = arrow,
                     solid = solid)
+    @staticmethod
+    def absoluteNumbered(x1,y1,x2,y2, arrow = False, solid = True):
+        return Line([AbsolutePoint(Number(x1),Number(y1)),
+                     AbsolutePoint(Number(x2),Number(y2))],
+                    arrow = arrow,
+                    solid = solid)
 
     def length(self):
         [p1,p2] = self.points
         return ((p1.x.n - p2.x.n)**2 + (p1.y.n - p2.y.n)**2)**(0.5)
+
+    def epsilonShrink(self):
+        e = 0.1/self.length()
+        [p1,p2] = self.points
+        # points online: t*p1 + (1 - t)*p2
+        x1 = (1 - e)*p1.x.n + e*p2.x.n
+        y1 = (1 - e)*p1.y.n + e*p2.y.n
+        x2 = (1 - e)*p2.x.n + e*p1.x.n
+        y2 = (1 - e)*p2.y.n + e*p1.y.n
+
+        return Line.absoluteNumbered(x1,y1,x2,y2)
+        
         
 
 class Rectangle():
@@ -250,6 +273,7 @@ class Rectangle():
     def intersects(self,o):
         if isinstance(o,Circle): return o.intersects(self)
         if isinstance(o,Line):
+            o = o.epsilonShrink() # lines are allowed to border rectangles
             for l in self.constituentLines():
                 if l.intersects(o): return True
             return False
