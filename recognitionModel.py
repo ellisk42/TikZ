@@ -292,8 +292,8 @@ class RecognitionModel():
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
-                print "\tTesting accuracy = %f"%(s.run(self.averageAccuracy,
-                                                       feed_dict = iterator.testingFeed()))
+                testingAccuracy = [ s.run(self.averageAccuracy, feed_dict = feed) for feed in iterator.testingFeeds() ]
+                print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):

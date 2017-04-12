@@ -14,6 +14,7 @@ class BatchIterator():
             self.testingTensors = [ t[0:testingCount,...] for t in self.tensors ]
             self.tensors = [ t[testingCount:(t.shape[0]),...] for t in self.tensors ]
             print "Holding out %d examples"%testingCount
+            self.testingSetSize = testingCount
         
         self.startingIndex = 0
         self.trainingSetSize = self.tensors[0].shape[0]
@@ -52,6 +53,17 @@ class BatchIterator():
     def testingExamples(self):
         return tuple([ self.processTensor(t) for t in self.testingTensors ])
 
+    def testingSlice(self, start, size):
+        return [ self.processTensor(t[start:(start+size),...]) for t in self.testingTensors ]
     
     def testingFeed(self):
         return dict(zip(self.placeholders, self.testingExamples()))
+
+    def testingFeeds(self):
+        '''Gives you feeds for smaller batches of the testing examples'''
+        testingIndex = 0
+        while True:
+            print "testing index",testingIndex
+            yield dict(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize)))
+            testingIndex += self.batchSize
+            if testingIndex > self.testingSetSize: break
