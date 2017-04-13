@@ -287,6 +287,7 @@ class RecognitionModel():
                 epicLoss = []
                 epicAccuracy = []
                 for feed in iterator.epochFeeds():
+                    print "(got batch feed)"
                     _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     epicLoss.append(l)
