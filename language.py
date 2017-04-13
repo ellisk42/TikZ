@@ -160,7 +160,8 @@ class Line(Program):
         self.solid = solid
 
         if self.length() == 0.0:
-            raise Exception('Attempt to create line with zero length')
+#            raise Exception('Attempt to create line with zero length')
+            pass
 
     def children(self): return self.points
     def substitute(self, old, new):

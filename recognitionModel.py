@@ -276,7 +276,7 @@ class RecognitionModel():
                                                                 exampleType)
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.025, stringProcessor = loadImage)
+                                 testingFraction = 0.0, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -287,7 +287,6 @@ class RecognitionModel():
                 epicLoss = []
                 epicAccuracy = []
                 for feed in iterator.epochFeeds():
-                    print "(got batch feed)"
                     _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     epicLoss.append(l)
@@ -296,6 +295,32 @@ class RecognitionModel():
                 testingAccuracy = [ s.run(self.averageAccuracy, feed_dict = feed) for feed in iterator.testingFeeds() ]
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+
+    def analyzeFailures(self, numberOfExamples, exampleType, checkpoint):
+        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
+                                                                exampleType)
+        initializer = tf.global_variables_initializer()
+        iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors),
+                                 testingFraction = 0.0, stringProcessor = loadImage)
+        iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
+                                      self.decoder.placeholders())
+        saver = tf.train.Saver()
+        failureLog = [] # pair of current goal
+
+        with tf.Session() as s:
+            s.run(initializer)
+            for feed in iterator.epochFeeds():
+                accuracy = s.run(self.averageAccuracy,
+                                 feed_dict = feed)
+                assert accuracy == 0.0 or accuracy == 1.0
+                if accuracy < 0.5:
+                    failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0]))
+
+        print "Failures:",len(failureLog),'/',iterator.trainingSetSize
+        for j,(c,g) in enumerate(failureLog):
+            saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
+            saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
+                
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
         totalNumberOfRenders = 0
@@ -364,5 +389,7 @@ if __name__ == '__main__':
         RecognitionModel().beam(sys.argv[2],
                                 beamSize = 20,
                                 checkpoint = "checkpoints/model.checkpoint")
-    else:
+    elif sys.argv[1] == 'analyze':
+        RecognitionModel().analyzeFailures(1000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
+    elif sys.argv[1] == 'train':
         RecognitionModel().train(10000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")

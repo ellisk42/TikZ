@@ -23,6 +23,9 @@ def showImage(image):
     plot.imshow(image,cmap = 'gray')
     plot.show()
 
+def saveMatrixAsImage(m,f):
+    Image.fromarray(m).convert('RGB').save(f)
+
 
 def crossEntropyWithMask(labels, masks, predictions):
     crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = labels,logits = predictions)
