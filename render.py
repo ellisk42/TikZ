@@ -1,3 +1,4 @@
+from utilities import showImage
 import tempfile
 import sys
 import os
@@ -6,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 
-def render(sources, showImage = False, output = None, yieldsPixels = False, canvas = (8,8), resolution = 256):
+def render(sources, showImage = False, output = None, yieldsPixels = False, canvas = (16,16), resolution = 256):
     # definitely do not try to render too much at once - I think this causes memory problems
     if len(sources) > 100:
         prefix = render(sources[:100], showImage, output, yieldsPixels, canvas, resolution)
@@ -18,7 +19,7 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
 '''%(canvas[0],canvas[1])
 
     preamble = "\\begin{tikzpicture}"
-    preamble += "[pencildraw/.style={black,decorate,decoration={random steps,segment length=2pt,amplitude=0.5pt}}]"
+    preamble += "[pencildraw/.style={black,decorate,decoration={random steps,segment length=4pt,amplitude=1pt}}]"
     preamble += "\n"
     sources = [preamble + canvas + "\n" + s + "\n\\end{tikzpicture}"
                for s in sources ]
@@ -88,11 +89,11 @@ def animateMatrices(matrices,outputFilename = None):
 
 if __name__ == "__main__":
     challenge = '''
-    \\node(b)[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (3,5) {};
-    \\node(a)[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
-    \\draw[pencildraw,ultra thick] (4,5) -- (6,5);
+    \\node[draw,circle,inner sep=0pt,minimum size = 2cm,line width = 0.1cm] at (3,5) {};
+    \\node[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
+    \\draw[pencildraw,line width = 0.1cm,dashed,->] (4,5) -- (6,5);
 '''
-    render([challenge],showImage = True,yieldsPixels = True)[0]
+    showImage(render([challenge],showImage = False,yieldsPixels = True)[0])
     # inputFile = sys.argv[1]
     # outputFile = sys.argv[2]
     # i = sys.stdin if inputFile == '-' else open(inputFile, "r")

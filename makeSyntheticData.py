@@ -47,12 +47,14 @@ def proposeAttachmentLines(objects):
 
     for j in range(len(attachmentSets) - 1):
         for k in range(j + 1,len(attachmentSets)):
-            for (x1,y1) in attachmentSets[j]:
-                for (x2,y2) in attachmentSets[k]:
+            for (x1,y1,o1) in attachmentSets[j]:
+                for (x2,y2,o2) in attachmentSets[k]:
+                    if o1 != o2: continue
+                    
                     candidate = None
-                    if x2 == x1 and y1 != y2:
+                    if x2 == x1 and y1 != y2 and o == 'v':
                         candidate = (x1,min(y1,y2),x1,max(y1,y2))
-                    elif y2 == y1 and x1 != x2:
+                    elif y2 == y1 and x1 != x2 and o == 'h':
                         candidate = (min(x1,x2),y1,max(x1,x2),y1)
                     if candidate != None:
                         l = Line.absolute(Number(candidate[0]),
@@ -128,7 +130,7 @@ def handleGeneration(arguments):
     
 if __name__ == '__main__':
     setCoordinateNoise(0.4)
-    setRadiusNoise(0.4)
+    setRadiusNoise(0.3)
     k = 10000
     os.system('mkdir syntheticTrainingData')
     for n in sys.argv[1:]:

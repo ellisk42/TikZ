@@ -7,7 +7,7 @@ Programs: evaluator maps environment to (trace, environment)
 Expressions: evaluator maps environment to value
 '''
 
-MAXIMUMCOORDINATE = 8
+MAXIMUMCOORDINATE = 16
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
 
@@ -180,7 +180,7 @@ class Line(Program):
 
     @staticmethod
     def lineCommand(points, arrow, solid, noisy = False):
-        attributes = ["ultra thick"]
+        attributes = ["line width = 0.1cm"]
         if arrow: attributes += ["->"]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
@@ -212,7 +212,15 @@ class Line(Program):
         if self.length() < 3:
             n = COORDINATENOISE
             setCoordinateNoise(n*self.length()/4.0*COORDINATENOISE)
-        e = ([Line.lineCommand([ p.noisyEvaluate(environment) for p in self.points ],
+        # 60% of the noise is applied equally to each coordinate
+        # 40% of the noise is per coordinate
+        setCoordinateNoise(0.4*COORDINATENOISE)
+        points = [ eval(p.noisyEvaluate(environment)) for p in self.points ]
+        setCoordinateNoise(COORDINATENOISE/0.4)
+        dx = truncatedNormal(-1,1)*COORDINATENOISE*0.6
+        dy = truncatedNormal(-1,1)*COORDINATENOISE*0.6
+        points = [ str((x + dx,y + dy)) for (x,y) in points ]
+        e = ([Line.lineCommand(points,
                                self.arrow,
                                self.solid,
                                noisy = True)],
@@ -265,10 +273,10 @@ class Rectangle():
                 Line([AbsolutePoint(self.p1.x,self.p2.y), self.p1])]
     def attachmentPoints(self):
         # all of the edges
-        ps = [ (x, self.p1.y.n) for x in range(self.p1.x.n + 1, self.p2.x.n) ]
-        ps += [ (self.p2.x.n, y) for y in range(self.p1.y.n + 1, self.p2.y.n) ]
-        ps += [ (x, self.p2.y.n) for x in range(self.p1.x.n + 1, self.p2.x.n) ]
-        ps += [ (self.p1.x.n, y) for y in range(self.p1.y.n + 1, self.p2.y.n) ]
+        ps = [ (x, self.p1.y.n, 'v') for x in range(self.p1.x.n + 1, self.p2.x.n) ]
+        ps += [ (self.p2.x.n, y, 'h') for y in range(self.p1.y.n + 1, self.p2.y.n) ]
+        ps += [ (x, self.p2.y.n, 'v') for x in range(self.p1.x.n + 1, self.p2.x.n) ]
+        ps += [ (self.p1.x.n, y, 'h') for y in range(self.p1.y.n + 1, self.p2.y.n) ]
         return ps
     
     def intersects(self,o):
@@ -288,14 +296,14 @@ class Rectangle():
     
     @staticmethod
     def command(p1,p2, noisy = False):
-        attributes = ["ultra thick"]
+        attributes = ["line width = 0.1cm"]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         return "\\draw [%s] %s rectangle %s;"%(attributes,p1,p2)
 
     @staticmethod
     def noisyLineCommand(p1,p2,p3,p4, noisy = True):
-        attributes = ["ultra thick"]
+        attributes = ["line width = 0.1cm"]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         return "\\draw [%s] %s -- %s -- %s -- %s -- cycle;"%(attributes,
@@ -362,20 +370,20 @@ class Circle():
         r = self.radius.n
         x = self.center.x.n
         y = self.center.y.n
-        return [(x + r,y),
-                (x - r,y),
-                (x,y + r),
-                (x,y - r)]
+        return [(x + r,y,'h'),
+                (x - r,y,'h'),
+                (x,y + r,'v'),
+                (x,y - r,'v')]
     
     @staticmethod
     def command(center, radius, noisy = False):
         noisy = "pencildraw," if noisy else ""
         radius = float(str(radius))
-        return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,ultra thick] at %s {};"%(noisy,radius*2, center)
+        return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,line width = 0.1cm] at %s {};"%(noisy,radius*2, center)
     def __str__(self):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
     def labeled(self,label):
-        return "\\node(%s)[draw,circle,inner sep=0pt,minimum size = %dcm,ultra thick] at %s {};"%(label, self.radius*2, self.center)
+        return "\\node(%s)[draw,circle,inner sep=0pt,minimum size = %dcm,line width = 0.1cm] at %s {};"%(label, self.radius*2, self.center)
     def mutate(self):
         while True:
             c = Circle(self.center.mutate(), self.radius)
