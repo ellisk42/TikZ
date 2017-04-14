@@ -7,7 +7,7 @@ Programs: evaluator maps environment to (trace, environment)
 Expressions: evaluator maps environment to value
 '''
 
-MAXIMUMCOORDINATE = 16
+MAXIMUMCOORDINATE = 8
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
 
@@ -259,7 +259,7 @@ class Line(Program):
         
         
 
-class Rectangle():
+class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
@@ -357,7 +357,7 @@ class Rectangle():
                 p2 = AbsolutePoint(x2,y2)
                 return Rectangle(p1, p2)
 
-class Circle():
+class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius

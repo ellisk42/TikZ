@@ -11,6 +11,10 @@ from time import time
 import pickle
 import cProfile
 
+# The data is generated on a  MAXIMUMCOORDINATExMAXIMUMCOORDINATE grid
+# We can interpolate between stochastic search and neural networks by downsampling to a smaller grid
+APPROXIMATINGGRID = MAXIMUMCOORDINATE
+
 learning_rate = 0.001
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
@@ -62,21 +66,29 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
 
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
-        self.prediction = []
+        # A placeholder for each target
         self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in self.outputDimensions ]
+
+        # A prediction for each target
+        self.prediction = []
+        # populate self.production
         predictionInputs = imageRepresentation
         for j,d in enumerate(self.outputDimensions):
             self.prediction.append(tf.layers.dense(predictionInputs, d, activation = None))
             predictionInputs = tf.concat([predictionInputs,
                                           tf.one_hot(self.targetPlaceholder[j], d)],
                                          axis = 1)
+        # "hard" predictions (integers)
         self.hard = [ tf.cast(tf.argmax(p,dimension = 1),tf.int32) for p in self.prediction ]
+
+        # "soft" predictions (logits)
         self.soft = [ tf.nn.log_softmax(p) for p in self.prediction ]
 
     def loss(self):
         return sum([ tf.nn.sparse_softmax_cross_entropy_with_logits(labels = l, logits = p)
                      for l,p in zip(self.targetPlaceholder, self.prediction) ])
     def accuracyVector(self):
+        '''For each example in the batch, do hard predictions match the target? ty = [None,bool]'''
         return reduce(tf.logical_and,
                       [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)])
     def placeholders(self): return self.targetPlaceholder
@@ -108,7 +120,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Circle
     
     def __init__(self, imageRepresentation):
-        self.outputDimensions = [8,8] # x,y
+        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
@@ -125,7 +137,7 @@ class RectangleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Rectangle
 
     def __init__(self, imageRepresentation):
-        self.outputDimensions = [8,8,8,8] # x,y
+        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
         self.makeNetwork(imageRepresentation)
             
 
@@ -144,7 +156,7 @@ class LineDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Line
 
     def __init__(self, imageRepresentation):
-        self.outputDimensions = [8,8,8,8,2,2] # x,y for beginning and end; arrow/-
+        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,2,2] # x,y for beginning and end; arrow/-
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
@@ -214,6 +226,7 @@ class PrimitiveDecoder():
 
     @staticmethod
     def extractTargets(l):
+        '''Given a line of code l, what is the array of targets (int's) we expect the decoder to produce?'''
         t = [STOP]
         for d in PrimitiveDecoder.decoderClasses:
             if isinstance(l,d.languagePrimitive):
@@ -299,7 +312,6 @@ class RecognitionModel():
     def analyzeFailures(self, numberOfExamples, exampleType, checkpoint):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
                                                                 exampleType)
-        initializer = tf.global_variables_initializer()
         iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors),
                                  testingFraction = 0.0, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
@@ -308,18 +320,27 @@ class RecognitionModel():
         failureLog = [] # pair of current goal
 
         with tf.Session() as s:
-            s.run(initializer)
+            saver.restore(s,checkpoint)
             for feed in iterator.epochFeeds():
                 accuracy = s.run(self.averageAccuracy,
                                  feed_dict = feed)
                 assert accuracy == 0.0 or accuracy == 1.0
                 if accuracy < 0.5:
-                    failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0]))
+                    # decode the action preferred by the model
+                    preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
+                                                              self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
+                                        key = lambda foo: foo[0])[1]
+                    preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
+                    failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
+                    
 
         print "Failures:",len(failureLog),'/',iterator.trainingSetSize
-        for j,(c,g) in enumerate(failureLog):
+        for j,(c,g,l) in enumerate(failureLog):
             saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
             saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
+            pixels = render([l],yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))[0]
+            pixels = 1.0 - pixels
+            saveMatrixAsImage(pixels*255 + 255*c,"failures/%d-predicted.png"%j)
                 
 
     def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
@@ -390,6 +411,6 @@ if __name__ == '__main__':
                                 beamSize = 20,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(1000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(100, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
         RecognitionModel().train(10000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
