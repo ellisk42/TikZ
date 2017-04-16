@@ -166,7 +166,11 @@ if __name__ == '__main__':
         offsetsAndCounts.append((n,startingPoint,kp))
         startingPoint += examplesPerBatch
     print offsetsAndCounts
-    Pool(totalNumberOfExamples/examplesPerBatch).map(handleGeneration, offsetsAndCounts)
+    workers = totalNumberOfExamples/examplesPerBatch
+    if workers > 1:
+        Pool(workers).map(handleGeneration, offsetsAndCounts)
+    else:
+        map(handleGeneration, offsetsAndCounts)
 
     print "Generated files, building archive..."
     os.system('tar cvf syntheticTrainingData.tar -T /dev/null')

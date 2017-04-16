@@ -438,6 +438,7 @@ class RecognitionModel():
                 print "Finished program: log likelihood %f"%(n['logLikelihood'])
                 print n['program'].TikZ()
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
+                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'],show = True)
                 print ""
                 trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
                 animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
