@@ -6,10 +6,9 @@ from render import render
 from PIL import Image
 import pickle
 from random import choice
+from utilities import showImage
 
 CANONICAL = True
-
-
 
 def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
@@ -20,6 +19,12 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     distinctPrograms = list(set([ p.TikZ() for prefix in programPrefixes for p in prefix] + noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
     print "Rendered %d images."%len(distinctPrograms)
+
+    # for program,image in zip(distinctPrograms,pixels):
+    #     print program
+    #     showImage(image)
+    #     print 
+    
     pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
     pixels = dict(zip(distinctPrograms,pixels))
     
@@ -125,20 +130,36 @@ def handleGeneration(arguments):
                   "tripleCircle": multipleObjects(circles = 3),
                   "individualRectangle": multipleObjects(rectangles = 1)}
     (n,startingPoint,k) = arguments
-    makeSyntheticData("syntheticTrainingData/"+n, generators[n], k = k, offset = startingPoint)
-    print "Generated %d training sequences."%k
+    # IMPORTANT!
+    # You *do not* want directories with an enormous number of files in them
+    # pack it all up into a directory that we will tar together later
+    
+    os.system('mkdir syntheticTrainingData/%d'%startingPoint)
+    makeSyntheticData("syntheticTrainingData/%d/%s"%(startingPoint,n), generators[n], k = k, offset = startingPoint)
+    print "Generated %d training sequences into syntheticTrainingData/%d"%(k,startingPoint)
     
 if __name__ == '__main__':
     setCoordinateNoise(0.4)
     setRadiusNoise(0.3)
-    k = 10000
-    os.system('mkdir syntheticTrainingData')
-    for n in sys.argv[1:]:
-        print n
-        startingPoint = 0
-        offsetsAndCounts = []
-        while startingPoint < k:
-            kp = min(k - startingPoint,1000)
-            offsetsAndCounts.append((n,startingPoint,kp))
-            startingPoint += 1000
-        Pool(5).map(handleGeneration, offsetsAndCounts)
+    totalNumberOfExamples = 10
+    examplesPerBatch = totalNumberOfExamples/1
+    os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
+    n = "randomScene"
+    startingPoint = 0
+    offsetsAndCounts = []
+    while startingPoint < totalNumberOfExamples:
+        kp = min(totalNumberOfExamples - startingPoint,examplesPerBatch)
+        offsetsAndCounts.append((n,startingPoint,kp))
+        startingPoint += examplesPerBatch
+    print offsetsAndCounts
+    map(handleGeneration, offsetsAndCounts)#Pool(5).
+
+    print "Generated files, building archive..."
+    os.system('tar cvf syntheticTrainingData.tar -T /dev/null')
+
+    for _,startingPoint,_ in offsetsAndCounts:
+        os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
+#        os.system('rm -r syntheticTrainingData/%d'%startingPoint)
+
+#    os.system('rm -r syntheticTrainingData')
+    print "Done. You should see everything in syntheticTrainingData.tar"

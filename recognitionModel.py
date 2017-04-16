@@ -4,6 +4,7 @@ from render import render,animateMatrices
 from utilities import *
 
 
+import tarfile
 import sys
 import tensorflow as tf
 import os
@@ -14,6 +15,8 @@ import cProfile
 # The data is generated on a  MAXIMUMCOORDINATExMAXIMUMCOORDINATE grid
 # We can interpolate between stochastic search and neural networks by downsampling to a smaller grid
 APPROXIMATINGGRID = MAXIMUMCOORDINATE
+def coordinate2grid(c): return c*MAXIMUMCOORDINATE/APPROXIMATINGGRID
+def grid2coordinate(g): return g*APPROXIMATINGGRID/MAXIMUMCOORDINATE
 
 learning_rate = 0.001
 
@@ -23,12 +26,13 @@ learning_rate = 0.001
 def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
-def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
-    print "Loading examples from these prefixes: %s"%(" ".join(filePrefixes))
-    programNames = [ "syntheticTrainingData/%s-%d.p"%(filePrefix,j)
-                     for j in range(numberOfExamples)
-                     for filePrefix in filePrefixes ]
-    programs = loadPrograms(programNames)
+def loadExamples(numberOfExamples, dummyImages = True):
+    handle = tarfile.open('syntheticTrainingData.tar')
+    
+    programNames = [ "./randomScene-%d.p"%(j)
+                     for j in range(numberOfExamples) ]
+    programs = [ pickle.load(handle.extractfile(n)) for n in programNames ]
+    
     startingExamples = []
     endingExamples = []
     target = {}
@@ -36,13 +40,13 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
     startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
-        trace = [ "%s-%d.png"%(programNames[j][:-2], k) for k in range(len(program)) ]
-        noisyTarget = "%s-noisy.png"%(programNames[j][:-2])
+        trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
+        noisyTarget = "./randomScene-%d-noisy.png"%(j)
         if not dummyImages:
-            trace = loadImages(trace)
-            noisyTarget = loadImage(noisyTarget)
+            trace = loadImages(trace,handle)
+            noisyTarget = loadImage(noisyTarget,handle)
         else:
-            loadImages(trace + [noisyTarget]) # puts them into IMAGEBYTES
+            loadImages(trace + [noisyTarget], handle) # puts them into IMAGEBYTES
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
@@ -61,6 +65,8 @@ def loadExamples(numberOfExamples, filePrefixes, dummyImages = True):
 
     print "loaded images in",(time() - startTime),"s"
     print "target dimensionality:",len(targetVectors)
+
+    handle.close()
     
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
@@ -112,7 +118,8 @@ class StandardPrimitiveDecoder():
                   for coordinateIndex,coordinateScore in enumerate(soft[traceIndex]) ]
             traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
         return traces
-            
+
+
 
 
 class CircleDecoder(StandardPrimitiveDecoder):
@@ -124,12 +131,14 @@ class CircleDecoder(StandardPrimitiveDecoder):
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Circle(AbsolutePoint(Number(x),Number(y)),Number(1)))
+        return [(s, Circle(AbsolutePoint(Number(grid2coordinate(x)),Number(grid2coordinate(y))),Number(1)))
                 for s,[x,y] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
     def extractTargets(l):
-        if isinstance(l,Circle): return [l.center.x.n, l.center.y.n]
+        if isinstance(l,Circle):
+            return [coordinate2grid(l.center.x.n),
+                    coordinate2grid(l.center.y.n)]
         return [0,0]
 
 class RectangleDecoder(StandardPrimitiveDecoder):
@@ -142,13 +151,19 @@ class RectangleDecoder(StandardPrimitiveDecoder):
             
 
     def beam(self, session, feed, beamSize):
-        return [(s, Rectangle(AbsolutePoint(Number(x1),Number(y1)),
-                              AbsolutePoint(Number(x2),Number(y2))))
+        return [(s, Rectangle.absolute(grid2coordinate(x1),
+                                       grid2coordinate(y1),
+                                       grid2coordinate(x2),
+                                       grid2coordinate(y2)))
                 for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
     def extractTargets(l):
-        if isinstance(l,Rectangle): return [l.p1.x.n,l.p1.y.n,l.p2.x.n,l.p2.y.n]
+        if isinstance(l,Rectangle):
+            return [coordinate2grid(l.p1.x.n),
+                    coordinate2grid(l.p1.y.n),
+                    coordinate2grid(l.p2.x.n),
+                    coordinate2grid(l.p2.y.n)]
         return [0]*4
 
 class LineDecoder(StandardPrimitiveDecoder):
@@ -160,16 +175,20 @@ class LineDecoder(StandardPrimitiveDecoder):
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Line.absolute(Number(x1),Number(y1),Number(x2),Number(y2),arrow = arrow,solid = solid))
+        return [(s, Line.absolute(Number(grid2coordinate(x1)),
+                                  Number(grid2coordinate(y1)),
+                                  Number(grid2coordinate(x2)),
+                                  Number(grid2coordinate(y2)),
+                                  arrow = arrow,solid = solid))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize) ]
 
     @staticmethod
     def extractTargets(l):
         if isinstance(l,Line):
-            return [l.points[0].x.n,
-                    l.points[0].y.n,
-                    l.points[1].x.n,
-                    l.points[1].y.n,
+            return [coordinate2grid(l.points[0].x.n),
+                    coordinate2grid(l.points[0].y.n),
+                    coordinate2grid(l.points[1].x.n),
+                    coordinate2grid(l.points[1].y.n),
                     int(l.arrow),
                     int(l.solid)]
         return [0]*6
@@ -284,12 +303,12 @@ class RecognitionModel():
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(self.loss)        
 
 
-    def train(self, numberOfExamples, exampleType, checkpoint = "/tmp/model.checkpoint"):
-        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
-                                                                exampleType)
+    def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint"):
+        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
+        
         initializer = tf.global_variables_initializer()
-        iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.0, stringProcessor = loadImage)
+        iterator = BatchIterator(10,tuple([partialImages,targetImages] + targetVectors),
+                                 testingFraction = 0.1, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -309,9 +328,8 @@ class RecognitionModel():
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
 
-    def analyzeFailures(self, numberOfExamples, exampleType, checkpoint):
-        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples,
-                                                                exampleType)
+    def analyzeFailures(self, numberOfExamples, checkpoint):
+        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
         iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors),
                                  testingFraction = 0.0, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
@@ -378,7 +396,8 @@ class RecognitionModel():
                 beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
                                    for n in beam ],
-                                 yieldsPixels = True)
+                                 yieldsPixels = True,
+                                 canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
                 totalNumberOfRenders += len(beam)
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
@@ -399,7 +418,7 @@ class RecognitionModel():
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                 print ""
                 trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
-                animateMatrices(render(trace,yieldsPixels = True),"neuralAnimation.gif")            
+                animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
 
                         
 
@@ -411,6 +430,6 @@ if __name__ == '__main__':
                                 beamSize = 20,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(100, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(10, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
-        RecognitionModel().train(10000, ["randomScene"], checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().train(10, checkpoint = "checkpoints/model.checkpoint")

@@ -7,11 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 
-def render(sources, showImage = False, output = None, yieldsPixels = False, canvas = (16,16), resolution = 256):
+def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), resolution = 256):
     # definitely do not try to render too much at once - I think this causes memory problems
     if len(sources) > 100:
-        prefix = render(sources[:100], showImage, output, yieldsPixels, canvas, resolution)
-        suffix = render(sources[100:], showImage, output, yieldsPixels, canvas, resolution)
+        prefix = render(sources[:100], showImage, yieldsPixels, canvas, resolution)
+        suffix = render(sources[100:], showImage, yieldsPixels, canvas, resolution)
         return prefix + suffix
     if canvas == None: canvas = ""
     else: canvas = '''
@@ -23,7 +23,7 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
     preamble += "\n"
     sources = [preamble + canvas + "\n" + s + "\n\\end{tikzpicture}"
                for s in sources ]
-    source = "\n".join(sources)
+    source = "\n\n\n".join(sources)
     source = '''
 \\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
 \\usetikzlibrary{decorations.pathmorphing}
@@ -33,9 +33,10 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
 ''' % (resolution, resolution, source)
 
     fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
+
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
-    os.system("cd /tmp; echo X|pdflatex -shell-escape %s > /dev/null 2> /dev/null" % temporaryName)
+    os.system("cd /tmp; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % temporaryName)
 
     temporaryPrefix = temporaryName[:-4]
     temporaryImages = [temporaryPrefix + ".png"]
@@ -48,23 +49,23 @@ def render(sources, showImage = False, output = None, yieldsPixels = False, canv
             os.system("feh %s" % temporaryImage)
 
     returnValue = []
-    if output != None:
-        os.system("mv %s %s 2> /dev/null" % (temporaryImages[0], output))
-        temporaryImages = [output]
-        
     if yieldsPixels:
         for temporaryImage in temporaryImages:
-            im = Image.open(temporaryImage).convert('L')
+            im = Image.open(temporaryImage)
             (width, height) = im.size
             if width != resolution or height != resolution:
-                # print "Got a bad resolution:",im.size
-                # print source
-                # assert False
                 im = im.resize((resolution,resolution))
+            if im.mode == 'RGBA' or im.mode == '1':
+                im = im.convert('L')
+                scale = 255.0
+            elif im.mode == 'I': # why God does this happen
+                scale = 65535.0
+            else:
+                raise Exception('Unhandled image format:'+im.mode)
             greyscale_map = list(im.getdata())
             greyscale_map = np.array(greyscale_map)
             greyscale_map = greyscale_map.reshape((resolution, resolution))
-            returnValue.append(greyscale_map/255.0)
+            returnValue.append(greyscale_map/scale)
 
 
     os.system("rm %s*" % temporaryPrefix)

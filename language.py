@@ -7,7 +7,7 @@ Programs: evaluator maps environment to (trace, environment)
 Expressions: evaluator maps environment to value
 '''
 
-MAXIMUMCOORDINATE = 8
+MAXIMUMCOORDINATE = 16
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
 
@@ -263,6 +263,10 @@ class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
+    @staticmethod
+    def absolute(x1,y1,x2,y2):
+        return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
+                         AbsolutePoint(Number(x2),Number(y2)))
     def children(self): return [self.p1,self.p2]
     def substitute(self, old, new):
         return Rectangle(self.p1.substitute(old, new),self.p2.substitute(old, new))
@@ -299,7 +303,13 @@ class Rectangle(Program):
         attributes = ["line width = 0.1cm"]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
-        return "\\draw [%s] %s rectangle %s;"%(attributes,p1,p2)
+        (x1,y1) = eval(p1)
+        (x2,y2) = eval(p2)
+        p1 = "(%.2f,%.2f)"%(x1,y1)
+        p2 = "(%.2f,%.2f)"%(x2,y1)
+        p3 = "(%.2f,%.2f)"%(x2,y2)
+        p4 = "(%.2f,%.2f)"%(x1,y2)
+        return "\\draw [%s] %s -- %s -- %s -- %s -- cycle;"%(attributes,p1,p2,p3,p4)
 
     @staticmethod
     def noisyLineCommand(p1,p2,p3,p4, noisy = True):
