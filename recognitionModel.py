@@ -19,6 +19,7 @@ def coordinate2grid(c): return c*MAXIMUMCOORDINATE/APPROXIMATINGGRID
 def grid2coordinate(g): return g*APPROXIMATINGGRID/MAXIMUMCOORDINATE
 
 learning_rate = 0.001
+TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
@@ -308,7 +309,7 @@ class RecognitionModel():
         
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.1, stringProcessor = loadImage)
+                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -331,7 +332,7 @@ class RecognitionModel():
     def analyzeFailures(self, numberOfExamples, checkpoint):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
         iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors),
-                                 testingFraction = 0.0, stringProcessor = loadImage)
+                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
@@ -339,7 +340,7 @@ class RecognitionModel():
 
         with tf.Session() as s:
             saver.restore(s,checkpoint)
-            for feed in iterator.epochFeeds():
+            for feed in iterator.testingFeeds():
                 accuracy = s.run(self.averageAccuracy,
                                  feed_dict = feed)
                 assert accuracy == 0.0 or accuracy == 1.0
