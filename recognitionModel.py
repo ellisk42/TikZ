@@ -307,7 +307,7 @@ class RecognitionModel():
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
         
         initializer = tf.global_variables_initializer()
-        iterator = BatchIterator(10,tuple([partialImages,targetImages] + targetVectors),
+        iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
                                  testingFraction = 0.1, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
@@ -432,4 +432,4 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'analyze':
         RecognitionModel().analyzeFailures(10, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
-        RecognitionModel().train(10, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().train(10000, checkpoint = "checkpoints/model.checkpoint")
