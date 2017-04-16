@@ -69,12 +69,12 @@ def proposeAttachmentLines(objects):
                         if all([not o.intersects(l) for o in objects ]):
                             yield candidate
 
-def horizontalOrVerticalLine(attachedLines = []):
+def sampleLine(attachedLines = []):
     concentration = 0.0
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
         points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
-    else:
+    elif random() < 1.0: # horizontal or vertical line
         x1 = randomCoordinate()
         y1 = randomCoordinate()
         if choice([True,False]):
@@ -87,9 +87,19 @@ def horizontalOrVerticalLine(attachedLines = []):
             x2 = x1
             while x2 == x1: x2 = randomCoordinate()
             points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
-    return Line(list(sorted(points, key = lambda p: (p.x.n,p.y.n))),
+    else: # arbitrary line between two points
+        while True:
+            p1 = AbsolutePoint.sample()
+            p2 = AbsolutePoint.sample()
+            if Line([p1,p2]).length() > 2:
+                points = [p1,p2]
+                break
+    arrow = random() > 0.5
+    if not arrow: # without an arrow there is no canonical orientation
+        points = list(sorted(points, key = lambda p: (p.x.n,p.y.n)))
+    return Line(points,
                 solid = random() > 0.5,
-                arrow = random() > 0.5)
+                arrow = arrow)
 
 def multipleObjects(rectangles = 0,lines = 0,circles = 0):
     def sampler():
@@ -97,7 +107,7 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0):
             cs = canonicalOrdering([ Circle.sample() for _ in range(circles) ])
             rs = canonicalOrdering([ Rectangle.sample() for _ in range(rectangles) ])
             attachedLines = list(proposeAttachmentLines(cs + rs))
-            ls = canonicalOrdering([ horizontalOrVerticalLine(attachedLines) for _ in range(lines) ])
+            ls = canonicalOrdering([ sampleLine(attachedLines) for _ in range(lines) ])
             program = cs + rs + ls
             failure = False
             for p in program:
@@ -141,8 +151,12 @@ def handleGeneration(arguments):
 if __name__ == '__main__':
     setCoordinateNoise(0.4)
     setRadiusNoise(0.3)
-    totalNumberOfExamples = 10000
-    examplesPerBatch = totalNumberOfExamples/10
+
+    if len(sys.argv) == 2:
+        totalNumberOfExamples = int(sys.argv[1])
+    else:
+        totalNumberOfExamples = 10000
+    examplesPerBatch = totalNumberOfExamples/10 if totalNumberOfExamples > 100 else totalNumberOfExamples
     os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
     n = "randomScene"
     startingPoint = 0
@@ -159,7 +173,9 @@ if __name__ == '__main__':
 
     for _,startingPoint,_ in offsetsAndCounts:
         os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
-        os.system('rm -r syntheticTrainingData/%d'%startingPoint)
+        if totalNumberOfExamples > 100:
+            os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
-    os.system('rm -r syntheticTrainingData')
+    if totalNumberOfExamples > 100:
+        os.system('rm -r syntheticTrainingData')
     print "Done. You should see everything in syntheticTrainingData.tar"
