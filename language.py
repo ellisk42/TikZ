@@ -181,7 +181,7 @@ class Line(Program):
     @staticmethod
     def lineCommand(points, arrow, solid, noisy = False):
         attributes = ["line width = 0.1cm"]
-        if arrow: attributes += ["->"]
+        if arrow: attributes += ["-{>[scale = 1.5]}"]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
