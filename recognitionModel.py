@@ -2,7 +2,7 @@ from batch import BatchIterator
 from language import *
 from render import render,animateMatrices
 from utilities import *
-
+from distanceMetrics import blurredDistance
 
 import tarfile
 import sys
@@ -217,6 +217,7 @@ class PrimitiveDecoder():
         self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
         self.soft = tf.nn.log_softmax(self.prediction)
         self.targetPlaceholder = tf.placeholder(tf.int32, [None])
+        self.imageRepresentation = imageRepresentation
 
     def loss(self):
         # the first label is for the primitive category
@@ -257,7 +258,11 @@ class PrimitiveDecoder():
         return t
 
     def beam(self, session, feed, beamSize):
-        tokenScores = session.run(self.soft, feed_dict = feed)[0]
+        # to accelerate beam decoding, we can cash the image representation
+        [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
+        tokenScores = tokenScores[0]
+        feed[self.imageRepresentation] = imageRepresentation
+        
         b = [(tokenScores[STOP], None)] # STOP
         for d in self.decoders:
             if d.token == STOP: continue
@@ -351,6 +356,9 @@ class RecognitionModel():
                                         key = lambda foo: foo[0])[1]
                     preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
+                    if len(failureLog) > 100:
+                        break
+                    
                     
 
         print "Failures:",len(failureLog),'/',iterator.trainingSetSize
@@ -379,8 +387,9 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(7):
+            for iteration in range(6):
                 children = []
+                startTime = time()
                 for parent in beam:
                     feed = {self.currentPlaceholder: np.array([parent['output']]),
                             self.goalPlaceholder: np.array([targetImage])}
@@ -393,16 +402,28 @@ class RecognitionModel():
                             k = parent['program'] + [suffix]
                         children.append({'program': k,
                                          'logLikelihood': parent['logLikelihood'] + childScore})
+                print "Ran neural network beam in %f seconds"%(time() - startTime)
                 
                 beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
+                startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
                                    for n in beam ],
                                  yieldsPixels = True,
                                  canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
+                print "Rendered in %f seconds"%(time() - startTime)
                 totalNumberOfRenders += len(beam)
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
+
+                for n in beam:
+                    p = n['program']
+                    if not finished(n): p = Sequence(p)
+                    print "Program in beam: %s"%(str(p))
+                    print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
+                    print "Pixel wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
+                    print "\n"
+                
                 # record all of the finished programs
                 finishedPrograms += [ n for n in beam if finished(n) ]
                 # Remove all of the finished programs
@@ -431,6 +452,6 @@ if __name__ == '__main__':
                                 beamSize = 20,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(10, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
         RecognitionModel().train(10000, checkpoint = "checkpoints/model.checkpoint")

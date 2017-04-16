@@ -176,12 +176,14 @@ class Line(Program):
                                   AbsolutePoint(o.points[1].x.n,o.points[1].y.n))
         
     def __str__(self):
-        return Line.lineCommand(map(str,self.points), self.arrow, self.solid)
+        return "Line(%s, arrow = %s, solid = %s)"%(", ".join(map(str,self.points)), str(self.arrow), str(self.solid))
 
     @staticmethod
     def lineCommand(points, arrow, solid, noisy = False):
         attributes = ["line width = 0.1cm"]
-        if arrow: attributes += ["-{>[scale = 1.5]}"]
+        if arrow:
+            #attributes += ["-{>[scale = 1.5]}"]
+            attributes += ["->"]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
