@@ -42,6 +42,8 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     temporaryImages = [temporaryPrefix + ".png"]
     if len(sources) > 1:
         pattern = "%s-%0"+str(len(str(len(sources) - 1)))+"d.png"
+        # for sketch2
+        pattern = "%s-%d.png"
         temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
 
     if showImage:
