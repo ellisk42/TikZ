@@ -272,7 +272,7 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        numberOfFilters = [8,6]
+        numberOfFilters = [10,6]
         kernelSizes = [8,8]
         
         poolSizes = [8,2]
