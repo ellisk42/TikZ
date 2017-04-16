@@ -278,12 +278,37 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        numberOfFilters = [10,6]
-        kernelSizes = [8,8]
+        horizontalKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 4,
+                                             kernel_size = [16,4],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        verticalKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 4,
+                                             kernel_size = [4,16],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        squareKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 6,
+                                             kernel_size = [8,8],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
+        c1 = tf.layers.max_pooling2d(inputs = c1,
+                                     pool_size = 8,
+                                     strides = 4,
+                                     padding = "same")
+        print c1
+
+        numberOfFilters = [10]
+        kernelSizes = [8]
         
-        poolSizes = [8,2]
-        poolStrides = [4,2]
-        nextInput = imageInput
+        poolSizes = [4]
+        poolStrides = [4]
+        nextInput = c1
         for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
             c1 = tf.layers.conv2d(inputs = nextInput,
                                   filters = filterCount,
