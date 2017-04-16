@@ -1,8 +1,10 @@
 import numpy as np
 
 class BatchIterator():
-    def __init__(self, batchSize, tensors, testingFraction = 0.0, stringProcessor = None):
+    def __init__(self, batchSize, tensors, testingFraction = 0.0, stringProcessor = None, seed = 42):
         for t in tensors: assert t.shape[0] == tensors[0].shape[0]
+
+        np.random.seed(seed)
         
         # side-by-side shuffle of the data
         permutation = np.random.permutation(range(tensors[0].shape[0]))
@@ -63,7 +65,6 @@ class BatchIterator():
         '''Gives you feeds for smaller batches of the testing examples'''
         testingIndex = 0
         while True:
-            print "testing index",testingIndex
             yield dict(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize)))
             testingIndex += self.batchSize
             if testingIndex > self.testingSetSize: break
