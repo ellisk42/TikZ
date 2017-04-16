@@ -141,8 +141,8 @@ def handleGeneration(arguments):
 if __name__ == '__main__':
     setCoordinateNoise(0.4)
     setRadiusNoise(0.3)
-    totalNumberOfExamples = 10
-    examplesPerBatch = totalNumberOfExamples/1
+    totalNumberOfExamples = 10000
+    examplesPerBatch = totalNumberOfExamples/10
     os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
     n = "randomScene"
     startingPoint = 0
@@ -152,14 +152,14 @@ if __name__ == '__main__':
         offsetsAndCounts.append((n,startingPoint,kp))
         startingPoint += examplesPerBatch
     print offsetsAndCounts
-    map(handleGeneration, offsetsAndCounts)#Pool(5).
+    Pool(totalNumberOfExamples/examplesPerBatch).map(handleGeneration, offsetsAndCounts)
 
     print "Generated files, building archive..."
     os.system('tar cvf syntheticTrainingData.tar -T /dev/null')
 
     for _,startingPoint,_ in offsetsAndCounts:
         os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
-#        os.system('rm -r syntheticTrainingData/%d'%startingPoint)
+        os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
-#    os.system('rm -r syntheticTrainingData')
+    os.system('rm -r syntheticTrainingData')
     print "Done. You should see everything in syntheticTrainingData.tar"
