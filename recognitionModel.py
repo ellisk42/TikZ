@@ -28,6 +28,8 @@ def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
 def loadExamples(numberOfExamples, dummyImages = True):
+    noisyTrainingData = "noisy" in sys.argv
+    
     handle = tarfile.open('syntheticTrainingData.tar')
     
     programNames = [ "./randomScene-%d.p"%(j)
@@ -42,7 +44,7 @@ def loadExamples(numberOfExamples, dummyImages = True):
     # get one example from each line of each program
     for j,program in enumerate(programs):
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
-        noisyTarget = "./randomScene-%d-noisy.png"%(j)
+        noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
         if not dummyImages:
             trace = loadImages(trace,handle)
             noisyTarget = loadImage(noisyTarget,handle)
@@ -367,10 +369,12 @@ class RecognitionModel():
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
         failureLog = [] # pair of current goal
+        k = 0
 
         with tf.Session() as s:
             saver.restore(s,checkpoint)
             for feed in iterator.testingFeeds():
+                k += 1
                 accuracy = s.run(self.averageAccuracy,
                                  feed_dict = feed)
                 assert accuracy == 0.0 or accuracy == 1.0
@@ -384,9 +388,7 @@ class RecognitionModel():
                     if len(failureLog) > 100:
                         break
                     
-                    
-
-        print "Failures:",len(failureLog),'/',iterator.trainingSetSize
+        print "Failures:",len(failureLog),'/',k
         for j,(c,g,l) in enumerate(failureLog):
             saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
             saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
@@ -412,7 +414,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(6):
+            for iteration in range(17):
                 children = []
                 startTime = time()
                 for parent in beam:
@@ -429,7 +431,8 @@ class RecognitionModel():
                                          'logLikelihood': parent['logLikelihood'] + childScore})
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
                 
-                beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
+                beam = children
+                
                 startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
                                    for n in beam ],
@@ -442,10 +445,14 @@ class RecognitionModel():
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
                 for n in beam:
+                    n['distance'] = -blurredDistance(targetImage, n['output'])
+                beam = sorted(children, key = lambda c: c['distance'])[:beamSize]
+
+                for n in beam:
                     p = n['program']
                     if not finished(n): p = Sequence(p)
                     print "Program in beam: %s"%(str(p))
-                    print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
+                    print "Blurred distance: %f"%n['distance']
                     print "Pixel wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                     print "\n"
                 
@@ -475,7 +482,7 @@ class RecognitionModel():
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 20,
+                                beamSize = 10,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
         RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")

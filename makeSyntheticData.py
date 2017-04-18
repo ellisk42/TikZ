@@ -131,6 +131,13 @@ def randomScene(maximumNumberOfObjects):
                                circles = len([x for x in shapeIdentities if x == 2 ]))()
     return sampler
 
+def icingModel():
+    primitives = [ Circle(AbsolutePoint(Number(3*x + 3),Number(3*y + 3)), Number(1))
+      for x in range(3)
+      for y in range(3) ]
+    return Sequence(primitives)
+            
+
 def handleGeneration(arguments):
     generators = {"individualCircle": multipleObjects(circles = 1),
                   "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
@@ -151,6 +158,13 @@ def handleGeneration(arguments):
 if __name__ == '__main__':
     setCoordinateNoise(0.4)
     setRadiusNoise(0.3)
+
+    if len(sys.argv) == 2 and sys.argv[1] == 'challenge':
+        setCoordinateNoise(0.1)
+        setRadiusNoise(0.05)
+        x = render([icingModel().noisyTikZ()],showImage = True,yieldsPixels = True)[0]
+        Image.fromarray(255*x).convert('L').save('challenge.png')
+        assert False
 
     if len(sys.argv) == 2:
         totalNumberOfExamples = int(sys.argv[1])
