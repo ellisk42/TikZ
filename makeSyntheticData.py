@@ -185,7 +185,7 @@ if __name__ == '__main__':
     print offsetsAndCounts
     workers = totalNumberOfExamples/examplesPerBatch
     if workers > 1:
-        if workers > 15: workers = 15
+        if workers > 10: workers = 10
         Pool(workers).map(handleGeneration, offsetsAndCounts)
     else:
         map(handleGeneration, offsetsAndCounts)

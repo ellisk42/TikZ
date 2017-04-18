@@ -13,6 +13,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
         prefix = render(sources[:100], showImage, yieldsPixels, canvas, resolution)
         suffix = render(sources[100:], showImage, yieldsPixels, canvas, resolution)
         return prefix + suffix
+    if sources == []: return []
     if canvas == None: canvas = ""
     else: canvas = '''
 \draw[fill = white, white] (0,0) rectangle (%d,%d);
@@ -27,7 +28,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     source = '''
 \\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
 \\usetikzlibrary{decorations.pathmorphing}
-%%\\usetikzlibrary{arrows.meta}
+\\usetikzlibrary{arrows.meta}
 \\begin{document}
 %s
 \\end{document}
@@ -43,10 +44,22 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     temporaryImages = [temporaryPrefix + ".png"]
     if len(sources) > 1:
         pattern = "%s-%0"+str(len(str(len(sources) - 1)))+"d.png"
-        # for sketch2
-        pattern = "%s-%d.png"
         temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
-
+        if not all([os.path.isfile(t) for t in temporaryImages ]):
+            print "WARNING: didn't render to zero prefixed filenames. Trying without prefixes:"
+            # for sketch2
+            pattern = "%s-%d.png"
+            temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
+            if not all([os.path.isfile(t) for t in temporaryImages ]):
+                print "ERROR: didn't get any files without zero prefixes either. Here is the latex output:"
+                
+                raise Exception('No image output from latex process. prefix = %s, len(sources) = %d, fs = \n%s\n,checks = \n%s\n'%(temporaryPrefix,
+                                                                                                                                   len(sources),
+                                                                                                                                   "\n".join(temporaryImages),
+                                                                                                                                   "\n".join(map(str,[os.path.isfile(t) for t in temporaryImages ]))))
+            else:
+                print "Got it without zero prefixes"
+                
     if showImage:
         for temporaryImage in temporaryImages:
             os.system("feh %s" % temporaryImage)
@@ -97,7 +110,7 @@ if __name__ == "__main__":
     \\node[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
     \\draw[pencildraw,line width = 0.1cm,dashed,-{>[scale = 3]}] (4,5) -- (6,5);
 '''
-    showImage(render([challenge],showImage = False,yieldsPixels = True)[0])
+    print render([challenge]*5,showImage = False,yieldsPixels = True)[0]
     # inputFile = sys.argv[1]
     # outputFile = sys.argv[2]
     # i = sys.stdin if inputFile == '-' else open(inputFile, "r")
