@@ -185,8 +185,7 @@ class Line(Program):
         else:
             attributes = ["line width = 0.1cm"]
         if arrow:
-            #attributes += ["-{>[scale = 1.5]}"]
-            attributes += ["->"]
+            attributes += ["-{>[scale = 1.5]}"]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
@@ -514,6 +513,11 @@ class Sequence(Program):
         validParents = LABELS[:len(notLines)]
         validLines = [l for l in isLines if l.isValid(validParents) ]
         return validLines + notLines
+
+    def hasCollisions(self):
+        return any([ (j > k and l.intersects(lp))
+                      for j,l in enumerate(self.lines)
+                      for k,lp in enumerate(self.lines) ])
 
     def __eq__(self,o): return str(self) == str(o)
     def __ne__(self,o): return str(self) != str(o)

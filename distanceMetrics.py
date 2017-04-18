@@ -21,6 +21,27 @@ def blurredDistance(a,b, show = False):
         showImage(a)
         showImage(b)
     return -np.sum(np.abs(a - b))
+
+def asymmetricBlurredDistance(a,b, show = False):
+    # a = target
+    # b = current
+    # if you see a pixel in current that isn't in target, that's really bad
+    # if you see a pixel and target that isn't an current, that's not so bad
+    import cv2
+    kernelSize = 15
+    
+    a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
+    b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
+    
+    if show:
+        showImage(a)
+        showImage(b)
+
+    d = a - b
+    positives = d > 0
+    targetBigger = np.sum(np.abs(d[d > 0]))
+    currentBigger = np.sum(np.abs(d[d < 0]))
+    return currentBigger*10 + targetBigger
     
 
 # Hausdorff Distance
