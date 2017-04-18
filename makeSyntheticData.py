@@ -74,7 +74,7 @@ def sampleLine(attachedLines = []):
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
         points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
-    elif random() < 1.0: # horizontal or vertical line
+    elif random() < 0.75: # horizontal or vertical line
         x1 = randomCoordinate()
         y1 = randomCoordinate()
         if choice([True,False]):
@@ -131,6 +131,13 @@ def randomScene(maximumNumberOfObjects):
                                circles = len([x for x in shapeIdentities if x == 2 ]))()
     return sampler
 
+def icingModel():
+    primitives = [ Circle(AbsolutePoint(Number(3*x + 3),Number(3*y + 3)), Number(1))
+      for x in range(3)
+      for y in range(3) ]
+    return Sequence(primitives)
+            
+
 def handleGeneration(arguments):
     generators = {"individualCircle": multipleObjects(circles = 1),
                   "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
@@ -149,14 +156,24 @@ def handleGeneration(arguments):
     print "Generated %d training sequences into syntheticTrainingData/%d"%(k,startingPoint)
     
 if __name__ == '__main__':
-    setCoordinateNoise(0.4)
-    setRadiusNoise(0.3)
+    setCoordinateNoise(0.2)
+    setRadiusNoise(0.1)
+
+    if len(sys.argv) == 2 and sys.argv[1] == 'challenge':
+        setCoordinateNoise(0.1)
+        setRadiusNoise(0.05)
+        x = render([icingModel().noisyTikZ()],showImage = True,yieldsPixels = True)[0]
+        Image.fromarray(255*x).convert('L').save('challenge.png')
+        assert False
 
     if len(sys.argv) == 2:
         totalNumberOfExamples = int(sys.argv[1])
     else:
         totalNumberOfExamples = 10000
     examplesPerBatch = totalNumberOfExamples/10 if totalNumberOfExamples > 100 else totalNumberOfExamples
+    # this keeps any particular directory from getting too big
+    if examplesPerBatch > 1000: examplesPerBatch = 1000
+    
     os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
     n = "randomScene"
     startingPoint = 0
@@ -166,7 +183,12 @@ if __name__ == '__main__':
         offsetsAndCounts.append((n,startingPoint,kp))
         startingPoint += examplesPerBatch
     print offsetsAndCounts
-    Pool(totalNumberOfExamples/examplesPerBatch).map(handleGeneration, offsetsAndCounts)
+    workers = totalNumberOfExamples/examplesPerBatch
+    if workers > 1:
+        if workers > 15: workers = 15
+        Pool(workers).map(handleGeneration, offsetsAndCounts)
+    else:
+        map(handleGeneration, offsetsAndCounts)
 
     print "Generated files, building archive..."
     os.system('tar cvf syntheticTrainingData.tar -T /dev/null')

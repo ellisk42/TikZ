@@ -5,14 +5,21 @@ Created on Mon Jun 16 23:56:41 2014
 """
 import numpy as np
 from numpy.core.umath_tests import inner1d
-import cv2
+from utilities import showImage
 # A = np.array([[1,2],[3,4],[5,6],[7,8]])
 # B = np.array([[2,3],[4,5],[6,7],[8,9],[10,11]])
 
 
-def blurredDistance(a,b):
-    a = cv2.GaussianBlur(a,(61,61),sigmaX = 15)
-    b = cv2.GaussianBlur(b,(61,61),sigmaX = 15)
+def blurredDistance(a,b, show = False):
+    import cv2
+    kernelSize = 15
+    
+    a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
+    b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
+    
+    if show:
+        showImage(a)
+        showImage(b)
     return -np.sum(np.abs(a - b))
     
 

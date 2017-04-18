@@ -2,7 +2,7 @@ from batch import BatchIterator
 from language import *
 from render import render,animateMatrices
 from utilities import *
-
+from distanceMetrics import blurredDistance
 
 import tarfile
 import sys
@@ -28,6 +28,8 @@ def loadPrograms(filenames):
     return [ pickle.load(open(n,'rb')) for n in filenames ]
 
 def loadExamples(numberOfExamples, dummyImages = True):
+    noisyTrainingData = "noisy" in sys.argv
+    
     handle = tarfile.open('syntheticTrainingData.tar')
     
     programNames = [ "./randomScene-%d.p"%(j)
@@ -42,7 +44,7 @@ def loadExamples(numberOfExamples, dummyImages = True):
     # get one example from each line of each program
     for j,program in enumerate(programs):
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
-        noisyTarget = "./randomScene-%d-noisy.png"%(j)
+        noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
         if not dummyImages:
             trace = loadImages(trace,handle)
             noisyTarget = loadImage(noisyTarget,handle)
@@ -217,6 +219,7 @@ class PrimitiveDecoder():
         self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
         self.soft = tf.nn.log_softmax(self.prediction)
         self.targetPlaceholder = tf.placeholder(tf.int32, [None])
+        self.imageRepresentation = imageRepresentation
 
     def loss(self):
         # the first label is for the primitive category
@@ -257,7 +260,11 @@ class PrimitiveDecoder():
         return t
 
     def beam(self, session, feed, beamSize):
-        tokenScores = session.run(self.soft, feed_dict = feed)[0]
+        # to accelerate beam decoding, we can cash the image representation
+        [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
+        tokenScores = tokenScores[0]
+        feed[self.imageRepresentation] = imageRepresentation
+        
         b = [(tokenScores[STOP], None)] # STOP
         for d in self.decoders:
             if d.token == STOP: continue
@@ -273,12 +280,37 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        numberOfFilters = [10,6]
-        kernelSizes = [8,8]
+        horizontalKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 4,
+                                             kernel_size = [16,4],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        verticalKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 4,
+                                             kernel_size = [4,16],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        squareKernels = tf.layers.conv2d(inputs = imageInput,
+                                             filters = 6,
+                                             kernel_size = [8,8],
+                                             padding = "same",
+                                             activation = tf.nn.relu,
+                                             strides = 1)
+        c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
+        c1 = tf.layers.max_pooling2d(inputs = c1,
+                                     pool_size = 8,
+                                     strides = 4,
+                                     padding = "same")
+        print c1
+
+        numberOfFilters = [10]
+        kernelSizes = [8]
         
-        poolSizes = [8,2]
-        poolStrides = [4,2]
-        nextInput = imageInput
+        poolSizes = [4]
+        poolStrides = [4]
+        nextInput = c1
         for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
             c1 = tf.layers.conv2d(inputs = nextInput,
                                   filters = filterCount,
@@ -337,10 +369,12 @@ class RecognitionModel():
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
         failureLog = [] # pair of current goal
+        k = 0
 
         with tf.Session() as s:
             saver.restore(s,checkpoint)
             for feed in iterator.testingFeeds():
+                k += 1
                 accuracy = s.run(self.averageAccuracy,
                                  feed_dict = feed)
                 assert accuracy == 0.0 or accuracy == 1.0
@@ -351,9 +385,10 @@ class RecognitionModel():
                                         key = lambda foo: foo[0])[1]
                     preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
+                    if len(failureLog) > 100:
+                        break
                     
-
-        print "Failures:",len(failureLog),'/',iterator.trainingSetSize
+        print "Failures:",len(failureLog),'/',k
         for j,(c,g,l) in enumerate(failureLog):
             saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
             saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
@@ -379,8 +414,9 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(7):
+            for iteration in range(17):
                 children = []
+                startTime = time()
                 for parent in beam:
                     feed = {self.currentPlaceholder: np.array([parent['output']]),
                             self.goalPlaceholder: np.array([targetImage])}
@@ -393,16 +429,33 @@ class RecognitionModel():
                             k = parent['program'] + [suffix]
                         children.append({'program': k,
                                          'logLikelihood': parent['logLikelihood'] + childScore})
+                print "Ran neural network beam in %f seconds"%(time() - startTime)
                 
-                beam = sorted(children, key = lambda c: -c['logLikelihood'])[:beamSize]
+                beam = children
+                
+                startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
                                    for n in beam ],
                                  yieldsPixels = True,
                                  canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
+                print "Rendered in %f seconds"%(time() - startTime)
                 totalNumberOfRenders += len(beam)
                 for n,o in zip(beam,outputs): n['output'] = 1.0 - o
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
+
+                for n in beam:
+                    n['distance'] = -blurredDistance(targetImage, n['output'])
+                beam = sorted(children, key = lambda c: c['distance'])[:beamSize]
+
+                for n in beam:
+                    p = n['program']
+                    if not finished(n): p = Sequence(p)
+                    print "Program in beam: %s"%(str(p))
+                    print "Blurred distance: %f"%n['distance']
+                    print "Pixel wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
+                    print "\n"
+                
                 # record all of the finished programs
                 finishedPrograms += [ n for n in beam if finished(n) ]
                 # Remove all of the finished programs
@@ -417,6 +470,7 @@ class RecognitionModel():
                 print "Finished program: log likelihood %f"%(n['logLikelihood'])
                 print n['program'].TikZ()
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
+                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'],show = True)
                 print ""
                 trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
                 animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
@@ -428,9 +482,9 @@ class RecognitionModel():
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 20,
+                                beamSize = 10,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(10, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
         RecognitionModel().train(10000, checkpoint = "checkpoints/model.checkpoint")

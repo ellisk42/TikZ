@@ -176,12 +176,17 @@ class Line(Program):
                                   AbsolutePoint(o.points[1].x.n,o.points[1].y.n))
         
     def __str__(self):
-        return Line.lineCommand(map(str,self.points), self.arrow, self.solid)
+        return "Line(%s, arrow = %s, solid = %s)"%(", ".join(map(str,self.points)), str(self.arrow), str(self.solid))
 
     @staticmethod
     def lineCommand(points, arrow, solid, noisy = False):
-        attributes = ["line width = 0.1cm"]
-        if arrow: attributes += ["-{>[scale = 1.5]}"]
+        if noisy:
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
+        else:
+            attributes = ["line width = 0.1cm"]
+        if arrow:
+            #attributes += ["-{>[scale = 1.5]}"]
+            attributes += ["->"]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
@@ -301,6 +306,8 @@ class Rectangle(Program):
     @staticmethod
     def command(p1,p2, noisy = False):
         attributes = ["line width = 0.1cm"]
+        if noisy:
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         (x1,y1) = eval(p1)
@@ -314,6 +321,8 @@ class Rectangle(Program):
     @staticmethod
     def noisyLineCommand(p1,p2,p3,p4, noisy = True):
         attributes = ["line width = 0.1cm"]
+        if noisy:
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         return "\\draw [%s] %s -- %s -- %s -- %s -- cycle;"%(attributes,
@@ -389,7 +398,10 @@ class Circle(Program):
     def command(center, radius, noisy = False):
         noisy = "pencildraw," if noisy else ""
         radius = float(str(radius))
-        return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,line width = 0.1cm] at %s {};"%(noisy,radius*2, center)
+        lw = "line width = 0.1cm"
+        if noisy:
+            lw = "line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)
+        return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,%s] at %s {};"%(noisy,radius*2,lw,center)
     def __str__(self):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
     def labeled(self,label):

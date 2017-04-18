@@ -67,4 +67,4 @@ class BatchIterator():
         while True:
             yield dict(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize)))
             testingIndex += self.batchSize
-            if testingIndex > self.testingSetSize: break
+            if testingIndex >= self.testingSetSize: break

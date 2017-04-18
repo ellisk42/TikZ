@@ -27,7 +27,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     source = '''
 \\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
 \\usetikzlibrary{decorations.pathmorphing}
-\\usetikzlibrary{arrows.meta}
+%%\\usetikzlibrary{arrows.meta}
 \\begin{document}
 %s
 \\end{document}
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     challenge = '''
     \\node[draw,circle,inner sep=0pt,minimum size = 2cm,line width = 0.1cm] at (3,5) {};
     \\node[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
-    \\draw[pencildraw,line width = 0.1cm,dashed,-{>[scale = 1.5]}] (4,5) -- (6,5);
+    \\draw[pencildraw,line width = 0.1cm,dashed,-{>[scale = 3]}] (4,5) -- (6,5);
 '''
     showImage(render([challenge],showImage = False,yieldsPixels = True)[0])
     # inputFile = sys.argv[1]
