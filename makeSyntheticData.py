@@ -74,7 +74,7 @@ def sampleLine(attachedLines = []):
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
         points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
-    elif random() < 1.0: # horizontal or vertical line
+    elif random() < 0.75: # horizontal or vertical line
         x1 = randomCoordinate()
         y1 = randomCoordinate()
         if choice([True,False]):
@@ -156,8 +156,8 @@ def handleGeneration(arguments):
     print "Generated %d training sequences into syntheticTrainingData/%d"%(k,startingPoint)
     
 if __name__ == '__main__':
-    setCoordinateNoise(0.4)
-    setRadiusNoise(0.3)
+    setCoordinateNoise(0.2)
+    setRadiusNoise(0.1)
 
     if len(sys.argv) == 2 and sys.argv[1] == 'challenge':
         setCoordinateNoise(0.1)
@@ -171,6 +171,9 @@ if __name__ == '__main__':
     else:
         totalNumberOfExamples = 10000
     examplesPerBatch = totalNumberOfExamples/10 if totalNumberOfExamples > 100 else totalNumberOfExamples
+    # this keeps any particular directory from getting too big
+    if examplesPerBatch > 1000: examplesPerBatch = 1000
+    
     os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
     n = "randomScene"
     startingPoint = 0
@@ -182,6 +185,7 @@ if __name__ == '__main__':
     print offsetsAndCounts
     workers = totalNumberOfExamples/examplesPerBatch
     if workers > 1:
+        if workers > 15: workers = 15
         Pool(workers).map(handleGeneration, offsetsAndCounts)
     else:
         map(handleGeneration, offsetsAndCounts)
