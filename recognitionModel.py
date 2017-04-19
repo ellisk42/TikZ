@@ -2,7 +2,7 @@ from batch import BatchIterator
 from language import *
 from render import render,animateMatrices
 from utilities import *
-from distanceMetrics import blurredDistance
+from distanceMetrics import blurredDistance,asymmetricBlurredDistance
 
 import tarfile
 import sys
@@ -163,7 +163,8 @@ class RectangleDecoder(StandardPrimitiveDecoder):
                                        grid2coordinate(y1),
                                        grid2coordinate(x2),
                                        grid2coordinate(y2)))
-                for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize) ]
+                for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize)
+                if x1 != x2 and y1 != y2]
 
     @staticmethod
     def extractTargets(l):
@@ -188,7 +189,8 @@ class LineDecoder(StandardPrimitiveDecoder):
                                   Number(grid2coordinate(x2)),
                                   Number(grid2coordinate(y2)),
                                   arrow = arrow,solid = solid))
-                for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize) ]
+                for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
+                if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 ]
 
     @staticmethod
     def extractTargets(l):
@@ -419,7 +421,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(17):
+            for iteration in range(12):
                 children = []
                 startTime = time()
                 for parent in beam:
@@ -435,8 +437,11 @@ class RecognitionModel():
                         children.append({'program': k,
                                          'logLikelihood': parent['logLikelihood'] + childScore})
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
+
                 
-                beam = children
+                
+                beam = [ n for n in children
+                         if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
                 
                 startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
@@ -450,13 +455,20 @@ class RecognitionModel():
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
                 for n in beam:
-                    n['distance'] = -blurredDistance(targetImage, n['output'])
-                beam = sorted(children, key = lambda c: c['distance'])[:beamSize]
+                    n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
+                beam = sorted(beam, key = lambda c: c['distance'])
+
+                if len(beam) > beamSize:
+                    # only keep things in the beam if they produce unique outputs. encourages diversity
+                    beam = [n for j,n in enumerate(beam)
+                            if all([ not np.array_equal(n['output'], m['output']) for m in beam[:j] ])]
+                beam = beam[:beamSize]
+                
 
                 for n in beam:
                     p = n['program']
                     if not finished(n): p = Sequence(p)
-                    print "Program in beam: %s"%(str(p))
+                    print "Program in beam: %s\n"%(str(p))
                     print "Blurred distance: %f"%n['distance']
                     print "Pixel wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                     print "\n"
@@ -487,7 +499,7 @@ class RecognitionModel():
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 10,
+                                beamSize = 20,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
         RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
