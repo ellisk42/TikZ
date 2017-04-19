@@ -3,8 +3,17 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
-
+# maps from a file named to the bytes in that file
 IMAGEBYTES = {}
+def cachedImage(n, archive = None):
+    if not n in IMAGEBYTES:
+        if archive == None:
+            with open(n,'rb') as handle:
+                IMAGEBYTES[n] = handle.read()
+        else:
+            IMAGEBYTES[n] = archive.extractfile(n).read()
+    return IMAGEBYTES[n]
+def cachedImages(ns,archive = None): return map(lambda n: cachedImage(n, archive),ns)
 def loadImage(n, archive = None): # archive: optionally a tarball handle
     if n == "blankImage": return np.zeros((256,256))
     def processPicture(p):
@@ -12,15 +21,7 @@ def loadImage(n, archive = None): # archive: optionally a tarball handle
         p = p.convert('L')
         (w,h) = p.size
         return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
-    if not n in IMAGEBYTES:
-        if archive == None:
-            with open(n,'rb') as handle:
-                IMAGEBYTES[n] = handle.read()
-        else:
-            IMAGEBYTES[n] = archive.extractfile(n).read()
-        # print "I just loaded %s for the first time"%n
-        # showImage(processPicture(Image.open(io.BytesIO(IMAGEBYTES[n]))))
-    return processPicture(Image.open(io.BytesIO(IMAGEBYTES[n])))
+    return processPicture(Image.open(io.BytesIO(cachedImage(n,archive))))
 def loadImages(ns,archive = None): return map(lambda n: loadImage(n, archive),ns)
 
 def showImage(image):

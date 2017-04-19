@@ -31,11 +31,11 @@ def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
     
     if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
-        print "Loading open mind training data"
-        handle = tarfile.open('/om/user/ellisk/syntheticTrainingData.tar')
+        handle = '/om/user/ellisk/syntheticTrainingData.tar'
     else:
-        print "Falling back on training data in current working directory"
-        handle = tarfile.open('syntheticTrainingData.tar')
+        handle = 'syntheticTrainingData.tar'
+    print "Loading data from",handle
+    handle = tarfile.open(handle)
     
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
@@ -48,13 +48,15 @@ def loadExamples(numberOfExamples, dummyImages = True):
     startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
+        if j%10000 == 1:
+            print "Loaded %d/%d programs"%(j - 1,len(programs))
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
         noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
         if not dummyImages:
             trace = loadImages(trace,handle)
             noisyTarget = loadImage(noisyTarget,handle)
         else:
-            loadImages(trace + [noisyTarget], handle) # puts them into IMAGEBYTES
+            cachedImages(trace + [noisyTarget], handle) # so that we don't need to load them later
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
