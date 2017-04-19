@@ -30,7 +30,12 @@ def loadPrograms(filenames):
 def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
     
-    handle = tarfile.open('syntheticTrainingData.tar')
+    if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
+        print "Loading open mind training data"
+        handle = tarfile.open('/om/user/ellisk/syntheticTrainingData.tar')
+    else:
+        print "Falling back on training data in current working directory"
+        handle = tarfile.open('syntheticTrainingData.tar')
     
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
