@@ -8,6 +8,7 @@ import tarfile
 import sys
 import tensorflow as tf
 import os
+import io
 from time import time
 import pickle
 import cProfile
@@ -24,18 +25,28 @@ TESTINGFRACTION = 0.1
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
 
-def loadPrograms(filenames):
-    return [ pickle.load(open(n,'rb')) for n in filenames ]
-
 def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
     
-    handle = tarfile.open('syntheticTrainingData.tar')
+    handle = tarfile.open('/home/ellisk/synthetic100000.tar')
+    
+    # just load everything into RAM - faster that way. screw you tar
+    members = {}
+    for member in handle:
+        if member.name == '.': continue
+        stuff = handle.extractfile(member)
+        members[member.name] = stuff.read()
+        stuff.close()
+    handle.close()
+
+    print "Loaded tar file into RAM: %d entries."%len(members)
     
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
-    programs = [ pickle.load(handle.extractfile(n)) for n in programNames ]
-    
+    programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
+
+    print "Loaded pickles."
+
     startingExamples = []
     endingExamples = []
     target = {}
@@ -45,11 +56,12 @@ def loadExamples(numberOfExamples, dummyImages = True):
     for j,program in enumerate(programs):
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
         noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
+        # cache the images
+        for imageFilename in [noisyTarget] + trace:
+            cacheImage(imageFilename, members[imageFilename])
         if not dummyImages:
-            trace = loadImages(trace,handle)
-            noisyTarget = loadImage(noisyTarget,handle)
-        else:
-            loadImages(trace + [noisyTarget], handle) # puts them into IMAGEBYTES
+            trace = loadImages(trace)
+            noisyTarget = loadImage(noisyTarget)
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
@@ -69,8 +81,6 @@ def loadExamples(numberOfExamples, dummyImages = True):
     print "loaded images in",(time() - startTime),"s"
     print "target dimensionality:",len(targetVectors)
 
-    handle.close()
-    
     return np.array(startingExamples), np.array(endingExamples), targetVectors
 
 class StandardPrimitiveDecoder():
@@ -282,23 +292,27 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
+        initialDilation = 1
         horizontalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
                                              kernel_size = [16,4],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         verticalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
                                              kernel_size = [4,16],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         squareKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 6,
                                              kernel_size = [8,8],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
         c1 = tf.layers.max_pooling2d(inputs = c1,
@@ -416,7 +430,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(12):
+            for iteration in range(8):
                 children = []
                 startTime = time()
                 for parent in beam:
@@ -451,7 +465,7 @@ class RecognitionModel():
 
                 for n in beam:
                     n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
-                beam = sorted(beam, key = lambda c: c['distance'])
+                beam = sorted(beam, key = lambda c: c['logLikelihood'])
 
                 if len(beam) > beamSize:
                     # only keep things in the beam if they produce unique outputs. encourages diversity
@@ -484,8 +498,8 @@ class RecognitionModel():
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                 print "Blurred distance: %f"%blurredDistance(targetImage, n['output'],show = True)
                 print ""
-                trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
-                animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
+                # trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
+                # animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
 
                         
 
@@ -494,9 +508,9 @@ class RecognitionModel():
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 20,
+                                beamSize = 10,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
         RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
-        RecognitionModel().train(10000, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().train(100000, checkpoint = "checkpoints/model.checkpoint")

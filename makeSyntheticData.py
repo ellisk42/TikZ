@@ -136,22 +136,22 @@ def hiddenMarkovModel():
     offset = 3
     primitives = [ Circle(AbsolutePoint(Number((spacing + 2)*x + offset),
                                         Number((spacing + 2)*y + offset)), Number(1))
-      for x in range(3)
+      for x in range(2)
       for y in range(2) ]
     # horizontal lines connecting hidden nodes
     primitives += [ Line.absolute(Number((spacing + 2)*x + offset + 1),
                                   Number(offset + y*(spacing + 2)),
                                   Number((spacing + 2)*x + offset + spacing + 1),
                                   Number(offset + y*(spacing + 2)),
-                                  arrow = True)
-                    for x in range(2)
+                                  arrow = False)
+                    for x in range(1)
                     for y in [1] ]
     primitives += [ Line.absolute(Number(offset + x*(spacing + 2)),
                                   Number((spacing + 2)*y + offset + spacing + 1),
                                   Number(offset + x*(spacing + 2)),
                                   Number((spacing + 2)*y + offset + 1),
-                                  arrow = True)
-                    for x in range(3)
+                                  arrow = False)
+                    for x in range(2)
                     for y in [0] ]
     return Sequence(primitives)
     
