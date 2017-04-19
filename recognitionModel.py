@@ -28,7 +28,13 @@ TESTINGFRACTION = 0.1
 def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
     
-    handle = tarfile.open('/home/ellisk/synthetic100000.tar')
+    if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
+        handle = '/om/user/ellisk/syntheticTrainingData.tar'
+    else:
+        handle = 'syntheticTrainingData.tar'
+#    handle = '/home/ellisk/synthetic100000.tar'
+    print "Loading data from",handle
+    handle = tarfile.open(handle)
     
     # just load everything into RAM - faster that way. screw you tar
     members = {}
@@ -54,6 +60,8 @@ def loadExamples(numberOfExamples, dummyImages = True):
     startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
+        if j%10000 == 1:
+            print "Loaded %d/%d programs"%(j - 1,len(programs))
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
         noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
         # cache the images
@@ -62,6 +70,7 @@ def loadExamples(numberOfExamples, dummyImages = True):
         if not dummyImages:
             trace = loadImages(trace)
             noisyTarget = loadImage(noisyTarget)
+        
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):

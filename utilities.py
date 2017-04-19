@@ -3,19 +3,18 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
-
+# maps from a file named to the bytes in that file
 IMAGEBYTES = {}
 def loadImage(n):
     if n == "blankImage": return np.zeros((256,256))
-    def processPicture(p):
-        # most of the time is spent in here for some reason
-        p = p.convert('L')
-        (w,h) = p.size
-        return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
     if not n in IMAGEBYTES:
         with open(n,'rb') as handle:
             IMAGEBYTES[n] = handle.read()
-    return processPicture(Image.open(io.BytesIO(IMAGEBYTES[n])))
+    p = Image.open(io.BytesIO(IMAGEBYTES[n]))
+    # most of the time is spent in here for some reason
+    p = p.convert('L')
+    (w,h) = p.size
+    return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
 def loadImages(ns): return map(lambda n: loadImage(n),ns)
 
 def cacheImage(n,content): IMAGEBYTES[n] = content
