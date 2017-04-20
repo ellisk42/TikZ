@@ -3,6 +3,11 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
+def image2array(p):
+    p = p.convert('L')
+    (w,h) = p.size
+    return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
+
 # maps from a file named to the bytes in that file
 IMAGEBYTES = {}
 def loadImage(n):
@@ -12,9 +17,7 @@ def loadImage(n):
             IMAGEBYTES[n] = handle.read()
     p = Image.open(io.BytesIO(IMAGEBYTES[n]))
     # most of the time is spent in here for some reason
-    p = p.convert('L')
-    (w,h) = p.size
-    return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
+    return image2array(p)
 def loadImages(ns): return map(lambda n: loadImage(n),ns)
 
 def cacheImage(n,content): IMAGEBYTES[n] = content
