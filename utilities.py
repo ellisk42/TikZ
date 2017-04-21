@@ -1,3 +1,4 @@
+import sys
 import io
 import numpy as np
 from PIL import Image
@@ -78,3 +79,6 @@ def truncatedNormal(lower = None,upper = None):
     if lower != None and x < lower: return truncatedNormal(lower = lower,upper = upper)
     if upper != None and x > upper: return truncatedNormal(lower = lower,upper = upper)
     return x
+def flushEverything():
+    sys.stdout.flush()
+    sys.stderr.flush()

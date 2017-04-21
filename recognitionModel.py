@@ -32,7 +32,6 @@ def loadExamples(numberOfExamples, dummyImages = True):
         handle = '/om/user/ellisk/syntheticTrainingData.tar'
     else:
         handle = 'syntheticTrainingData.tar'
-#    handle = '/home/ellisk/synthetic100000.tar'
     print "Loading data from",handle
     handle = tarfile.open(handle)
     
@@ -371,6 +370,8 @@ class RecognitionModel():
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
 
+        flushEverything()
+
         with tf.Session() as s:
             s.run(initializer)
             for e in range(20):
@@ -385,6 +386,7 @@ class RecognitionModel():
                 testingAccuracy = [ s.run(self.averageAccuracy, feed_dict = feed) for feed in iterator.testingFeeds() ]
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+                flushEverything()
 
     def analyzeFailures(self, numberOfExamples, checkpoint):
         partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
@@ -523,3 +525,5 @@ if __name__ == '__main__':
         RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
         RecognitionModel().train(100000, checkpoint = "checkpoints/model.checkpoint")
+    elif sys.argv[1] == 'profile':
+        cProfile.run('loadExamples(100000)')
