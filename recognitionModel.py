@@ -228,6 +228,8 @@ class StopDecoder():
     def extractTargets(_): return []
 
 class PrimitiveDecoder():
+    # It might matter in which order these classes are listed.
+    # Because you predict circle targets, then rectangle targets, then line targets
     decoderClasses = [CircleDecoder,
                       RectangleDecoder,
                       LineDecoder,
@@ -283,6 +285,9 @@ class PrimitiveDecoder():
         # to accelerate beam decoding, we can cash the image representation
         [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
         tokenScores = tokenScores[0]
+        # print "token scores ",
+        # for s in tokenScores: print s," "
+        # print "\nToken rectangle score: %f"%tokenScores[RectangleDecoder.token]
         feed[self.imageRepresentation] = imageRepresentation
         
         b = [(tokenScores[STOP], None)] # STOP
@@ -290,6 +295,9 @@ class PrimitiveDecoder():
             if d.token == STOP: continue
             b += [ (s + tokenScores[d.token], program)
                    for (s, program) in d.beam(session, feed, beamSize) ]
+        # for s,p in b:
+        #     print s,p
+#        assert False
         return b
 
 class RecognitionModel():
@@ -414,6 +422,15 @@ class RecognitionModel():
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
                     if len(failureLog) > 100:
                         break
+                else:
+                    # decode the action preferred by the model
+                    preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
+                                                              self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
+                                        key = lambda foo: foo[0])[1]
+                    preferredLine = "\n%end of program\n" if preferredLine == None else str(preferredLine)
+                    print preferredLine
+                    showImage(feed[self.currentPlaceholder][0])
+                    showImage(feed[self.goalPlaceholder][0])
                     
         print "Failures:",len(failureLog),'/',k
         for j,(c,g,l) in enumerate(failureLog):
@@ -424,10 +441,14 @@ class RecognitionModel():
             saveMatrixAsImage(pixels*255 + 255*c,"failures/%d-predicted.png"%j)
                 
 
-    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
+    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10, beamLength = 10):
+
+        # place where we will save the parses
+        parseDirectory = targetImage[:-4] + "-parses"
+        
         totalNumberOfRenders = 0
         targetImage = loadImage(targetImage)
-        showImage(targetImage)
+        #showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [{'program': [],
                  'output': np.zeros(targetImage.shape),
@@ -441,7 +462,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(8):
+            for iteration in range(beamLength):
                 children = []
                 startTime = time()
                 for parent in beam:
@@ -458,10 +479,12 @@ class RecognitionModel():
                                          'logLikelihood': parent['logLikelihood'] + childScore})
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
 
-                
+                beam = children
                 
                 beam = [ n for n in children
                          if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
+                beam = sorted(beam, key = lambda c: -c['logLikelihood'])
+                beam = beam[:beamSize]
                 
                 startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
@@ -476,7 +499,8 @@ class RecognitionModel():
 
                 for n in beam:
                     n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
-                beam = sorted(beam, key = lambda c: c['logLikelihood'])
+
+                beam = sorted(beam, key = lambda c: c['distance'])
 
                 if len(beam) > beamSize:
                     # only keep things in the beam if they produce unique outputs. encourages diversity
@@ -502,27 +526,26 @@ class RecognitionModel():
                     break
 
             print "Finished programs, sorted by likelihood:"
+            os.system('rm -r %s'%(parseDirectory))
+            os.system('mkdir %s'%(parseDirectory))
             finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
-            for n in finishedPrograms[:3]:
+            for j,n in enumerate(finishedPrograms):
                 print "Finished program: log likelihood %f"%(n['logLikelihood'])
-                print n['program'].TikZ()
+                print n['program']
+                saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
-                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'],show = True)
+                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
                 print ""
-                # trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
-                # animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
-
-                        
-
                     
 
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 10,
+                                beamSize = 100,
+                                beamLength = 13,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(100, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
         RecognitionModel().train(100000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'profile':

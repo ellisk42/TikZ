@@ -75,6 +75,15 @@ def processPDF(name):
         a[a > 1.0] = 1.0
         a[a < 0.1] = 0
 
+        # this verifies that indeed the grid lines have been completely removed
+        # a = a*100
+        # a[a > 1] = 1
+
+        # showImage(a)
+        # continue
+    
+    
+
         # negative, so that it is black on white
         a = 1.0 - a
 

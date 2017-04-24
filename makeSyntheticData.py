@@ -55,6 +55,7 @@ def proposeAttachmentLines(objects):
             for (x1,y1,o1) in attachmentSets[j]:
                 for (x2,y2,o2) in attachmentSets[k]:
                     if o1 != o2: continue
+                    o = o1
                     
                     candidate = None
                     if x2 == x1 and y1 != y2 and o == 'v':
@@ -132,11 +133,11 @@ def randomScene(maximumNumberOfObjects):
     return sampler
 
 def hiddenMarkovModel():
-    spacing = 3
-    offset = 3
+    spacing = 4
+    offset = 2
     primitives = [ Circle(AbsolutePoint(Number((spacing + 2)*x + offset),
                                         Number((spacing + 2)*y + offset)), Number(1))
-      for x in range(2)
+      for x in range(3)
       for y in range(2) ]
     # horizontal lines connecting hidden nodes
     primitives += [ Line.absolute(Number((spacing + 2)*x + offset + 1),
@@ -144,14 +145,14 @@ def hiddenMarkovModel():
                                   Number((spacing + 2)*x + offset + spacing + 1),
                                   Number(offset + y*(spacing + 2)),
                                   arrow = False)
-                    for x in range(1)
+                    for x in range(2)
                     for y in [1] ]
     primitives += [ Line.absolute(Number(offset + x*(spacing + 2)),
                                   Number((spacing + 2)*y + offset + spacing + 1),
                                   Number(offset + x*(spacing + 2)),
                                   Number((spacing + 2)*y + offset + 1),
                                   arrow = False)
-                    for x in range(2)
+                    for x in range(3)
                     for y in [0] ]
     return Sequence(primitives)
     
@@ -186,7 +187,7 @@ def handleGeneration(arguments):
                   "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
                   "tripleLine": multipleObjects(lines = 3),
                   "doubleCircle": multipleObjects(circles = 2),
-                  "randomScene": randomScene(5),
+                  "randomScene": randomScene(8),
                   "tripleCircle": multipleObjects(circles = 3),
                   "individualRectangle": multipleObjects(rectangles = 1)}
     (n,startingPoint,k) = arguments
