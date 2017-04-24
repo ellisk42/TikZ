@@ -415,12 +415,14 @@ class RecognitionModel():
                 assert accuracy == 0.0 or accuracy == 1.0
                 if accuracy < 0.5:
                     # decode the action preferred by the model
-                    preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
-                                                              self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
-                                        key = lambda foo: foo[0])[1]
+                    topHundred = self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
+                                                       self.goalPlaceholder: feed[self.goalPlaceholder]}, 100)
+                    topHundred.sort(key = lambda foo: foo[0], reverse = True)
+                    preferredLine = topHundred[0][1]
                     preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
+                    # check to see the rank of the correct line, because it wasn't the best
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
-                    if len(failureLog) > 100:
+                    if len(failureLog) > 10:
                         break
                 else:
                     # decode the action preferred by the model
