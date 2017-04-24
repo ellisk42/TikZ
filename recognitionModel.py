@@ -77,7 +77,8 @@ def loadExamples(numberOfExamples, dummyImages = True):
             endingExamples.append(noisyTarget)
             currentImage = trace[k]
             for j,t in enumerate(PrimitiveDecoder.extractTargets(l)):
-                target[j] = target.get(j,[]) + [t]
+                if not j in target: target[j] = []
+                target[j].append(t)
         # end of program
         startingExamples.append(targetImage)
         endingExamples.append(noisyTarget)
@@ -303,21 +304,21 @@ class RecognitionModel():
         initialDilation = 1
         horizontalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
-                                             kernel_size = [16,4],
+                                             kernel_size = [16/initialDilation,4/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              dilation_rate = initialDilation,
                                              strides = 1)
         verticalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
-                                             kernel_size = [4,16],
+                                             kernel_size = [4/initialDilation,16/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              dilation_rate = initialDilation,
                                              strides = 1)
         squareKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 6,
-                                             kernel_size = [8,8],
+                                             kernel_size = [8/initialDilation,8/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              dilation_rate = initialDilation,
