@@ -8,6 +8,7 @@ import tarfile
 import sys
 import tensorflow as tf
 import os
+import io
 from time import time
 import pickle
 import cProfile
@@ -24,43 +25,68 @@ TESTINGFRACTION = 0.1
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
 
-def loadPrograms(filenames):
-    return [ pickle.load(open(n,'rb')) for n in filenames ]
-
 def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
     
-    handle = tarfile.open('syntheticTrainingData.tar')
+    if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
+        handle = '/om/user/ellisk/syntheticTrainingData.tar'
+    else:
+        handle = 'syntheticTrainingData.tar'
+    print "Loading data from",handle
+    handle = tarfile.open(handle)
+    
+    # just load everything into RAM - faster that way. screw you tar
+    members = {}
+    for member in handle:
+        if member.name == '.': continue
+        stuff = handle.extractfile(member)
+        members[member.name] = stuff.read()
+        stuff.close()
+    handle.close()
+
+    print "Loaded tar file into RAM: %d entries."%len(members)
     
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
-    programs = [ pickle.load(handle.extractfile(n)) for n in programNames ]
-    
+    programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
+
+    print "Loaded pickles."
+
     startingExamples = []
     endingExamples = []
     target = {}
 
+    # for debugging purposes / analysis, keep track of the target line
+    targetLine = []
+
     startTime = time()
     # get one example from each line of each program
     for j,program in enumerate(programs):
+        if j%10000 == 1:
+            print "Loaded %d/%d programs"%(j - 1,len(programs))
         trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
         noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
+        # cache the images
+        for imageFilename in [noisyTarget] + trace:
+            cacheImage(imageFilename, members[imageFilename])
         if not dummyImages:
-            trace = loadImages(trace,handle)
-            noisyTarget = loadImage(noisyTarget,handle)
-        else:
-            loadImages(trace + [noisyTarget], handle) # puts them into IMAGEBYTES
+            trace = loadImages(trace)
+            noisyTarget = loadImage(noisyTarget)
+        
         targetImage = trace[-1]
         currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
         for k,l in enumerate(program.lines):
             startingExamples.append(currentImage)
             endingExamples.append(noisyTarget)
+            targetLine.append(l)
             currentImage = trace[k]
             for j,t in enumerate(PrimitiveDecoder.extractTargets(l)):
-                target[j] = target.get(j,[]) + [t]
+                if not j in target: target[j] = []
+                target[j].append(t)
         # end of program
         startingExamples.append(targetImage)
         endingExamples.append(noisyTarget)
+        targetLine.append(None)
         for j in target:
             target[j] += [STOP] # should be zero and therefore valid for everyone
             
@@ -69,9 +95,7 @@ def loadExamples(numberOfExamples, dummyImages = True):
     print "loaded images in",(time() - startTime),"s"
     print "target dimensionality:",len(targetVectors)
 
-    handle.close()
-    
-    return np.array(startingExamples), np.array(endingExamples), targetVectors
+    return np.array(startingExamples), np.array(endingExamples), targetVectors, np.array(targetLine)
 
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
@@ -210,6 +234,8 @@ class StopDecoder():
     def extractTargets(_): return []
 
 class PrimitiveDecoder():
+    # It might matter in which order these classes are listed.
+    # Because you predict circle targets, then rectangle targets, then line targets
     decoderClasses = [CircleDecoder,
                       RectangleDecoder,
                       LineDecoder,
@@ -265,6 +291,9 @@ class PrimitiveDecoder():
         # to accelerate beam decoding, we can cash the image representation
         [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
         tokenScores = tokenScores[0]
+        # print "token scores ",
+        # for s in tokenScores: print s," "
+        # print "\nToken rectangle score: %f"%tokenScores[RectangleDecoder.token]
         feed[self.imageRepresentation] = imageRepresentation
         
         b = [(tokenScores[STOP], None)] # STOP
@@ -272,6 +301,9 @@ class PrimitiveDecoder():
             if d.token == STOP: continue
             b += [ (s + tokenScores[d.token], program)
                    for (s, program) in d.beam(session, feed, beamSize) ]
+        # for s,p in b:
+        #     print s,p
+#        assert False
         return b
 
 class RecognitionModel():
@@ -282,23 +314,27 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
+        initialDilation = 1
         horizontalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
-                                             kernel_size = [16,4],
+                                             kernel_size = [16/initialDilation,4/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         verticalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 4,
-                                             kernel_size = [4,16],
+                                             kernel_size = [4/initialDilation,16/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         squareKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = 6,
-                                             kernel_size = [8,8],
+                                             kernel_size = [8/initialDilation,8/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
+                                             dilation_rate = initialDilation,
                                              strides = 1)
         c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
         c1 = tf.layers.max_pooling2d(inputs = c1,
@@ -339,7 +375,7 @@ class RecognitionModel():
 
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint"):
-        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
+        partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples)
         
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
@@ -347,6 +383,8 @@ class RecognitionModel():
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
                                       self.decoder.placeholders())
         saver = tf.train.Saver()
+
+        flushEverything()
 
         with tf.Session() as s:
             s.run(initializer)
@@ -362,35 +400,68 @@ class RecognitionModel():
                 testingAccuracy = [ s.run(self.averageAccuracy, feed_dict = feed) for feed in iterator.testingFeeds() ]
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+                flushEverything()
 
     def analyzeFailures(self, numberOfExamples, checkpoint):
-        partialImages,targetImages,targetVectors = loadExamples(numberOfExamples)
-        iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors),
+        partialImages,targetImages,targetVectors,targetLines = loadExamples(numberOfExamples)
+        iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors + [targetLines]),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
-                                      self.decoder.placeholders())
+                                      self.decoder.placeholders() + [None])
         saver = tf.train.Saver()
         failureLog = [] # pair of current goal
+        targetRanks = []
         k = 0
 
         with tf.Session() as s:
             saver.restore(s,checkpoint)
             for feed in iterator.testingFeeds():
+                targetLine = feed[None]
+                del feed[None]
                 k += 1
                 accuracy = s.run(self.averageAccuracy,
                                  feed_dict = feed)
                 assert accuracy == 0.0 or accuracy == 1.0
                 if accuracy < 0.5:
                     # decode the action preferred by the model
-                    preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
-                                                              self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
-                                        key = lambda foo: foo[0])[1]
+                    topHundred = self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
+                                                       self.goalPlaceholder: feed[self.goalPlaceholder]}, 100)
+                    topHundred.sort(key = lambda foo: foo[0], reverse = True)
+                    preferredLine = topHundred[0][1]
+                    preferredLineHumanReadable = str(preferredLine)
                     preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
+                    # check to see the rank of the correct line, because it wasn't the best
+                    targetLine = str(targetLine[0])
+                    topHundred = [str(l) for _,l in topHundred]
+                    print "Target line (not model preference):",targetLine
+                    print "Model preference:",preferredLineHumanReadable
+                    if targetLine in topHundred:
+                        print "Target line has rank %d in beam"%(1 + topHundred.index(targetLine))
+                        targetRanks.append(1 + topHundred.index(targetLine))
+                    else:
+                        print "Target lie not in beam."
+                        targetRanks.append(None)
+                    
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
                     if len(failureLog) > 100:
                         break
+                else:
+                    pass
+                    # decode the action preferred by the model
+                    # preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
+                    #                                           self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
+                    #                     key = lambda foo: foo[0])[1]
+                    # preferredLine = "\n%end of program\n" if preferredLine == None else str(preferredLine)
+                    # print preferredLine
+                    # showImage(feed[self.currentPlaceholder][0])
+                    # showImage(feed[self.goalPlaceholder][0])
                     
         print "Failures:",len(failureLog),'/',k
+        successfulTargetRanks = [ r for r in targetRanks if r != None ]
+        print "In beam %d/%d of the time."%(len(successfulTargetRanks),len(targetRanks))
+        print "Average successful target rank: %f"%(sum(successfulTargetRanks)/float(len(successfulTargetRanks)))
+        print "Successful target ranks: %s"%(str(successfulTargetRanks))
+        
         for j,(c,g,l) in enumerate(failureLog):
             saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
             saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
@@ -399,10 +470,14 @@ class RecognitionModel():
             saveMatrixAsImage(pixels*255 + 255*c,"failures/%d-predicted.png"%j)
                 
 
-    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10):
+    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10, beamLength = 10):
+
+        # place where we will save the parses
+        parseDirectory = targetImage[:-4] + "-parses"
+        
         totalNumberOfRenders = 0
         targetImage = loadImage(targetImage)
-        showImage(targetImage)
+        #showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [{'program': [],
                  'output': np.zeros(targetImage.shape),
@@ -416,7 +491,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
-            for iteration in range(12):
+            for iteration in range(beamLength):
                 children = []
                 startTime = time()
                 for parent in beam:
@@ -433,10 +508,12 @@ class RecognitionModel():
                                          'logLikelihood': parent['logLikelihood'] + childScore})
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
 
-                
+                beam = children
                 
                 beam = [ n for n in children
                          if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
+                beam = sorted(beam, key = lambda c: -c['logLikelihood'])
+                beam = beam[:beamSize]
                 
                 startTime = time()
                 outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
@@ -451,6 +528,7 @@ class RecognitionModel():
 
                 for n in beam:
                     n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
+
                 beam = sorted(beam, key = lambda c: c['distance'])
 
                 if len(beam) > beamSize:
@@ -477,26 +555,27 @@ class RecognitionModel():
                     break
 
             print "Finished programs, sorted by likelihood:"
+            os.system('rm -r %s'%(parseDirectory))
+            os.system('mkdir %s'%(parseDirectory))
             finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
-            for n in finishedPrograms[:3]:
+            for j,n in enumerate(finishedPrograms):
                 print "Finished program: log likelihood %f"%(n['logLikelihood'])
-                print n['program'].TikZ()
+                print n['program']
+                saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
-                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'],show = True)
+                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
                 print ""
-                trace = [Sequence(n['program'].lines[:j]).TikZ() for j in range(len(n['program'])+1) ]
-                animateMatrices(render(trace,yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE)),"neuralAnimation.gif")            
-
-                        
-
                     
 
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
         RecognitionModel().beam(sys.argv[2],
-                                beamSize = 20,
+                                beamSize = 100,
+                                beamLength = 13,
                                 checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(10000, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().analyzeFailures(100000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
-        RecognitionModel().train(10000, checkpoint = "checkpoints/model.checkpoint")
+        RecognitionModel().train(100000, checkpoint = "checkpoints/model.checkpoint")
+    elif sys.argv[1] == 'profile':
+        cProfile.run('loadExamples(100000)')

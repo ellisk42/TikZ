@@ -1,27 +1,27 @@
+import sys
 import io
 import numpy as np
 from PIL import Image
 import tensorflow as tf
 
+def image2array(p):
+    p = p.convert('L')
+    (w,h) = p.size
+    return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
 
+# maps from a file named to the bytes in that file
 IMAGEBYTES = {}
-def loadImage(n, archive = None): # archive: optionally a tarball handle
+def loadImage(n):
     if n == "blankImage": return np.zeros((256,256))
-    def processPicture(p):
-        # most of the time is spent in here for some reason
-        p = p.convert('L')
-        (w,h) = p.size
-        return 1.0 - np.array(p,np.uint8).reshape((h,w))/255.0
     if not n in IMAGEBYTES:
-        if archive == None:
-            with open(n,'rb') as handle:
-                IMAGEBYTES[n] = handle.read()
-        else:
-            IMAGEBYTES[n] = archive.extractfile(n).read()
-        # print "I just loaded %s for the first time"%n
-        # showImage(processPicture(Image.open(io.BytesIO(IMAGEBYTES[n]))))
-    return processPicture(Image.open(io.BytesIO(IMAGEBYTES[n])))
-def loadImages(ns,archive = None): return map(lambda n: loadImage(n, archive),ns)
+        with open(n,'rb') as handle:
+            IMAGEBYTES[n] = handle.read()
+    p = Image.open(io.BytesIO(IMAGEBYTES[n]))
+    # most of the time is spent in here for some reason
+    return image2array(p)
+def loadImages(ns): return map(lambda n: loadImage(n),ns)
+
+def cacheImage(n,content): IMAGEBYTES[n] = content
 
 def showImage(image):
     import matplotlib.pyplot as plot
@@ -79,3 +79,6 @@ def truncatedNormal(lower = None,upper = None):
     if lower != None and x < lower: return truncatedNormal(lower = lower,upper = upper)
     if upper != None and x > upper: return truncatedNormal(lower = lower,upper = upper)
     return x
+def flushEverything():
+    sys.stdout.flush()
+    sys.stderr.flush()
