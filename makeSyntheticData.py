@@ -5,7 +5,7 @@ from language import *
 from render import render
 from PIL import Image
 import pickle
-from random import choice
+from random import choice,shuffle
 from utilities import showImage
 
 CANONICAL = True
@@ -38,44 +38,62 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
             
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
-    if isinstance(things[0],Circle):
-        # sort the circles so that there are always drawn in a canonical order
-        return sorted(things, key = lambda c: (c.center.x.n, c.center.y.n))
-    if isinstance(things[0],Line):
-        return sorted(things, key = lambda l: (l.points[0].x.n,l.points[0].y.n))
-    if isinstance(things[0],Rectangle):
-        return sorted(things, key = lambda r: (r.p1.x.n,
-                                               r.p1.y.n))
+    cs = [c for c in things if isinstance(c,Circle) ]
+    cs = sorted(cs, key = lambda c: (c.center.x.n, c.center.y.n))
+    rs = [c for c in things if isinstance(c,Rectangle) ]
+    rs = sorted(rs, key = lambda r: (r.p1.x.n,
+                                         r.p1.y.n))
+    ls = [c for c in things if isinstance(c,Line) ]
+    ls = sorted(ls, key = lambda l: (l.points[0].x.n,l.points[0].y.n))
+    return cs + rs + ls
+
 
 def proposeAttachmentLines(objects):
     attachmentSets = [o.attachmentPoints() for o in objects ]
+
+    # attachments where they both have the same orientation and are nicely aligned
+    alignedAttachments = []
+    # all the other possible attachments
+    arbitraryAttachments = []
 
     for j in range(len(attachmentSets) - 1):
         for k in range(j + 1,len(attachmentSets)):
             for (x1,y1,o1) in attachmentSets[j]:
                 for (x2,y2,o2) in attachmentSets[k]:
-                    if o1 != o2: continue
-                    o = o1
                     
                     candidate = None
-                    if x2 == x1 and y1 != y2 and o == 'v':
+                    isAligned = True
+                    if x2 == x1 and y1 != y2 and o1 == 'v' and o2 == 'v':
                         candidate = (x1,min(y1,y2),x1,max(y1,y2))
-                    elif y2 == y1 and x1 != x2 and o == 'h':
+                    elif y2 == y1 and x1 != x2 and o1 == 'h' and o2 == 'h':
                         candidate = (min(x1,x2),y1,max(x1,x2),y1)
+                    else:
+                        candidate = (x1,y1,x2,y2)
+                        isAligned = False
+                        
                     if candidate != None:
                         l = Line.absolute(Number(candidate[0]),
                                           Number(candidate[1]),
                                           Number(candidate[2]),
                                           Number(candidate[3]))
-                        if all([not o.intersects(l) for o in objects ]):
-                            yield candidate
+                        if l.length() > 0 and all([not o.intersects(l) for o in objects ]):
+                            if isAligned:
+                                alignedAttachments.append(candidate)
+                            else:
+                                arbitraryAttachments.append(candidate)
+    # randomly remove arbitrary attachments if there are too many
+    if alignedAttachments != []:
+        shuffle(arbitraryAttachments)
+        arbitraryAttachments = arbitraryAttachments[:max(2,len(alignedAttachments))]
+    return arbitraryAttachments + alignedAttachments
+                                
 
 def sampleLine(attachedLines = []):
-    concentration = 0.0
+    concentration = 2.0
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
         points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
-    elif random() < 0.75: # horizontal or vertical line
+    elif random() < 1.0: # horizontal or vertical line: diagonals only allowed as attachments
         x1 = randomCoordinate()
         y1 = randomCoordinate()
         if choice([True,False]):
@@ -102,24 +120,22 @@ def sampleLine(attachedLines = []):
                 solid = random() > 0.5,
                 arrow = arrow)
 
+def sampleWithoutIntersection(n, existingObjects, f):
+    targetLength = len(existingObjects) + n
+    while len(existingObjects) < targetLength:
+        newObject = f()
+        if not any([o.intersects(newObject) for o in existingObjects ]):
+            existingObjects = existingObjects + [newObject]
+    return existingObjects
+
 def multipleObjects(rectangles = 0,lines = 0,circles = 0):
     def sampler():
-        while True:
-            cs = canonicalOrdering([ Circle.sample() for _ in range(circles) ])
-            rs = canonicalOrdering([ Rectangle.sample() for _ in range(rectangles) ])
-            attachedLines = list(proposeAttachmentLines(cs + rs))
-            ls = canonicalOrdering([ sampleLine(attachedLines) for _ in range(lines) ])
-            program = cs + rs + ls
-            failure = False
-            for p in program:
-                if failure: break
-
-                for q in program:
-                    if p != q and p.intersects(q):
-                        failure = True
-                        break
-            if not failure:
-                return Sequence(program)
+        objects = []
+        objects = sampleWithoutIntersection(circles, objects, Circle.sample)
+        objects = sampleWithoutIntersection(rectangles, objects, Rectangle.sample)
+        attachedLines = proposeAttachmentLines(objects)
+        objects = sampleWithoutIntersection(lines, objects, lambda: sampleLine(attachedLines))
+        return Sequence(canonicalOrdering(objects))
     return sampler
 
 def randomScene(maximumNumberOfObjects):
@@ -234,14 +250,14 @@ if __name__ == '__main__':
     else:
         map(handleGeneration, offsetsAndCounts)
 
-    print "Generated files, building archive..."
-    os.system('tar cvf syntheticTrainingData.tar -T /dev/null')
-
-    for _,startingPoint,_ in offsetsAndCounts:
-        os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
-        if totalNumberOfExamples > 100:
-            os.system('rm -r syntheticTrainingData/%d'%startingPoint)
-
     if totalNumberOfExamples > 100:
-        os.system('rm -r syntheticTrainingData')
-    print "Done. You should see everything in syntheticTrainingData.tar"
+        print "Generated files, building archive..."
+        os.system('tar cvf syntheticTrainingData.tar -T /dev/null')
+
+        for _,startingPoint,_ in offsetsAndCounts:
+            os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
+            if totalNumberOfExamples > 100:
+                os.system('rm -r syntheticTrainingData/%d'%startingPoint)
+
+            os.system('rm -r syntheticTrainingData')
+        print "Done. You should see everything in syntheticTrainingData.tar if you had at least 100 examples."
