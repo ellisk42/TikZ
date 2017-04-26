@@ -86,6 +86,36 @@ def proposeAttachmentLines(objects):
         shuffle(arbitraryAttachments)
         arbitraryAttachments = arbitraryAttachments[:max(2,len(alignedAttachments))]
     return arbitraryAttachments + alignedAttachments
+
+def samplePoint(objects):
+    xs = list(set([ x for o in objects for x in o.usedXCoordinates() ]))
+    ys = list(set([ y for o in objects for y in o.usedYCoordinates() ]))
+    option = choice(range(3))
+    if option == 0 and len(xs) > 0:
+        return AbsolutePoint(Number(choice(xs)),Number(randomCoordinate()))
+    if option == 1 and len(ys) > 0:
+        return AbsolutePoint(Number(randomCoordinate()), Number(choice(ys)))
+    return AbsolutePoint.sample()
+
+def sampleCircle(objects):
+    while True:
+        p = samplePoint(objects)
+        r = Number(1)
+        c = Circle(p,r)
+        if c.inbounds(): return c
+
+def sampleRectangle(objects):
+    while True:
+        p1 = samplePoint(objects)
+        p2 = samplePoint(objects)
+        if p1.x != p2.x and p1.y != p2.y:
+            x1 = Number(min([p1.x.n,p2.x.n]))
+            x2 = Number(max([p1.x.n,p2.x.n]))
+            y1 = Number(min([p1.y.n,p2.y.n]))
+            y2 = Number(max([p1.y.n,p2.y.n]))
+            p1 = AbsolutePoint(x1,y1)
+            p2 = AbsolutePoint(x2,y2)
+            return Rectangle(p1, p2)
                                 
 
 def sampleLine(attachedLines = []):
@@ -106,7 +136,7 @@ def sampleLine(attachedLines = []):
             x2 = x1
             while x2 == x1: x2 = randomCoordinate()
             points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
-    else: # arbitrary line between two points
+    else: # arbitrary line between two points. Don't allow these.
         while True:
             p1 = AbsolutePoint.sample()
             p2 = AbsolutePoint.sample()
@@ -125,14 +155,14 @@ def sampleWithoutIntersection(n, existingObjects, f):
     while len(existingObjects) < targetLength:
         newObject = f()
         if not any([o.intersects(newObject) for o in existingObjects ]):
-            existingObjects = existingObjects + [newObject]
+            existingObjects += [newObject]
     return existingObjects
 
 def multipleObjects(rectangles = 0,lines = 0,circles = 0):
     def sampler():
         objects = []
-        objects = sampleWithoutIntersection(circles, objects, Circle.sample)
-        objects = sampleWithoutIntersection(rectangles, objects, Rectangle.sample)
+        objects = sampleWithoutIntersection(circles, objects, lambda: sampleCircle(objects))
+        objects = sampleWithoutIntersection(rectangles, objects, lambda: sampleRectangle(objects))
         attachedLines = proposeAttachmentLines(objects)
         objects = sampleWithoutIntersection(lines, objects, lambda: sampleLine(attachedLines))
         return Sequence(canonicalOrdering(objects))
