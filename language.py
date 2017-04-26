@@ -174,7 +174,10 @@ class Line(Program):
                                   AbsolutePoint(self.points[1].x.n,self.points[1].y.n),
                                   AbsolutePoint(o.points[0].x.n,o.points[0].y.n),
                                   AbsolutePoint(o.points[1].x.n,o.points[1].y.n))
-        
+
+    def usedXCoordinates(self): return [p.x.n for p in self.points ]
+    def usedYCoordinates(self): return [p.y.n for p in self.points ]
+    
     def __str__(self):
         return "Line(%s, arrow = %s, solid = %s)"%(", ".join(map(str,self.points)), str(self.arrow), str(self.solid))
 
@@ -286,6 +289,10 @@ class Rectangle(Program):
         ps += [ (x, self.p2.y.n, 'v') for x in range(self.p1.x.n + 1, self.p2.x.n) ]
         ps += [ (self.p1.x.n, y, 'h') for y in range(self.p1.y.n + 1, self.p2.y.n) ]
         return ps
+    def usedXCoordinates(self):
+        return [self.p1.x.n,self.p2.x.n]
+    def usedYCoordinates(self):
+        return [self.p1.y.n,self.p2.y.n]
     
     def intersects(self,o):
         if isinstance(o,Circle): return o.intersects(self)
@@ -392,6 +399,14 @@ class Circle(Program):
                 (x - r,y,'h'),
                 (x,y + r,'v'),
                 (x,y - r,'v')]
+    def usedXCoordinates(self):
+        return [self.center.x.n,
+                self.center.x.n + self.radius.n,
+                self.center.x.n - self.radius.n]
+    def usedYCoordinates(self):
+        return [self.center.y.n,
+                self.center.y.n + self.radius.n,
+                self.center.y.n - self.radius.n]
     
     @staticmethod
     def command(center, radius, noisy = False):
