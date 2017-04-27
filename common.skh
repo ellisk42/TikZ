@@ -1,7 +1,7 @@
 pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 3 --bnd-arr-size 3";
 
-#define SHAPEVARIABLES int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, int rx1, int ry1, int rx2, int ry2
-#define SHAPEARGUMENTS shapeIdentity,cx,cy,lx1,ly1,lx2,ly2,rx1,ry1,rx2,ry2
+#define SHAPEVARIABLES int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2
+#define SHAPEARGUMENTS shapeIdentity,cx,cy,lx1,ly1,lx2,ly2,dashed,arrow,rx1,ry1,rx2,ry2
 #define CIRCLE 0
 #define LINE 1
 #define RECTANGLE 2
@@ -20,7 +20,7 @@ int [n + 1] push([int n], int [n] environment, int j) {
 
 
 #define _c(x,y) (shapeIdentity == CIRCLE && cx == x && cy == y)
-#define _l(x1,y1,x2,y2) (shapeIdentity == LINE && x1 == lx1 && y1 == ly1 && x2 == lx2 && y2 == ly2)
+#define _l(x1,y1,x2,y2,d,a) (shapeIdentity == LINE && x1 == lx1 && y1 == ly1 && x2 == lx2 && y2 == ly2 && d == dashed && a == arrow)
 #define _r(x1,y1,x2,y2) (shapeIdentity == RECTANGLE && x1 == rx1 && y1 == ry1 && x2 == rx2 && y2 == ry2)
 bit renderSpecification(SHAPEVARIABLES) {
   assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
@@ -39,12 +39,12 @@ bit renderSpecification(SHAPEVARIABLES) {
 #ifdef LADDER
   return
     // ladder edges
-    _l(1,1,1,5) ||
-    _l(3,1,3,5) ||
+    _l(1,1,1,5,0,0) ||
+    _l(3,1,3,5,0,0) ||
     // ladder rungs
-    _l(1,2,3,2) ||
-    _l(1,3,3,3) ||
-    _l(1,4,3,4);
+    _l(1,2,3,2,0,0) ||
+    _l(1,3,3,3,0,0) ||
+    _l(1,4,3,4,0,0);
 #endif
 #ifdef HMM
   return
@@ -58,16 +58,16 @@ bit renderSpecification(SHAPEVARIABLES) {
     _c(7,1) ||
     // hidden state transitions
     _l(2,5,
-       3,5) ||
+       3,5,0,1) ||
     _l(5,5,
-       6,5) ||
+       6,5,0,1) ||
     // emission arc
     _l(1,4,
-       1,2) ||
+       1,2,0,1) ||
     _l(4,4,
-       4,2) ||
+       4,2,0,1) ||
     _l(7,4,
-       7,2)
+       7,2,0,1)
     ;
 }
 
@@ -113,7 +113,7 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
       int y2 = expression(environment, yc);
       cost += (xc + yc);
       if (??) 
-	hit = _l(x,y,x2,y2);
+	hit = _l(x,y,x2,y2,??,??);
       else
 	hit = _r(x,y,x2,y2);
     }
