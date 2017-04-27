@@ -7,8 +7,9 @@ pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 3 --bnd-arr-size 3";
 #define RECTANGLE 2
 
 // Which figure we are trying to explain
-#define CIRCLEGRID
+//#define CIRCLEGRID
 //#define LADDER
+#define HMM
 
 
 int [n + 1] push([int n], int [n] environment, int j) {
@@ -45,6 +46,29 @@ bit renderSpecification(SHAPEVARIABLES) {
     _l(1,3,3,3) ||
     _l(1,4,3,4);
 #endif
+#ifdef HMM
+  return
+    // hidden nodes
+    _c(1,5) ||
+    _c(4,5) ||
+    _c(7,5) ||
+    // visible nodes
+    _c(1,1) ||
+    _c(4,1) ||
+    _c(7,1) ||
+    // hidden state transitions
+    _l(2,5,
+       3,5) ||
+    _l(5,5,
+       6,5) ||
+    // emission arc
+    _l(1,4,
+       1,2) ||
+    _l(4,4,
+       4,2) ||
+    _l(7,4,
+       7,2)
+    ;
 }
 
 generator int expression([int n], int[n] environment, ref int cost) {
@@ -101,7 +125,7 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
 bit render(SHAPEVARIABLES) implements renderSpecification{
   assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
   int cost;
-  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},2,cost);
   minimize(cost);
   return inScene;
 }
