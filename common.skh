@@ -7,8 +7,8 @@ pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 3 --bnd-arr-size 3";
 #define RECTANGLE 2
 
 // Which figure we are trying to explain
-//#define CIRCLEGRID
-#define LADDER
+#define CIRCLEGRID
+//#define LADDER
 
 
 int [n + 1] push([int n], int [n] environment, int j) {
@@ -52,54 +52,56 @@ generator int expression([int n], int[n] environment, ref int cost) {
   return {| ??(4) | ??(3)*environment[??] + ??(4) |};
 }
 
-generator bit program([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
+// blocks are sequences of commands; can also introduce local variables.
+generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
+  cost = 0;
+  bit hit = 0;
+  repeat(??) {
+    int newCost;
+    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost);
+    cost += newCost;
+    hit = hit || newHit;
+  }
+  return hit;
+}
+
+generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
   assert d > 0;
   bit hit = 0;
   if (??) {
     int loop_bound_cost,loop_body_cost;
     int loop_bound = expression(environment,loop_bound_cost);
     for (int j = 0; j < loop_bound; j++) {
-      hit = hit || program(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
+      hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
     }
     cost = loop_body_cost + loop_bound_cost;
     return hit;
   } else if (??) {
     cost = 0;
     int xc,yc;
-    repeat(??){
-      int x = expression(environment, xc);
-      int y = expression(environment, yc);
+    int x = expression(environment, xc);
+    int y = expression(environment, yc);
+    cost += (xc + yc);
+    if (??) { // draw a circle
+	hit = _c(x,y);
+    } else {  // draw a line or rectangle
+      int x2 = expression(environment, xc);
+      int y2 = expression(environment, yc);
       cost += (xc + yc);
-      bit newHit;
-      if (??) { // draw a circle
-	newHit = _c(x,y);
-      } else {  // draw a line or rectangle
-	int x2 = expression(environment, xc);
-	int y2 = expression(environment, yc);
-	cost += (xc + yc);
-	if (??) { // draw a line
-	  newHit = _l(x,y,x2,y2);
-	} else { // draw a rectangle
-	  newHit = _r(x,y,x2,y2);
-	}
-      }
-      hit = hit || newHit;
+      if (??) 
+	hit = _l(x,y,x2,y2);
+      else
+	hit = _r(x,y,x2,y2);
     }
     return hit;
-  } else {
-    assert 0;
-    int variable_cost,body_cost;
-    int variable_value = expression(environment,variable_cost);
-    bit body_value = program(SHAPEARGUMENTS,push(environment,variable_value),d - 1,body_cost);
-    cost = variable_cost + body_cost;
-    return body_value;
   }
 }
+
 
 bit render(SHAPEVARIABLES) implements renderSpecification{
   assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
   int cost;
-  bit inScene = program(SHAPEARGUMENTS,{},3,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
   minimize(cost);
   return inScene;
 }
