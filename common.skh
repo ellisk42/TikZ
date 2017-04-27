@@ -73,13 +73,15 @@ generator bit program([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
       bit newHit;
       if (??) { // draw a circle
 	newHit = _c(x,y);
-      } else if (??) { // draw a line
+      } else {  // draw a line or rectangle
 	int x2 = expression(environment, xc);
 	int y2 = expression(environment, yc);
 	cost += (xc + yc);
-	newHit = _l(x,y,x2,y2);
-      } else { // draw a rectangle
-	assert 0;
+	if (??) { // draw a line
+	  newHit = _l(x,y,x2,y2);
+	} else { // draw a rectangle
+	  newHit = _r(x,y,x2,y2);
+	}
       }
       hit = hit || newHit;
     }
@@ -101,103 +103,3 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   minimize(cost);
   return inScene;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#define PHASE2
-
-// Canvas: records set of drawing objects
-/* bit[MAXIMUMCOORDINATE,MAXIMUMCOORDINATE] circleCanvas; */
-
-/* void drawCircle(int x,int y) { circleCanvas[x,y] = 1; } */
-
-
-/* generator int expression(fun choices){ */
-/*   return ?? * choices() + ??; */
-/* } */
-
-/* void newSubroutine(int j){ */
-/*   generator int v() { */
-/*     return {| ?? | j |}; */
-/*   } */
-/*   drawCircle(expression(v), */
-/* 	     expression(v)); */
-/* } */
-
-/* void newLoop(int j){ */
-/*   generator int v() { */
-/*     return {| ?? | j |}; */
-/*   } */
-/*   drawCircle(expression(v), */
-/* 	     expression(v)); */
-/* } */
-
-/* generator void modelBlock(fun block, ref int looped, ref int abstracted){ */
-/*   if (??) block(); */
-/*   else if (??) { newSubroutine(??); abstracted += 1; } */
-/*   else { looped += 1; } */
-/* } */
-
-/* void iterate(int k, fun block){ */
-/*   for (int j = 0; j < k; j++) { */
-/*     block(j); */
-/*   } */
-/* } */
-
-/* harness void main() { */
-/*   int numberOfAbstractedExpressions = 0; */
-/*   int numberOfLoopedExpressions = 0; */
-
-/*   modelBlock(() -> drawCircle(1,2), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/*   modelBlock(() -> drawCircle(1,5), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/*   modelBlock(() -> drawCircle(1,8), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-  
-/* #ifdef PHASE1 */
-/*   modelBlock(() -> drawCircle(3,2), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/*   modelBlock(() -> drawCircle(3,5), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/*   modelBlock(() -> drawCircle(3,8), numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/* #else */
-/*   modelBlock(() -> iterate(3, (j) -> drawCircle(3,2 + 3*j)), */
-/* 	     numberOfLoopedExpressions, numberOfAbstractedExpressions); */
-/* #endif */
-
-/*   iterate(numberOfLoopedExpressions, newLoop); */
-
-/*   minimize(10 - numberOfLoopedExpressions); */
-
-/*   if (numberOfAbstractedExpressions > 0) { */
-/*     assert numberOfLoopedExpressions == 0; */
-/*   } */
-/*   if (numberOfLoopedExpressions > 0) */
-/*     assert numberOfAbstractedExpressions == 0; */
-/*   assert numberOfLoopedExpressions > 0 || */
-/*     numberOfLoopedExpressions == 0; */
-    
-    
-
-/*   assert circleCanvas[1,2]; */
-/*   assert circleCanvas[1,5]; */
-/*   assert circleCanvas[1,8]; */
-/*   assert circleCanvas[3,2]; */
-/*   assert circleCanvas[3,5]; */
-/*   assert circleCanvas[3,8]; */
-/* } */
-
-
