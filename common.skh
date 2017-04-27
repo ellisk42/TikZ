@@ -69,6 +69,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     _l(7,4,
        7,2,0,1)
     ;
+#endif
 }
 
 generator int expression([int n], int[n] environment, ref int cost) {
