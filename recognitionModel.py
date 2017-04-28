@@ -101,13 +101,21 @@ class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
         # A placeholder for each target
         self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in self.outputDimensions ]
+        if not hasattr(self, 'hiddenSizes'):
+            self.hiddenSizes = [None]*len(self.outputDimensions)
 
         # A prediction for each target
         self.prediction = []
         # populate self.production
         predictionInputs = imageRepresentation
         for j,d in enumerate(self.outputDimensions):
-            self.prediction.append(tf.layers.dense(predictionInputs, d, activation = None))
+            if self.hiddenSizes[j] == None or self.hiddenSizes[j] == 0:
+                self.prediction.append(tf.layers.dense(predictionInputs, d, activation = None))
+            else:
+                intermediateRepresentation = tf.layers.dense(predictionInputs,
+                                                             self.hiddenSizes[j],
+                                                             activation = tf.nn.sigmoid)
+                self.prediction.append(tf.layers.dense(intermediateRepresentation, d, activation = None))
             predictionInputs = tf.concat([predictionInputs,
                                           tf.one_hot(self.targetPlaceholder[j], d)],
                                          axis = 1)
@@ -200,6 +208,12 @@ class LineDecoder(StandardPrimitiveDecoder):
 
     def __init__(self, imageRepresentation):
         self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,2,2] # x,y for beginning and end; arrow/-
+        self.hiddenSizes = [None,
+                            32,
+                            32,
+                            32,
+                            None,
+                            None]
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):

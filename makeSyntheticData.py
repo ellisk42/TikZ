@@ -264,7 +264,7 @@ if __name__ == '__main__':
     # this keeps any particular directory from getting too big
     if examplesPerBatch > 1000: examplesPerBatch = 1000
     
-    os.system('rm -r syntheticTrainingData ; mkdir syntheticTrainingData')
+    os.system('rm -r syntheticTrainingData syntheticTrainingData.tar ; mkdir syntheticTrainingData')
     n = "randomScene"
     startingPoint = 0
     offsetsAndCounts = []
@@ -286,8 +286,8 @@ if __name__ == '__main__':
 
         for _,startingPoint,_ in offsetsAndCounts:
             os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
-            if totalNumberOfExamples > 100:
-                os.system('rm -r syntheticTrainingData/%d'%startingPoint)
+        #     if totalNumberOfExamples > 100:
+        #         os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
-            os.system('rm -r syntheticTrainingData')
+        # os.system('rm -r syntheticTrainingData')
         print "Done. You should see everything in syntheticTrainingData.tar if you had at least 100 examples."
