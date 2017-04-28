@@ -579,14 +579,46 @@ class RecognitionModel():
                 print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                 print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
                 print ""
+
+    def visualizeFilters(self,checkpoint):
+        filters = []
+        saver = tf.train.Saver()
+        with tf.Session() as s:
+            saver.restore(s,checkpoint)
+            print tf.GraphKeys.TRAINABLE_VARIABLES
+            for v in tf.trainable_variables():
+                if v.name.startswith("conv2d") and v.name.endswith('kernel:0'):
+                    print v
+                    filters.append(v.eval())
+        # first layer
+        filters = filters[:3]
+        for f in filters:
+            (w,h,_,n) = f.shape
+            print f.shape
+
+            imageWidth = (w)*n + 5*(n - 1)
+            imageHeight = (2*h + 5)
+            v = np.zeros((imageWidth,imageHeight))
+            print "v = ",v.shape
+            for j in range(n):
+                print "target size",v[w*j:w*(j+1), 0:h].shape
+                print "destination size",f[:,:,0,j].shape
+                v[(w+5)*j:(w+5)*j+w, 0:h] = f[:,:,0,j]
+                v[(w+5)*j:(w+5)*j+w, h+5:2*h+5] = f[:,:,1,j]
+            saveMatrixAsImage(v*255,"/tmp/filters.png")
+            os.system("feh /tmp/filters.png")
+
                     
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3 and sys.argv[1] == 'test':
-        RecognitionModel().beam(sys.argv[2],
-                                beamSize = 100,
-                                beamLength = 13,
-                                checkpoint = "checkpoints/model.checkpoint")
+    if sys.argv[1] == 'test':
+        for target in sys.argv[2:]:
+            RecognitionModel().beam(target,
+                                    beamSize = 100,
+                                    beamLength = 13,
+                                    checkpoint = "checkpoints/model.checkpoint")
+    elif sys.argv[1] == 'visualize':
+        RecognitionModel().visualizeFilters("checkpoints/model.checkpoint")
     elif sys.argv[1] == 'analyze':
         RecognitionModel().analyzeFailures(100000, checkpoint = "checkpoints/model.checkpoint")
     elif sys.argv[1] == 'train':
