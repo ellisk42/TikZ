@@ -4,6 +4,7 @@ from render import render,animateMatrices
 from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance
 
+import argparse
 import tarfile
 import sys
 import tensorflow as tf
@@ -221,7 +222,7 @@ class LineDecoder(StandardPrimitiveDecoder):
                                   Number(grid2coordinate(y1)),
                                   Number(grid2coordinate(x2)),
                                   Number(grid2coordinate(y2)),
-                                  arrow = arrow,solid = solid))
+                                  arrow = arrow == 1,solid = solid == 1))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
                 if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 ]
 
@@ -430,7 +431,7 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
             for feed in iterator.testingFeeds():
-                targetLine = feed[None]
+                targetLine = feed[None].reshape((1))[0].tolist()
                 del feed[None]
                 k += 1
                 accuracy = s.run(self.averageAccuracy,
@@ -445,30 +446,27 @@ class RecognitionModel():
                     preferredLineHumanReadable = str(preferredLine)
                     preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
                     # check to see the rank of the correct line, because it wasn't the best
-                    targetLine = str(targetLine[0])
-                    topHundred = [str(l) for _,l in topHundred]
-                    print "Target line (not model preference):",targetLine
-                    print "Model preference:",preferredLineHumanReadable
-                    if targetLine in topHundred:
-                        print "Target line has rank %d in beam"%(1 + topHundred.index(targetLine))
-                        targetRanks.append(1 + topHundred.index(targetLine))
+                    targetLineString = str(targetLine)
+                    topHundred = [ l for _,l in topHundred]
+                    topHundredString = map(str,topHundred)
+                    
+                    if targetLineString in topHundredString:
+                        #print "Target line has rank %d in beam"%(1 + topHundred.index(targetLine))
+                        targetRanks.append(1 + topHundredString.index(targetLineString))
                     else:
-                        print "Target lie not in beam."
+                        print "Target line (not model preference):",targetLine
+                        print "Model preference:",preferredLineHumanReadable
+                        print "Target not in beam."
+                        if isinstance(targetLine, Line):
+                            print "The target length = %f"%(targetLine.length())
+                            print "Is the target diagonal? %s"%(str(targetLine.isDiagonal()))
+                            print "Smallest distance: %f"%(min([targetLine - h for h in topHundred ]))
+                        print ""
                         targetRanks.append(None)
                     
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
                     if len(failureLog) > 100:
                         break
-                else:
-                    pass
-                    # decode the action preferred by the model
-                    # preferredLine = max(self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
-                    #                                           self.goalPlaceholder: feed[self.goalPlaceholder]}, 1),
-                    #                     key = lambda foo: foo[0])[1]
-                    # preferredLine = "\n%end of program\n" if preferredLine == None else str(preferredLine)
-                    # print preferredLine
-                    # showImage(feed[self.currentPlaceholder][0])
-                    # showImage(feed[self.goalPlaceholder][0])
                     
         print "Failures:",len(failureLog),'/',k
         successfulTargetRanks = [ r for r in targetRanks if r != None ]
@@ -524,7 +522,7 @@ class RecognitionModel():
 
                 beam = children
                 
-                beam = [ n for n in children
+                beam = [ n for n in children 
                          if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
                 beam = sorted(beam, key = lambda c: -c['logLikelihood'])
                 beam = beam[:beamSize]
@@ -611,17 +609,27 @@ class RecognitionModel():
                     
 
 if __name__ == '__main__':
-    if sys.argv[1] == 'test':
-        for target in sys.argv[2:]:
+    parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
+    parser.add_argument('task')
+    parser.add_argument('-c','--checkpoint', default = "checkpoints/model.checkpoint", type = str)
+    parser.add_argument('-n','--numberOfExamples', default = 100000, type = int)
+    parser.add_argument('-l','--beamLength', default = 13, type = int)
+    parser.add_argument('-b','--beamWidth', default = 10, type = int)
+    parser.add_argument('-t','--test', default = '', type = str)
+
+    arguments = parser.parse_args()
+    
+    if arguments.task == 'test':
+        for target in arguments.test.split(','):
             RecognitionModel().beam(target,
-                                    beamSize = 100,
-                                    beamLength = 13,
-                                    checkpoint = "checkpoints/model.checkpoint")
-    elif sys.argv[1] == 'visualize':
-        RecognitionModel().visualizeFilters("checkpoints/model.checkpoint")
-    elif sys.argv[1] == 'analyze':
-        RecognitionModel().analyzeFailures(100000, checkpoint = "checkpoints/model.checkpoint")
-    elif sys.argv[1] == 'train':
-        RecognitionModel().train(100000, checkpoint = "checkpoints/model.checkpoint")
-    elif sys.argv[1] == 'profile':
-        cProfile.run('loadExamples(100000)')
+                                    beamSize = arguments.beamWidth,
+                                    beamLength = arguments.beamLength,
+                                    checkpoint = arguments.checkpoint)
+    elif arguments.task == 'visualize':
+        RecognitionModel().visualizeFilters(arguments.checkpoint)
+    elif arguments.task == 'analyze':
+        RecognitionModel().analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+    elif arguments.task == 'train':
+        RecognitionModel().train(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+    elif arguments.task == 'profile':
+        cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))

@@ -36,6 +36,8 @@ class Program():
         return "\n".join(self.evaluate([])[0])
     def noisyTikZ(self):
         return "\n".join(self.noisyEvaluate([])[0])
+    def __eq__(self,o): return str(self) == str(o)
+    def __ne__(self,o): return str(self) != str(o)
 
 class Expression():
     pass
@@ -162,6 +164,15 @@ class Line(Program):
         if self.length() == 0.0:
 #            raise Exception('Attempt to create line with zero length')
             pass
+
+    def isDiagonal(self):
+        return not (len(set(self.usedXCoordinates())) == 1 or len(set(self.usedYCoordinates())) == 1)
+    
+    def __sub__(self,o):
+        if not isinstance(o,Line): return float('inf')
+        dx = sum([ abs(x1 - x2) for x1,x2 in zip(o.usedXCoordinates(),self.usedXCoordinates()) ])
+        dy = sum([ abs(x1 - x2) for x1,x2 in zip(o.usedYCoordinates(),self.usedYCoordinates()) ])
+        return dx + dy
 
     def children(self): return self.points
     def substitute(self, old, new):
@@ -534,8 +545,6 @@ class Sequence(Program):
                       for j,l in enumerate(self.lines)
                       for k,lp in enumerate(self.lines) ])
 
-    def __eq__(self,o): return str(self) == str(o)
-    def __ne__(self,o): return str(self) != str(o)
     def __hash__(self): return hash(str(self))
     def __len__(self): return len(self.lines)
 
