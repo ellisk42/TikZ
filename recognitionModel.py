@@ -25,6 +25,8 @@ TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
+# once a program is finished we wrap it up in a sequence object
+def finished(x): return isinstance(x['program'], Sequence)
 
 def loadExamples(numberOfExamples, dummyImages = True):
     noisyTrainingData = "noisy" in sys.argv
@@ -168,7 +170,8 @@ class CircleDecoder(StandardPrimitiveDecoder):
     
     def beam(self, session, feed, beamSize):
         return [(s, Circle(AbsolutePoint(Number(grid2coordinate(x)),Number(grid2coordinate(y))),Number(1)))
-                for s,[x,y] in self.beamTrace(session, feed, beamSize) ]
+                for s,[x,y] in self.beamTrace(session, feed, beamSize)
+                if x > 1 and y > 1 and x < MAXIMUMCOORDINATE - 1 and y < MAXIMUMCOORDINATE - 1]
 
     @staticmethod
     def extractTargets(l):
@@ -494,8 +497,6 @@ class RecognitionModel():
         beam = [{'program': [],
                  'output': np.zeros(targetImage.shape),
                  'logLikelihood': 0.0}]
-        # once a program is finished we wrap it up in a sequence object
-        def finished(x): return isinstance(x['program'], Sequence)
 
         finishedPrograms = []
         
@@ -522,40 +523,24 @@ class RecognitionModel():
 
                 beam = children
                 
-                beam = [ n for n in children 
-                         if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
+                beam = self.removeParticlesWithCollisions(beam)
                 beam = sorted(beam, key = lambda c: -c['logLikelihood'])
                 beam = beam[:beamSize]
-                
-                startTime = time()
-                outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
-                                   for n in beam ],
-                                 yieldsPixels = True,
-                                 canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
-                print "Rendered in %f seconds"%(time() - startTime)
+                self.renderParticles(beam)
                 totalNumberOfRenders += len(beam)
-                for n,o in zip(beam,outputs): n['output'] = 1.0 - o
+                # only keep things in the beam if they produce unique outputs. encourages diversity
+                beam = self.removeDuplicateParticles(beam)                
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
                 for n in beam:
                     n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
 
-                beam = sorted(beam, key = lambda c: c['distance'])
-
-                if len(beam) > beamSize:
-                    # only keep things in the beam if they produce unique outputs. encourages diversity
-                    beam = [n for j,n in enumerate(beam)
-                            if all([ not np.array_equal(n['output'], m['output']) for m in beam[:j] ])]
-                beam = beam[:beamSize]
-                
-
                 for n in beam:
                     p = n['program']
                     if not finished(n): p = Sequence(p)
                     print "Program in beam: %s\n"%(str(p))
                     print "Blurred distance: %f"%n['distance']
-                    print "Pixel wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
                     print "\n"
                 
                 # record all of the finished programs
@@ -565,19 +550,41 @@ class RecognitionModel():
                 if beam == []:
                     print "Empty beam."
                     break
+            self.saveParticles(finishedPrograms, parseDirectory)
 
-            print "Finished programs, sorted by likelihood:"
-            os.system('rm -r %s'%(parseDirectory))
-            os.system('mkdir %s'%(parseDirectory))
-            finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
-            for j,n in enumerate(finishedPrograms):
-                print "Finished program: log likelihood %f"%(n['logLikelihood'])
-                print n['program']
-                saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
-                print "Absolute pixel-wise distance: %f"%(np.sum(np.abs(n['output'] - targetImage)))
-                print "Blurred distance: %f"%blurredDistance(targetImage, n['output'])
-                print ""
+    # helper functions for particle search
+    def removeParticlesWithCollisions(self,particles):
+        return [ n for n in particles
+                 if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
+    def removeDuplicateParticles(self,particles):
+        noDuplicates = []
+        for j,n in enumerate(particles):
+            if any([ np.array_equal(n['output'], m['output'])
+                     for m in particles[:j] ]): continue
+            noDuplicates.append(n)
+        return noDuplicates
+    def renderParticles(self,particles):
+        startTime = time()
+        outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
+                           for n in particles ],
+                         yieldsPixels = True,
+                         canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
+        print "Rendered in %f seconds"%(time() - startTime)
+        for n,o in zip(particles,outputs):
+            n['output'] = 1.0 - o
+    def saveParticles(self,finishedPrograms, parseDirectory):
+        print "Finished programs, sorted by likelihood:"
+        os.system('rm -r %s'%(parseDirectory))
+        os.system('mkdir %s'%(parseDirectory))
+        finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
+        for j,n in enumerate(finishedPrograms):
+            print "Finished program: log likelihood %f"%(n['logLikelihood'])
+            print n['program']
+            saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
+            print "Distance: %f"%(n['distance'])
+            print ""
 
+        
     def visualizeFilters(self,checkpoint):
         filters = []
         saver = tf.train.Saver()
