@@ -1,3 +1,4 @@
+import math
 import sys
 import io
 import numpy as np
@@ -79,6 +80,27 @@ def truncatedNormal(lower = None,upper = None):
     if lower != None and x < lower: return truncatedNormal(lower = lower,upper = upper)
     if upper != None and x > upper: return truncatedNormal(lower = lower,upper = upper)
     return x
+
+def isFinite(x):
+    return not (math.isnan(x) or math.isinf(x))
+def lse(x,y):
+    if not isFinite(x): return y
+    if not isFinite(y): return x
+    
+    if x > y:
+        return x + math.log(1 + math.exp(y - x))
+    else:
+        return y + math.log(1 + math.exp(x - y))
+def lseList(l):
+    a = l[0]
+    for x in l[1:]: a = lse(a,x)
+    return a
+    
+def sampleLogMultinomial(logLikelihoods):
+    z = lseList(logLikelihoods)
+    ps = [math.exp(p - z) for p in logLikelihoods ]
+    return np.random.multinomial(1,ps).tolist().index(1)
+
 def flushEverything():
     sys.stdout.flush()
     sys.stderr.flush()

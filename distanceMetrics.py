@@ -42,7 +42,7 @@ def asymmetricBlurredDistance(a,b, show = False):
     targetBigger = np.sum(np.abs(d[d > 0]))
     currentBigger = np.sum(np.abs(d[d < 0]))
     return currentBigger*10 + targetBigger
-    
+
 
 # Hausdorff Distance
 def HausdorffDist(A,B):

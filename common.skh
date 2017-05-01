@@ -7,10 +7,10 @@ pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 3 --bnd-arr-size 3";
 #define RECTANGLE 2
 
 // Which figure we are trying to explain
-//#define CIRCLEGRID
+#define CIRCLEGRID
 //#define LADDER
 //#define HMM
-#define ICINGMODEL
+//#define ICINGMODEL
 
 int [n + 1] push([int n], int [n] environment, int j) {
   int [n + 1] ep = environment;
@@ -22,79 +22,7 @@ int [n + 1] push([int n], int [n] environment, int j) {
 #define _c(x,y) (shapeIdentity == CIRCLE && cx == x && cy == y)
 #define _l(x1,y1,x2,y2,d,a) (shapeIdentity == LINE && x1 == lx1 && y1 == ly1 && x2 == lx2 && y2 == ly2 && d == dashed && a == arrow)
 #define _r(x1,y1,x2,y2) (shapeIdentity == RECTANGLE && x1 == rx1 && y1 == ry1 && x2 == rx2 && y2 == ry2)
-bit renderSpecification(SHAPEVARIABLES) {
-  assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
-#ifdef ICINGMODEL
-  return
-    _c(3,3) ||
-    _c(3,8) ||
-    _c(3,13) ||
-    _c(8,3) ||
-    _c(8,8) ||
-    _c(8,13) ||
-    _c(13,3) ||
-    _c(13,8) ||
-    _c(13,13) ||
-    _l(3,4, 3,7, 0, 0) ||
-    _l(3,9, 3,12, 0, 0) ||
-    _l(8,4, 8,7, 0, 0) ||
-    _l(8,9, 8,12, 0, 0) ||
-    _l(13,4, 13,7, 0, 0) ||
-    _l(13,9, 13,12, 0, 0) ||
-    _l(4,3, 7,3, 0, 0) ||
-    _l(4,8, 7,8, 0, 0) ||
-    _l(4,13, 7,13, 0, 0) ||
-    _l(9,3, 12,3, 0, 0) ||
-    _l(9,8, 12,8, 0, 0) ||
-    _l(9,13, 12,13, 0, 0);
-#endif
-#ifdef CIRCLEGRID
-  return
-    _c(1, 3) ||
-    _c(1, 5) ||
-    _c(1, 7) ||
-    _c(2, 3) ||
-    _c(2, 5) ||
-    _c(2, 7) ||
-    _c(3, 3) ||
-    _c(3, 5) ||
-    _c(3, 7);
-#endif
-#ifdef LADDER
-  return
-    // ladder edges
-    _l(1,1,1,5,0,0) ||
-    _l(3,1,3,5,0,0) ||
-    // ladder rungs
-    _l(1,2,3,2,0,0) ||
-    _l(1,3,3,3,0,0) ||
-    _l(1,4,3,4,0,0);
-#endif
-#ifdef HMM
-  return
-    // hidden nodes
-    _c(1,5) ||
-    _c(4,5) ||
-    _c(7,5) ||
-    // visible nodes
-    _c(1,1) ||
-    _c(4,1) ||
-    _c(7,1) ||
-    // hidden state transitions
-    _l(2,5,
-       3,5,0,1) ||
-    _l(5,5,
-       6,5,0,1) ||
-    // emission arc
-    _l(1,4,
-       1,2,0,1) ||
-    _l(4,4,
-       4,2,0,1) ||
-    _l(7,4,
-       7,2,0,1)
-    ;
-#endif
-}
+
 
 generator int expression([int n], int[n] environment, ref int cost) {
   cost = 1;
