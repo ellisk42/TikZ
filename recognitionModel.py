@@ -543,7 +543,7 @@ class RecognitionModel():
                 for n in sorted(beam,key = lambda n: n['distance']):
                     p = n['program']
                     if not finished(n): p = Sequence(p)
-                    print "Program in beam:\n%s\n"%(str(p))
+                    print "Program in beam: (%f)\n%s\n"%(n['logLikelihood'],str(p))
                     print "Blurred distance: %f"%n['distance']
                     #analyzeAsymmetric(targetImage, n['output'])
                     print "\n"
@@ -584,7 +584,9 @@ class RecognitionModel():
                             self.goalPlaceholder: np.array([targetImage])}
 
                     childCount = parent['count']
-                    for childScore,suffix in self.decoder.beam(s, feed, childCount*2)[:childCount]:
+                    kids = self.decoder.beam(s, feed, childCount*2)
+                    kids.sort(key = lambda k: k[0], reverse = True)
+                    for childScore,suffix in kids[:childCount]:
                         if suffix == None:
                             k = Sequence(parent['program'])
                         else:
@@ -615,9 +617,9 @@ class RecognitionModel():
                 beam = [ n for n in beam if not finished(n) ]                
 
                 # Resample
-                for n in beam: n['score'] = n['logLikelihood'] - n['distance']/1000.0
-                z = lseList([ -n['score'] for n in beam ])
-                ps = [math.exp(-n['score'] - z) for n in beam ]
+                for n in beam: n['score'] = n['logLikelihood'] - n['distance']/25.0
+                z = lseList([ n['score'] for n in beam ])
+                ps = [math.exp(n['score'] - z) for n in beam ]
                 print ps
                 cs = np.random.multinomial(beamSize, ps).tolist()
                 for n,c in zip(beam,cs):
@@ -626,9 +628,10 @@ class RecognitionModel():
                 for n in beam:
                     p = n['program']
                     if not finished(n): p = Sequence(p)
-                    print "Program in beam:\n%s\n"%(str(p))
+                    print "(x%d) Program in beam (%f):\n%s"%(n['count'], n['logLikelihood'], str(p))
                     print "Blurred distance: %f"%n['distance']
-                    showImage(n['output'])
+                    if n['count'] > 0:
+                        showImage(n['output'] + targetImage)
                     print "\n"
                 
                 # Remove all of the dead particles
@@ -703,7 +706,7 @@ class RecognitionModel():
 def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
-    RecognitionModel().beam(f,
+    RecognitionModel().SMC(f,
                             beamSize = arguments.beamWidth,
                             beamLength = arguments.beamLength,
                             checkpoint = arguments.checkpoint)
