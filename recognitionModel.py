@@ -29,8 +29,8 @@ TESTINGFRACTION = 0.1
 # once a program is finished we wrap it up in a sequence object
 def finished(x): return isinstance(x['program'], Sequence)
 
-def loadExamples(numberOfExamples, dummyImages = True):
-    noisyTrainingData = "noisy" in sys.argv
+def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
+    noisyTrainingData = noisy
     
     if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
         handle = '/om/user/ellisk/syntheticTrainingData.tar'
@@ -326,7 +326,8 @@ class PrimitiveDecoder():
         return b
 
 class RecognitionModel():
-    def __init__(self):
+    def __init__(self, noisy = False):
+        self.noisy = noisy
         # current and goal images
         self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
         self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
@@ -394,7 +395,7 @@ class RecognitionModel():
 
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
-        partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples)
+        partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples, noisy = self.noisy)
         
         initializer = tf.global_variables_initializer()
         iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
@@ -425,7 +426,7 @@ class RecognitionModel():
                 flushEverything()
 
     def analyzeFailures(self, numberOfExamples, checkpoint):
-        partialImages,targetImages,targetVectors,targetLines = loadExamples(numberOfExamples)
+        partialImages,targetImages,targetVectors,targetLines = loadExamples(numberOfExamples,noisy = self.noisy)
         iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors + [targetLines]),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
         iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
@@ -721,6 +722,7 @@ if __name__ == '__main__':
     parser.add_argument('-t','--test', default = '', type = str)
     parser.add_argument('-r', action="store_true", default=False)
     parser.add_argument('-m','--cores', default = 1, type = int)
+    parser.add_argument('--noisy',action = "store_true", default = False)
 
     arguments = parser.parse_args()
     
@@ -734,8 +736,8 @@ if __name__ == '__main__':
     elif arguments.task == 'visualize':
         RecognitionModel().visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':
-        RecognitionModel().analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+        RecognitionModel(noisy = arguments.noisy).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
     elif arguments.task == 'train':
-        RecognitionModel().train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+        RecognitionModel(noisy = arguments.noisy).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
     elif arguments.task == 'profile':
         cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))
