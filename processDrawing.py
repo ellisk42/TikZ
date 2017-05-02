@@ -4,6 +4,69 @@ from PIL import Image
 from utilities import showImage,image2array
 import os
 
+def processHalfpage(x):
+    x = x.transpose(Image.FLIP_LEFT_RIGHT)
+    
+    a = image2array(x)
+    a[a < 0.05] = 0.0
+    # locate the diagnostic dot: upper right-hand corner should have it
+    scanThreshold = 7
+    for j in range(0,200):
+        energy = a[0:j,0:j].sum()
+        if energy > scanThreshold:
+            corner = a[0:(j+3),0:(j+3)]
+            m = np.argmax(corner)
+            m = np.unravel_index(m, corner.shape)
+            break
+        
+# 
+    a[m[0],:] = 1.0
+    a[:,m[1]] = 1.0
+
+    gridSize = 37.5
+    
+    x = x.crop((m[1],m[0],
+                m[1] + gridSize*16,
+                m[0] + gridSize*16))
+    x = x.resize((256, 256),
+                 Image.BILINEAR)
+
+    # remove the . and rescale the colors
+    a = image2array(x)
+    a[0:10,0:10] = 0.0
+    a = a*3
+    a[a > 1] = 1.0
+    a[a < 0.1] = 0.0
+
+    if False: #}illustrate the great fit
+        for j in range(16):
+            a[:,(256/16)*j] = 0.5
+            a[(256/16)*j,:] = 0.5
+    else:
+        a = 1.0 - a
+        
+    return Image.fromarray(255*a).convert('L')
+    
+    
+
+def processExpert(name):
+    os.system('convert -density 150 %s -quality 90 /tmp/output.png'%name)
+    for j in range(100):
+        _j = j
+        p = '/tmp/output-%d.png'%j
+        if not os.path.isfile(p): break
+
+        x = Image.open(p).convert('L')
+        (w,h) = x.size
+
+        # splitted in half; process each half
+        top = x.crop((0,0,w,h/2))
+        bottom = x.crop((0,h/2,w,h)).transpose(Image.FLIP_TOP_BOTTOM)
+        processHalfpage(top).save('drawings/expert-%d.png'%(2*_j))
+        processHalfpage(bottom).save('drawings/expert-%d.png'%(2*_j + 1))
+
+
+
 def processPDF(name):
     os.system('convert -density 150 %s -quality 90 /tmp/output.png'%name)
     for j in range(100):
@@ -128,4 +191,4 @@ def processDrawing(name, export = False):
     return x
 
 if __name__ == '__main__':
-    processDrawing(sys.argv[1], export = True)
+    processExpert(sys.argv[1])

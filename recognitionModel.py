@@ -2,7 +2,7 @@ from batch import BatchIterator
 from language import *
 from render import render,animateMatrices
 from utilities import *
-from distanceMetrics import blurredDistance,asymmetricBlurredDistance
+from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
 
 import argparse
 import tarfile
@@ -13,6 +13,7 @@ import io
 from time import time
 import pickle
 import cProfile
+from multiprocessing import Pool
 
 # The data is generated on a  MAXIMUMCOORDINATExMAXIMUMCOORDINATE grid
 # We can interpolate between stochastic search and neural networks by downsampling to a smaller grid
@@ -538,11 +539,12 @@ class RecognitionModel():
                 for n in beam:
                     n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
 
-                for n in sorted(beam,key = n['distance']):
+                for n in sorted(beam,key = lambda n: n['distance']):
                     p = n['program']
                     if not finished(n): p = Sequence(p)
-                    print "Program in beam: %s\n"%(str(p))
+                    print "Program in beam:\n%s\n"%(str(p))
                     print "Blurred distance: %f"%n['distance']
+                    #analyzeAsymmetric(targetImage, n['output'])
                     print "\n"
                 
                 # record all of the finished programs
@@ -612,8 +614,9 @@ class RecognitionModel():
                 beam = [ n for n in beam if not finished(n) ]                
 
                 # Resample
-                z = lseList([ -n['distance'] for n in beam ])
-                ps = [math.exp(-n['distance'] - z) for n in beam ]
+                for n in beam: n['score'] = n['logLikelihood'] - n['distance']/1000.0
+                z = lseList([ -n['score'] for n in beam ])
+                ps = [math.exp(-n['score'] - z) for n in beam ]
                 print ps
                 cs = np.random.multinomial(beamSize, ps).tolist()
                 for n,c in zip(beam,cs):
@@ -622,8 +625,9 @@ class RecognitionModel():
                 for n in beam:
                     p = n['program']
                     if not finished(n): p = Sequence(p)
-                    print "Program in beam: %s\n"%(str(p))
+                    print "Program in beam:\n%s\n"%(str(p))
                     print "Blurred distance: %f"%n['distance']
+                    showImage(n['output'])
                     print "\n"
                 
                 # Remove all of the dead particles
@@ -663,7 +667,7 @@ class RecognitionModel():
             print n['program']
             saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
             print "Distance: %f"%(n['distance'])
-            asymmetricBlurredDistance(targetImage, n['output'], True)
+            #asymmetricBlurredDistance(targetImage, n['output'], True)
             print ""
 
         
@@ -695,7 +699,17 @@ class RecognitionModel():
             saveMatrixAsImage(v*255,"/tmp/filters.png")
             os.system("feh /tmp/filters.png")
 
-                    
+def handleTest(a):
+    (f,arguments) = a
+    tf.reset_default_graph()
+    RecognitionModel().beam(f,
+                            beamSize = arguments.beamWidth,
+                            beamLength = arguments.beamLength,
+                            checkpoint = arguments.checkpoint)
+def picturesInDirectory(d):
+    if d.endswith('.png'): return [d]
+    if not d.endswith('/'): d = d + '/'
+    return [ d + f for f in os.listdir(d) if f.endswith('.png') ]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
@@ -706,15 +720,17 @@ if __name__ == '__main__':
     parser.add_argument('-b','--beamWidth', default = 10, type = int)
     parser.add_argument('-t','--test', default = '', type = str)
     parser.add_argument('-r', action="store_true", default=False)
+    parser.add_argument('-m','--cores', default = 1, type = int)
 
     arguments = parser.parse_args()
     
     if arguments.task == 'test':
-        for target in arguments.test.split(','):
-            RecognitionModel().beam(target,
-                                    beamSize = arguments.beamWidth,
-                                    beamLength = arguments.beamLength,
-                                    checkpoint = arguments.checkpoint)
+        fs = picturesInDirectory(arguments.test)
+        if arguments.cores == 1:
+            map(handleTest, [ (f,arguments) for f in fs ])
+        else:
+            Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
+    
     elif arguments.task == 'visualize':
         RecognitionModel().visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':

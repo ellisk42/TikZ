@@ -6,13 +6,14 @@ Created on Mon Jun 16 23:56:41 2014
 import numpy as np
 from numpy.core.umath_tests import inner1d
 from utilities import showImage
-# A = np.array([[1,2],[3,4],[5,6],[7,8]])
-# B = np.array([[2,3],[4,5],[6,7],[8,9],[10,11]])
+
+
+blurKernelSize = 7
 
 
 def blurredDistance(a,b, show = False):
     import cv2
-    kernelSize = 15
+    kernelSize = blurKernelSize
     
     a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
     b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
@@ -22,13 +23,15 @@ def blurredDistance(a,b, show = False):
         showImage(b)
     return -np.sum(np.abs(a - b))
 
+
+
 def asymmetricBlurredDistance(a,b, show = False):
     # a = target
     # b = current
     # if you see a pixel in current that isn't in target, that's really bad
     # if you see a pixel and target that isn't an current, that's not so bad
     import cv2
-    kernelSize = 15
+    kernelSize = blurKernelSize
     
     a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
     b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
@@ -41,7 +44,31 @@ def asymmetricBlurredDistance(a,b, show = False):
     positives = d > 0
     targetBigger = np.sum(np.abs(d[d > 0]))
     currentBigger = np.sum(np.abs(d[d < 0]))
-    return currentBigger*10 + targetBigger
+    return currentBigger*2 + targetBigger
+
+def analyzeAsymmetric(a,b):
+    # a = target
+    # b = current
+    # if you see a pixel in current that isn't in target, that's really bad
+    # if you see a pixel and target that isn't an current, that's not so bad
+    import cv2
+    kernelSize = blurKernelSize
+
+   
+    a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
+    b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
+
+    showImage(a + b)
+    
+    d = a - b
+    targetBigger = np.sum(d[d > 0]*d[d > 0])
+    currentBigger = np.sum(d[d < 0]*d[d < 0])
+    print "targetBigger = %f"%targetBigger
+    print "currentBigger = %f"%currentBigger
+
+#    showImage(b)
+
+    return currentBigger*2 + targetBigger
 
 
 # Hausdorff Distance
