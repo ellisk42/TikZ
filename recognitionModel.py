@@ -350,7 +350,7 @@ class RecognitionModel():
                                              dilation_rate = initialDilation,
                                              strides = 1)
         squareKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = 6,
+                                             filters = 12,
                                              kernel_size = [8/initialDilation,8/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
@@ -473,7 +473,7 @@ class RecognitionModel():
                         targetRanks.append(None)
                     
                     failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
-                    if len(failureLog) > 1000:
+                    if len(failureLog) > 99:
                         break
                     
         print "Failures:",len(failureLog),'/',k
