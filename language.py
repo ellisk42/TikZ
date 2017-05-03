@@ -23,7 +23,7 @@ def makeLabel(j): return 'L'+str(j)
 LABELS = [ makeLabel(j) for j in range(4) ]
 
 def randomCoordinate():
-    return int(random()*(MAXIMUMCOORDINATE - 1)) + 1
+    return int(random()*(MAXIMUMCOORDINATE - 2)) + 1
 
 
 def inbounds(p):

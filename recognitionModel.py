@@ -3,6 +3,7 @@ from language import *
 from render import render,animateMatrices
 from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
+from fastRender import fastRender
 
 import argparse
 import tarfile
@@ -623,13 +624,20 @@ class RecognitionModel():
     
     def renderParticles(self,particles):
         startTime = time()
-        outputs = render([ (n.program if n.finished() else Sequence(n.program)).TikZ()
-                           for n in particles ],
-                         yieldsPixels = True,
-                         canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
+        if not self.arguments.fastRender:
+            outputs = render([ (n.program if n.finished() else Sequence(n.program)).TikZ()
+                               for n in particles ],
+                             yieldsPixels = True,
+                             canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
+        else:
+            outputs = [ fastRender(n.program if n.finished() else Sequence(n.program))
+                        for n in particles ]
+            
         print "Rendered in %f seconds"%(time() - startTime)
         for n,o in zip(particles,outputs):
-            n.output = 1.0 - o
+            n.output = o
+            if not self.arguments.fastRender:
+                n.output = 1.0 - n.output
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
         os.system('rm -r %s'%(parseDirectory))
@@ -704,6 +712,7 @@ if __name__ == '__main__':
     parser.add_argument('--distanceCoefficient', default = 1.0/25.0, type = float)
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
     parser.add_argument('--beam', action = "store_true", default = False)
+    parser.add_argument('--fastRender', action = "store_true", default = False)
 
     arguments = parser.parse_args()
     
