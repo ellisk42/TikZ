@@ -3,7 +3,7 @@ from language import *
 from render import render,animateMatrices
 from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
-from fastRender import fastRender
+from fastRender import fastRender,loadPrecomputedRenderings
 
 import argparse
 import tarfile
@@ -195,7 +195,7 @@ class RectangleDecoder(StandardPrimitiveDecoder):
                                        grid2coordinate(x2),
                                        grid2coordinate(y2)))
                 for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize)
-                if x1 != x2 and y1 != y2]
+                if x1 != x2 and y1 != y2 and x1 > 0 and x2 > 0 and y1 > 0 and y2 > 0 ]
 
     @staticmethod
     def extractTargets(l):
@@ -227,7 +227,7 @@ class LineDecoder(StandardPrimitiveDecoder):
                                   Number(grid2coordinate(y2)),
                                   arrow = arrow == 1,solid = solid == 1))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
-                if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 ]
+                if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 and x1 > 0 and y1 > 0 and x2 > 0 and y2 > 0 ]
 
     @staticmethod
     def extractTargets(l):
@@ -715,6 +715,8 @@ if __name__ == '__main__':
     parser.add_argument('--fastRender', action = "store_true", default = False)
 
     arguments = parser.parse_args()
+    if arguments.fastRender:
+        loadPrecomputedRenderings()
     
     if arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)

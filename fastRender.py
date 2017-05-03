@@ -12,11 +12,10 @@ def precomputedRenderings():
     c = 1.0 - render([c],yieldsPixels = True)[0]
 
     rectangles = {}
-    for dx in range(15):
-        for dy in range(15):
-            if dx > 0 and dy > 0 and 1 + dx < 15 and 1 + dy < 15:
-                rectangles[(dx,dy)] = Sequence([Rectangle(AbsolutePoint(Number(1),Number(1)),
-                                                          AbsolutePoint(Number(1 + dx),Number(1 + dy)))]).TikZ()
+    for dx in range(1,15):
+        for dy in range(1,15):
+            rectangles[(dx,dy)] = Rectangle(AbsolutePoint(Number(1),Number(1)),
+                                            AbsolutePoint(Number(1 + dx),Number(1 + dy))).TikZ()
     rectangleKeys = rectangles.keys()
     print "About to render %d rectangles"%(len(rectangleKeys))
     rectangleRenders = render([rectangles[k] for k in rectangleKeys ], yieldsPixels = True)
@@ -26,15 +25,15 @@ def precomputedRenderings():
         #        showImage(rectangles[k])
 
     lines = {} # keys: (dx,dy, solid, arrow). arrow is one of {None,True,False}. True = flip from canonical
-    for dx in range(0,13 + 1):
-        for dy in range(-13,14):
+    for dx in range(0,14 + 1):
+        for dy in range(-14,14 + 1):
             if dx == 0 and dy == 0: continue
 
             if dy >= 0:
                 y1 = 1
                 y2 = y1 + dy
             else:
-                y1 = 14
+                y1 = 15
                 y2 = y1 + dy            
             lines[(dx,dy,True,None)] = Line.absolute(Number(1), Number(y1),
                                                       Number(1 + dx), Number(y2)).TikZ()
@@ -89,16 +88,18 @@ def fastRender(program):
         else:
             arrow = None
 
+        if not (dx,dy,program.solid,arrow) in globalFastRenderTable['l']:
+            print program
         o = globalFastRenderTable['l'][(dx,dy,program.solid,arrow)]
         o = np.roll(o, (x1 - 1)*256/16,axis = 1)
 
         if dy >= 0: # starts at (1,1)
-            print "positive dy"
+#            print "positive dy"
             return np.roll(o, 256 - (y1 - 1)*256/16,axis = 0)
         else:
-            print "negative dy"
+#            print "negative dy"
             # starts at (1,14)
-            return np.roll(o, (14 - y1)*256/16,axis = 0)
+            return np.roll(o, (15 - y1)*256/16,axis = 0)
 
     if isinstance(program,Circle):
         x = program.center.x.n
@@ -119,7 +120,9 @@ def fastRender(program):
         dy = y2 - y1
 
         if dx == 0 or dy == 0: return np.zeros((256,256))
-
+        if not (dx,dy) in globalFastRenderTable['r']:
+            print program
+            render([program.TikZ()],showImage = True)
         o = globalFastRenderTable['r'][(dx,dy)]
         o = np.roll(o, (x1 - 1)*256/16,axis = 1)
         o = np.roll(o, 256 - (y1 - 1)*256/16,axis = 0)
@@ -132,14 +135,14 @@ def loadPrecomputedRenderings():
     
     if os.path.exists("precomputedRenderings.p"):
         globalFastRenderTable = pickle.load(open("precomputedRenderings.p",'rb'))
-        print "Loaded %d renderings."%(len(t['l']) + len(t['r']) + len(t['c']))
+#        print "Loaded %d renderings."%(len(t['l']) + len(t['r']) + len(t['c']))
     else:
         globalFastRenderTable = precomputedRenderings()
         pickle.dump(globalFastRenderTable,open("precomputedRenderings.p",'wb'))
 
 
 if __name__ == '__main__':
-    for _ in range(1):
+    for _ in range(20):
         p = Line.sample() #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
     #    p.solid = True
     #    p.arrow = False
