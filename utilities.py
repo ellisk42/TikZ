@@ -92,6 +92,7 @@ def lse(x,y):
     else:
         return y + math.log(1 + math.exp(x - y))
 def lseList(l):
+    if l == []: return float('-inf')
     a = l[0]
     for x in l[1:]: a = lse(a,x)
     return a

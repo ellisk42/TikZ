@@ -26,8 +26,6 @@ TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
-# once a program is finished we wrap it up in a sequence object
-def finished(x): return isinstance(x['program'], Sequence)
 
 def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
     noisyTrainingData = noisy
@@ -325,9 +323,29 @@ class PrimitiveDecoder():
 #        assert False
         return b
 
+# Particle in sequential Monte Carlo
+class Particle():
+    def __init__(self, program = None,
+                 parent = None,
+                 output = None,
+                 distance = None,
+                 count = None,
+                 logLikelihood = None,
+                 score = None):
+        self.score = score
+        self.count = count
+        self.program = program
+        self.parent = parent
+        self.output = output
+        self.distance = distance
+        self.logLikelihood = logLikelihood
+    # once a program is finished we wrap it up in a sedquence object
+    def finished(self): return isinstance(self.program, Sequence)
+
 class RecognitionModel():
-    def __init__(self, noisy = False):
-        self.noisy = noisy
+    def __init__(self, arguments):
+        self.noisy = arguments.noisy
+        self.arguments = arguments
         # current and goal images
         self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
         self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
@@ -490,73 +508,6 @@ class RecognitionModel():
             saveMatrixAsImage(pixels*255 + 255*c,"failures/%d-predicted.png"%j)
                 
 
-    def beam(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10, beamLength = 10):
-        # place where we will save the parses
-        parseDirectory = targetImage[:-4] + "-parses"
-        
-        totalNumberOfRenders = 0
-        targetImage = loadImage(targetImage)
-        #showImage(targetImage)
-        targetImage = np.reshape(targetImage,(256,256))
-        beam = [{'program': [],
-                 'output': np.zeros(targetImage.shape),
-                 'logLikelihood': 0.0}]
-
-        finishedPrograms = []
-        
-        saver = tf.train.Saver()
-        with tf.Session() as s:
-            saver.restore(s,checkpoint)
-
-            for iteration in range(beamLength):
-                children = []
-                startTime = time()
-                for parent in beam:
-                    feed = {self.currentPlaceholder: np.array([parent['output']]),
-                            self.goalPlaceholder: np.array([targetImage])}
-
-                    
-                    for childScore,suffix in self.decoder.beam(s, feed, beamSize):
-                        if suffix == None:
-                            k = Sequence(parent['program'])
-                        else:
-                            k = parent['program'] + [suffix]
-                        children.append({'program': k,
-                                         'logLikelihood': parent['logLikelihood'] + childScore})
-                print "Ran neural network beam in %f seconds"%(time() - startTime)
-
-                beam = children
-                
-                beam = self.removeParticlesWithCollisions(beam)
-                beam = sorted(beam, key = lambda c: -c['logLikelihood'])
-                beam = beam[:beamSize]
-                self.renderParticles(beam)
-                totalNumberOfRenders += len(beam)
-                # only keep things in the beam if they produce unique outputs. encourages diversity
-                beam = self.removeDuplicateParticles(beam)                
-
-                print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
-
-                for n in beam:
-                    n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
-
-                for n in sorted(beam,key = lambda n: n['distance']):
-                    p = n['program']
-                    if not finished(n): p = Sequence(p)
-                    print "Program in beam: (%f)\n%s\n"%(n['logLikelihood'],str(p))
-                    print "Blurred distance: %f"%n['distance']
-                    #analyzeAsymmetric(targetImage, n['output'])
-                    print "\n"
-                
-                # record all of the finished programs
-                finishedPrograms += [ n for n in beam if finished(n) ]
-                # Remove all of the finished programs
-                beam = [ n for n in beam if not finished(n) ]
-                if beam == []:
-                    print "Empty beam."
-                    break
-            self.saveParticles(finishedPrograms, parseDirectory, targetImage)
-
     def SMC(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10, beamLength = 10):
         # place where we will save the parses
         parseDirectory = targetImage[:-4] + "-parses"
@@ -565,10 +516,11 @@ class RecognitionModel():
         targetImage = loadImage(targetImage)
         #showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
-        beam = [{'program': [],
-                 'output': np.zeros(targetImage.shape),
-                 'logLikelihood': 0.0,
-                 'count': beamSize}]
+        beam = [Particle(program = [],
+                         output = np.zeros(targetImage.shape),
+                         logLikelihood = 0.0,
+                         count = beamSize,
+                         distance = asymmetricBlurredDistance(targetImage, np.zeros(targetImage.shape)))]
 
         finishedPrograms = []
         
@@ -580,62 +532,74 @@ class RecognitionModel():
                 children = []
                 startTime = time()
                 for parent in beam:
-                    feed = {self.currentPlaceholder: np.array([parent['output']]),
+                    feed = {self.currentPlaceholder: np.array([parent.output]),
                             self.goalPlaceholder: np.array([targetImage])}
 
-                    childCount = parent['count']
+                    childCount = beamSize if self.arguments.beam else parent.count
                     kids = self.decoder.beam(s, feed, childCount*2)
                     kids.sort(key = lambda k: k[0], reverse = True)
                     for childScore,suffix in kids[:childCount]:
                         if suffix == None:
-                            k = Sequence(parent['program'])
+                            k = Sequence(parent.program)
                         else:
-                            k = parent['program'] + [suffix]
-                        children.append({'program': k,
-                                         'logLikelihood': parent['logLikelihood'] + childScore,
-                                         'count': 1})
+                            k = parent.program + [suffix]
+                        children.append(Particle(program = k,
+                                                 logLikelihood = parent.logLikelihood + childScore,
+                                                 count = 1,
+                                                 parent = parent))
                 
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
 
                 beam = children
                 
-                beam = self.removeParticlesWithCollisions(beam)
-                beam = sorted(beam, key = lambda c: -c['logLikelihood'])
-                beam = beam[:beamSize]
+#                beam = self.removeParticlesWithCollisions(beam)
+                if self.arguments.beam:
+                    beam = sorted(beam, key = lambda p: p.logLikelihood)[:beamSize]
+                assert len(beam) <= beamSize
                 self.renderParticles(beam)
                 totalNumberOfRenders += len(beam)
-                # only keep things in the beam if they produce unique outputs. encourages diversity
-                beam = self.removeDuplicateParticles(beam)                
 
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
                 for n in beam:
-                    n['distance'] = asymmetricBlurredDistance(targetImage, n['output'])
+                    n.distance = asymmetricBlurredDistance(targetImage, n.output)
 
                 # record/remove all of the finished programs
-                finishedPrograms += [ n for n in beam if finished(n) ]
-                beam = [ n for n in beam if not finished(n) ]                
+                finishedPrograms += [ n for n in beam if n.finished() ]
+                beam = [ n for n in beam if not n.finished() ]                
 
                 # Resample
-                for n in beam: n['score'] = n['logLikelihood'] - n['distance']/25.0
-                z = lseList([ n['score'] for n in beam ])
-                ps = [math.exp(n['score'] - z) for n in beam ]
-                print ps
-                cs = np.random.multinomial(beamSize, ps).tolist()
+                for n in beam:
+                    n.score = 0.0
+                    n.score += math.log(n.parent.count) # simulate affect of drawing repeatedly from previous distribution
+                    n.score += self.arguments.proposalCoefficient *(n.logLikelihood)
+                    n.score += self.arguments.distanceCoefficient *(- n.distance)
+                    n.score += self.arguments.parentCoefficient   *(n.parent.distance)
+                    n.score += self.arguments.priorCoefficient    *(n.program[-1].logPrior())
+                    n.score /= self.arguments.temperature
+                    
+                z = lseList([ n.score for n in beam ])
+                ps = np.array([math.exp(n.score - z) for n in beam ])
+                cs = np.random.multinomial(beamSize, ps/ps.sum()).tolist()
                 for n,c in zip(beam,cs):
-                    n['count'] = c
+                    n.count = c
+
+                beam = self.consolidateIdenticalParticles(beam)
 
                 for n in beam:
-                    p = n['program']
-                    if not finished(n): p = Sequence(p)
-                    print "(x%d) Program in beam (%f):\n%s"%(n['count'], n['logLikelihood'], str(p))
-                    print "Blurred distance: %f"%n['distance']
-                    if n['count'] > 0:
-                        showImage(n['output'] + targetImage)
+                    if n.count == 0: continue
+                    
+                    p = n.program
+                    if not n.finished(): p = Sequence(p)
+                    print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
+                    print "Blurred distance: %f"%n.distance
+                    if n.count > beamSize/5 and iteration > 4 and False:
+                        showImage(n.output + targetImage)
                     print "\n"
                 
-                # Remove all of the dead particles
-                beam = [ n for n in beam if n['count'] > 0 ]
+                # Remove all of the dead particles, and less were doing a straight beam decoding
+                if not self.arguments.beam:
+                    beam = [ n for n in beam if n.count > 0 ]
                 if beam == []:
                     print "Empty beam."
                     break
@@ -644,33 +608,39 @@ class RecognitionModel():
     # helper functions for particle search
     def removeParticlesWithCollisions(self,particles):
         return [ n for n in particles
-                 if not (n['program'] if finished(n) else Sequence(n['program'])).hasCollisions() ]
-    def removeDuplicateParticles(self,particles):
-        noDuplicates = []
-        for j,n in enumerate(particles):
-            if any([ np.array_equal(n['output'], m['output'])
-                     for m in particles[:j] ]): continue
-            noDuplicates.append(n)
-        return noDuplicates
+                 if not (n.program if n.finished() else Sequence(n.program)).hasCollisions() ]
+    def consolidateIdenticalParticles(self,particles):
+        consolidated = []
+        for p in particles:
+            duplicate = False
+            for c in consolidated:
+                if np.array_equal(p.output, c.output):
+                    c.count += p.count
+                    duplicate = True
+                    break
+            if not duplicate: consolidated.append(p)
+        return consolidated
+    
     def renderParticles(self,particles):
         startTime = time()
-        outputs = render([ (n['program'] if finished(n) else Sequence(n['program'])).TikZ()
+        outputs = render([ (n.program if n.finished() else Sequence(n.program)).TikZ()
                            for n in particles ],
                          yieldsPixels = True,
                          canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
         print "Rendered in %f seconds"%(time() - startTime)
         for n,o in zip(particles,outputs):
-            n['output'] = 1.0 - o
+            n.output = 1.0 - o
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
         os.system('rm -r %s'%(parseDirectory))
         os.system('mkdir %s'%(parseDirectory))
-        finishedPrograms.sort(key = lambda n: -n['logLikelihood'])
+        finishedPrograms.sort(key = lambda n: -n.logLikelihood)
         for j,n in enumerate(finishedPrograms):
-            print "Finished program: log likelihood %f"%(n['logLikelihood'])
-            print n['program']
-            saveMatrixAsImage(n['output']*255, "%s/%d.png"%(parseDirectory, j))
-            print "Distance: %f"%(n['distance'])
+            print "Finished program: log likelihood %f"%(n.logLikelihood)
+            print n.program
+            saveMatrixAsImage(n.output*255, "%s/%d.png"%(parseDirectory, j))
+            pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'w'))
+            print "Distance: %f"%(n.distance)
             #asymmetricBlurredDistance(targetImage, n['output'], True)
             print ""
 
@@ -706,10 +676,10 @@ class RecognitionModel():
 def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
-    RecognitionModel().SMC(f,
-                            beamSize = arguments.beamWidth,
-                            beamLength = arguments.beamLength,
-                            checkpoint = arguments.checkpoint)
+    RecognitionModel(arguments).SMC(f,
+                                    beamSize = arguments.beamWidth,
+                                    beamLength = arguments.beamLength,
+                                    checkpoint = arguments.checkpoint)
 def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
     if not d.endswith('/'): d = d + '/'
@@ -727,6 +697,14 @@ if __name__ == '__main__':
     parser.add_argument('-m','--cores', default = 1, type = int)
     parser.add_argument('--noisy',action = "store_true", default = False)
 
+    # parameters of sequential Monte Carlo
+    parser.add_argument('-T','--temperature', default = 1.0, type = float)
+    parser.add_argument('--parentCoefficient', default = 0.0, type = float)
+    parser.add_argument('--proposalCoefficient', default = 0.0, type = float)
+    parser.add_argument('--distanceCoefficient', default = 1.0/25.0, type = float)
+    parser.add_argument('--priorCoefficient', default = 0.0, type = float)
+    parser.add_argument('--beam', action = "store_true", default = False)
+
     arguments = parser.parse_args()
     
     if arguments.task == 'test':
@@ -737,10 +715,10 @@ if __name__ == '__main__':
             Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
     
     elif arguments.task == 'visualize':
-        RecognitionModel().visualizeFilters(arguments.checkpoint)
+        RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':
-        RecognitionModel(noisy = arguments.noisy).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+        RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
     elif arguments.task == 'train':
-        RecognitionModel(noisy = arguments.noisy).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+        RecognitionModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
     elif arguments.task == 'profile':
         cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))

@@ -1,6 +1,7 @@
 from random import random,choice
 import numpy as np
 from utilities import linesIntersect,truncatedNormal
+import math
 
 '''
 Programs: evaluator maps environment to (trace, environment)
@@ -165,6 +166,8 @@ class Line(Program):
 #            raise Exception('Attempt to create line with zero length')
             pass
 
+    def logPrior(self): return math.log(14*14*14*14*2*2)
+
     def isDiagonal(self):
         return not (len(set(self.usedXCoordinates())) == 1 or len(set(self.usedYCoordinates())) == 1)
     
@@ -181,8 +184,13 @@ class Line(Program):
         if isinstance(o,Circle): return o.intersects(self)
         if isinstance(o,Rectangle): return o.intersects(self)
         if isinstance(o,Line):
-            return linesIntersect(AbsolutePoint(self.points[0].x.n,self.points[0].y.n),
-                                  AbsolutePoint(self.points[1].x.n,self.points[1].y.n),
+            s = self
+            # if they have different orientations and then do a small shrink
+            if len(set(self.usedXCoordinates())) != len(set(o.usedXCoordinates())) or len(set(self.usedYCoordinates())) != len(set(o.usedYCoordinates())):
+                o = o.epsilonShrink()
+                s = self.epsilonShrink()
+            return linesIntersect(AbsolutePoint(s.points[0].x.n,s.points[0].y.n),
+                                  AbsolutePoint(s.points[1].x.n,s.points[1].y.n),
                                   AbsolutePoint(o.points[0].x.n,o.points[0].y.n),
                                   AbsolutePoint(o.points[1].x.n,o.points[1].y.n))
 
@@ -281,6 +289,7 @@ class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
+    def logPrior(self): return math.log(14*14*14*14)
     @staticmethod
     def absolute(x1,y1,x2,y2):
         return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
@@ -397,6 +406,8 @@ class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius
+
+    def logPrior(self): return math.log(14*14)
 
     def children(self): return [self.center,self.radius]
     def substitute(self, old, new):
