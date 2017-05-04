@@ -555,7 +555,7 @@ class RecognitionModel():
                 
 #                beam = self.removeParticlesWithCollisions(beam)
                 if self.arguments.beam:
-                    beam = sorted(beam, key = lambda p: p.logLikelihood)[:beamSize]
+                    beam = sorted(beam, key = lambda p: p.logLikelihood,reverse = True)[:beamSize]
                 assert len(beam) <= beamSize
                 self.renderParticles(beam)
                 totalNumberOfRenders += len(beam)
@@ -572,7 +572,10 @@ class RecognitionModel():
                 # Resample
                 for n in beam:
                     n.score = 0.0
-                    n.score += math.log(n.parent.count) # simulate affect of drawing repeatedly from previous distribution
+                    if n.parent.count > 0:
+                        n.score += math.log(n.parent.count) # simulate affect of drawing repeatedly from previous distribution
+                    else:
+                        assert self.arguments.beam # should only occur in straight up beam search
                     n.score += self.arguments.proposalCoefficient *(n.logLikelihood)
                     n.score += self.arguments.distanceCoefficient *(- n.distance)
                     n.score += self.arguments.parentCoefficient   *(n.parent.distance)
@@ -588,7 +591,7 @@ class RecognitionModel():
                 beam = self.consolidateIdenticalParticles(beam)
 
                 for n in beam:
-                    if n.count == 0: continue
+                    if n.count == 0 and not self.arguments.beam: continue
                     
                     p = n.program
                     if not n.finished(): p = Sequence(p)
@@ -617,6 +620,7 @@ class RecognitionModel():
             for c in consolidated:
                 if np.array_equal(p.output, c.output):
                     c.count += p.count
+                    c.logLikelihood = max([c.logLikelihood,p.logLikelihood])
                     duplicate = True
                     break
             if not duplicate: consolidated.append(p)
@@ -644,6 +648,7 @@ class RecognitionModel():
         os.system('mkdir %s'%(parseDirectory))
         finishedPrograms.sort(key = lambda n: -n.logLikelihood)
         for j,n in enumerate(finishedPrograms):
+            n.parent = None
             print "Finished program: log likelihood %f"%(n.logLikelihood)
             print n.program
             saveMatrixAsImage(n.output*255, "%s/%d.png"%(parseDirectory, j))
