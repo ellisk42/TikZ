@@ -3,6 +3,7 @@ import sys
 import os
 from language import *
 from render import render
+from fastRender import fastRender
 from PIL import Image
 import pickle
 from random import choice,shuffle
@@ -16,9 +17,9 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     print "Sampled %d programs."%k
     programPrefixes = [ [ Sequence(p.lines[:j]) for j in range(len(p)+1) ] for p in programs ]
     noisyTargets = [ p.noisyTikZ() for p in programs ]
-    distinctPrograms = list(set([ p.TikZ() for prefix in programPrefixes for p in prefix] + noisyTargets))
+    distinctPrograms = list(set(noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
-    print "Rendered %d images."%len(distinctPrograms)
+    print "Rendered %d images for %s."%(len(distinctPrograms),filePrefix)
 
     # for program,image in zip(distinctPrograms,pixels):
     #     print program
@@ -32,7 +33,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
         pixels[noisyTargets[j]].save("%s-%d-noisy.png"%(filePrefix,j + offset))
         for k in range(len(programs[j])):
-            endingPoint = pixels[programPrefixes[j][k+1].TikZ()]
+            endingPoint = Image.fromarray(255*(1.0 - fastRender(programPrefixes[j][k+1]))).convert('L')
             endingPoint.save("%s-%d-%d.png"%(filePrefix,j + offset,k))
 
             
