@@ -5,6 +5,7 @@ from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
 from fastRender import fastRender,loadPrecomputedRenderings
 
+
 import argparse
 import tarfile
 import sys
@@ -327,12 +328,14 @@ class PrimitiveDecoder():
 # Particle in sequential Monte Carlo
 class Particle():
     def __init__(self, program = None,
+                 time = 0.0,
                  parent = None,
                  output = None,
                  distance = None,
                  count = None,
                  logLikelihood = None,
                  score = None):
+        self.time = time
         self.score = score
         self.count = count
         self.program = program
@@ -521,6 +524,7 @@ class RecognitionModel():
                          output = np.zeros(targetImage.shape),
                          logLikelihood = 0.0,
                          count = beamSize,
+                         time = 0.0,
                          distance = asymmetricBlurredDistance(targetImage, np.zeros(targetImage.shape)))]
 
         finishedPrograms = []
@@ -529,6 +533,8 @@ class RecognitionModel():
         with tf.Session() as s:
             saver.restore(s,checkpoint)
 
+            searchStartTime = time()
+            
             for iteration in range(beamLength):
                 children = []
                 startTime = time()
@@ -547,7 +553,8 @@ class RecognitionModel():
                         children.append(Particle(program = k,
                                                  logLikelihood = parent.logLikelihood + childScore,
                                                  count = 1,
-                                                 parent = parent))
+                                                 parent = parent,
+                                                 time = time() - searchStartTime))
                 
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
 
