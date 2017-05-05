@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 from utilities import showImage,image2array
 import os
+import cv2
 
 def processHalfpage(x):
     x = x.transpose(Image.FLIP_LEFT_RIGHT)
@@ -46,7 +47,78 @@ def processHalfpage(x):
         a = 1.0 - a
         
     return Image.fromarray(255*a).convert('L')
+
+def processRegion(r): # processes 1/6 of the handout
+    # locate the upper left-hand corner
+    a = image2array(r)
+    a[a > 0.1] = 1
+    size = 362
+
+    threshold = 7
+    radius = 20
+    startX,startY = None,None
+    for x in range(0,radius):
+        if a[:,x].sum() > threshold:
+            startX = x
+            break
+
+    # we start at the bottom for y
+    for y in range(a.shape[0] - 1,a.shape[0] - 1 - radius*3,-1):
+        if a[y,:].sum() > threshold:
+            startY = y - size
+            break
+    if startX == None or startY == None:
+        if startX == None: startX = 7
+        if startY == None: startY = 10
+
+    # startX = 7
+    # startY = 10
     
+    print startX,startY
+    
+    r = r.crop((startX,startY,
+                startX + size,startY + size))
+    r = r.resize((256*13/16,256*13/16),Image.BILINEAR)
+    a = image2array(r)
+    a[a < 0.25] = 0
+
+    # pad w/ one grid cell on each side
+    fullImage = np.zeros((256,256))
+    s = 256/16
+    fullImage[s:(s+a.shape[0]),s:(s+a.shape[1])] = a
+
+    # illustrate the grid
+    # for x in range(16):
+    #     fullImage[:,x*(256/16)] = 1
+    #     fullImage[x*(256/16),:] = 1
+
+            
+#    showImage(fullImage)
+    return Image.fromarray(255*(1 - fullImage)).convert('L')
+
+    
+def processHandout(name):    
+    os.system('convert -density 150 %s -quality 90 /tmp/output.png'%name)
+    for j in range(100):
+        _j = j
+        p = '/tmp/output-%d.png'%j
+        if not os.path.isfile(p): break
+
+        x = Image.open(p).convert('L')
+        (w,h) = x.size
+        corners = [(120,180),
+                   (120,625),
+                   (120,1070),
+                   (590,180),
+                   (590,625),
+                   (590,1070)]
+        regions = [ processRegion(x.crop((a,b,a + 400,b + 400))) for a,b in corners ]
+        regions[0].save('drawings/humanGrid/%d.png'%(_j*3))
+        regions[2].save('drawings/humanGrid/%d.png'%(_j*3 + 1))
+        regions[4].save('drawings/humanGrid/%d.png'%(_j*3 + 2))
+        regions[1].save('drawings/humanFree/%d.png'%(_j*2 + 0))
+        regions[3].save('drawings/humanFree/%d.png'%(_j*2 + 1))
+        regions[5].save('drawings/humanChallenge/%d.png'%_j)
     
 
 def processExpert(name):
@@ -191,4 +263,5 @@ def processDrawing(name, export = False):
     return x
 
 if __name__ == '__main__':
-    processExpert(sys.argv[1])
+#    processExpert(sys.argv[1])
+    processHandout(sys.argv[1])
