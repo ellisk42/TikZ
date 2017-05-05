@@ -562,7 +562,10 @@ class Sequence(Program):
     def mutate(self):
         r = random()
         if r < 0.3 or self.lines == []:
-            return Sequence(self.lines + [Sequence.samplePart()])
+            n = randomLineOfCode()
+            if n == None: n = []
+            else: n = [n]
+            return Sequence(self.lines + n)
         elif r < 0.6:
             r = choice(self.lines)
             return Sequence([ l for l in self.lines if l != r ])
@@ -570,7 +573,14 @@ class Sequence(Program):
             r = choice(self.lines)
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
 
-
+def randomLineOfCode():
+    k = choice(range(4))
+    if k == 0: return None
+    if k == 1: return Circle.sample()
+    if k == 2: return Line.sample()
+    if k == 3: return Rectangle.sample()
+    assert False
+    
 if __name__ == '__main__':
     print Sequence([DefineConstant(Number(1)),
                     Circle(AbsolutePoint(Variable(0),Variable(0)), Number(1))]).TikZ()

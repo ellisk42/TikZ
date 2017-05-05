@@ -539,11 +539,18 @@ class RecognitionModel():
                 children = []
                 startTime = time()
                 for parent in beam:
-                    feed = {self.currentPlaceholder: np.array([parent.output]),
-                            self.goalPlaceholder: np.array([targetImage])}
+                    
 
                     childCount = beamSize if self.arguments.beam else parent.count
-                    kids = self.decoder.beam(s, feed, childCount*2)
+                    if not self.arguments.unguided:
+                        # neural network guide: decoding
+                        feed = {self.currentPlaceholder: np.array([parent.output]),
+                                self.goalPlaceholder: np.array([targetImage])}
+                        kids = self.decoder.beam(s, feed, childCount*2)
+                    else:
+                        # no neural network guide: sample from the prior
+                        kids = [ (0.0, randomLineOfCode()) for _ in range(childCount) ]
+                        
                     kids.sort(key = lambda k: k[0], reverse = True)
                     for childScore,suffix in kids[:childCount]:
                         if suffix == None:
@@ -622,7 +629,7 @@ class RecognitionModel():
                  if not (n.program if n.finished() else Sequence(n.program)).hasCollisions() ]
     def consolidateIdenticalParticles(self,particles):
         consolidated = []
-        for p in particles:
+        for p in sorted(particles,key = lambda p: -p.logLikelihood):
             duplicate = False
             for c in consolidated:
                 if np.array_equal(p.output, c.output):
@@ -725,6 +732,8 @@ if __name__ == '__main__':
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
     parser.add_argument('--beam', action = "store_true", default = False)
     parser.add_argument('--fastRender', action = "store_true", default = False)
+    parser.add_argument('--unguided', action = "store_true", default = False)
+    
 
     arguments = parser.parse_args()
     if arguments.fastRender:
