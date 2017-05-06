@@ -223,7 +223,10 @@ class Line(Program):
         return Line([ (mutatePoint(p) if p == r else p) for p in self.points ], self.arrow,self.solid)
     @staticmethod
     def sample():
-        return Line([samplePoint(),samplePoint()], random() > 0.5, random() > 0.5)
+        while True:
+            l = Line([samplePoint(),samplePoint()], random() > 0.5, random() > 0.5)
+            if l.length() > 0: return l
+        
     def isValid(self, parents):
         return all([p.isValid(parents) for p in self.points ])
 
