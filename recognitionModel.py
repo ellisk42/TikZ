@@ -28,10 +28,7 @@ TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
-
-def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
-    noisyTrainingData = noisy
-    
+def loadTar():
     if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
         handle = '/om/user/ellisk/syntheticTrainingData.tar'
     else:
@@ -49,7 +46,22 @@ def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
     handle.close()
 
     print "Loaded tar file into RAM: %d entries."%len(members)
+    return members
+
+def loadFullPrograms(numberOfExamples):
+    members = loadTar()
+    programNames = [ "./randomScene-%d.p"%(j)
+                     for j in range(numberOfExamples) ]
+    programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
+    outputs = [ "./randomScene-%d-%d.png"%(j,len(programs[j].lines) - 1)
+                for j in range(numberOfExamples) ]
+    for o in outputs: cacheImage(o,members[o])
+    return zip(outputs,programs)
+
+def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
+    noisyTrainingData = noisy
     
+    members = loadTar()
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
