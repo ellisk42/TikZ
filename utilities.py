@@ -1,3 +1,4 @@
+from random import random
 import math
 import sys
 import io
