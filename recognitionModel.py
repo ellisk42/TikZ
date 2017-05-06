@@ -48,8 +48,8 @@ def loadTar(f = 'syntheticTrainingData.tar'):
     print "Loaded tar file into RAM: %d entries."%len(members)
     return members
 
-def loadFullPrograms(numberOfExamples):
-    members = loadTar('extrapolation.tar')
+def loadFullPrograms(numberOfExamples, f = 'extrapolation.tar'):
+    members = loadTar(f)
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
@@ -342,6 +342,10 @@ class PrimitiveDecoder():
 #        assert False
         return b
 
+class RecurrentDecoder():
+    def __init__(self, imageFeatures):
+        self.unit = LSTM(imageFeatures)
+
 # Particle in sequential Monte Carlo
 class Particle():
     def __init__(self, program = None,
@@ -560,6 +564,10 @@ class RecognitionModel():
                     # no neural network guide: sample from the prior
                     kids = [ (0.0, randomLineOfCode()) for _ in range(childCount) ]
 
+                # remove children that duplicate an existing line of code
+                existingLinesOfCode = map(str,parent.program)
+                kids = [ child for child in kids
+                         if not (str(child[1]) in existingLinesOfCode) ] 
                 kids.sort(key = lambda k: k[0], reverse = True)
                 for childScore,suffix in kids[:childCount]:
                     if suffix == None:
@@ -576,7 +584,7 @@ class RecognitionModel():
 
             beam = children
 
-            #                beam = self.removeParticlesWithCollisions(beam)
+            beam = self.removeParticlesWithCollisions(beam)
             if self.arguments.beam:
                 beam = sorted(beam, key = lambda p: p.logLikelihood,reverse = True)[:beamSize]
             assert len(beam) <= beamSize
@@ -639,9 +647,9 @@ class RecognitionModel():
 
         if finishedPrograms == []:
             print "No finished programs!"
-            showImage(targetImage)
-            for p in beam:
-                showImage(p.output)
+            # showImage(targetImage)
+            # for p in beam:
+            #     showImage(p.output)
         return finishedPrograms
 
     # helper functions for particle search
@@ -728,6 +736,8 @@ class RecognitionModel():
         programRank = {}
         # distance from correct program to suggested program
         programDistance = {}
+        # how long the search took
+        searchTime = {}
 
         # load the network
         saver = tf.train.Saver()
@@ -740,12 +750,15 @@ class RecognitionModel():
                 pixelDistance[k] = []
                 programRank[k] = []
                 programDistance[k] = []
+                searchTime[k] = []
             
             targetImage = loadImage(targetImage)
+            startTime = time()
             particles = self.SMC(session,
                                  targetImage,
                                  beamSize = arguments.beamWidth,
                                  beamLength = k + 1)
+            searchTime[k].append(time() - startTime)
             if particles == []:
                 print "No solutions."
                 pixelDistance[k].append(None)
@@ -788,7 +801,8 @@ class RecognitionModel():
         print programRank
         print pixelDistance
         print programDistance
-
+        print searchTime
+        
         session.close()
                     
 
