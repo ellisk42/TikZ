@@ -28,11 +28,11 @@ TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
-def loadTar():
-    if os.path.isfile('/om/user/ellisk/syntheticTrainingData.tar'):
-        handle = '/om/user/ellisk/syntheticTrainingData.tar'
+def loadTar(f = 'syntheticTrainingData.tar'):
+    if os.path.isfile('/om/user/ellisk/%s'%f):
+        handle = '/om/user/ellisk/%s'%f
     else:
-        handle = 'syntheticTrainingData.tar'
+        handle = f
     print "Loading data from",handle
     handle = tarfile.open(handle)
     
@@ -49,7 +49,7 @@ def loadTar():
     return members
 
 def loadFullPrograms(numberOfExamples):
-    members = loadTar()
+    members = loadTar('extrapolation.tar')
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
@@ -708,6 +708,59 @@ class RecognitionModel():
             saveMatrixAsImage(v*255,"/tmp/filters.png")
             os.system("feh /tmp/filters.png")
 
+    def evaluateAccuracy(self):
+        # map from the number of objects in the scene to the best pixel distance of the model
+        pixelDistance = {}
+        # similar map but for the rank of the correct program
+        programRank = {}
+
+        for targetImage,targetProgram in loadFullPrograms(self.arguments.numberOfExamples):
+            k = len(targetProgram.lines)
+            if not k in pixelDistance:
+                pixelDistance[k] = []
+                programRank[k] = []
+            
+            targetImage = loadImage(targetImage)
+            particles = self.SMC(targetImage,
+                                 beamSize = arguments.beamWidth,
+                                 beamLength = k,
+                                 checkpoint = arguments.checkpoint)
+            if particles == []:
+                print "No solutions."
+                pixelDistance[k].append(None)
+                programRank[k].append(None)
+                continue
+
+            # Sort the particles. Our preference depends on how the search was done.
+            if self.arguments.beam:
+                preference = lambda p: p.logLikelihood
+            elif self.arguments.unguided:
+                preference = lambda p: p.program.logPrior() - p.distance
+            else: # guided Monte Carlo
+                preference = lambda p: p.logLikelihood - p.distance*0.04
+            particles.sort(key = preference,reverse = True)
+            
+            # find the pixel distance of the preferred particle
+            preferred = particles[0]
+            d = np.sum(np.abs(targetImage - preferred.output))
+            pixelDistance[k].append(d)
+            
+            # see if any of the programs match exactly
+            targetSet = set(map(str,targetProgram.lines))
+            rank = None
+            for r,p in enumerate(particles):
+                if set(map(str,p.program.lines)) == targetSet:
+                    rank = r + 1
+                    print "Rank: %d"%(r + 1)
+                    break
+            programRank[k].append(rank)
+
+            showImage(targetImage)
+            showImage(preferred.output)
+
+                    
+
+
 def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
@@ -766,5 +819,7 @@ if __name__ == '__main__':
         RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
     elif arguments.task == 'train':
         RecognitionModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+    elif arguments.task == 'evaluate':
+        RecognitionModel(arguments).evaluateAccuracy()
     elif arguments.task == 'profile':
         cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))
