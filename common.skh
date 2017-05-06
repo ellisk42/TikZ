@@ -6,6 +6,7 @@
 #define LINE 1
 #define RECTANGLE 2
 #define LOOP 3
+#define REFLECT 4
 
 // Which figure we are trying to explain
 
@@ -45,7 +46,42 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
 generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity){
   assert d > 0;
   bit hit = 0;
+
+  
   if (??) {
+    identity = REFLECT;
+    int yr = ??; // y axis of reflection
+    int reflection_cost;
+	
+    // loop wrapper around the generator to make it only be called once
+    for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
+      if (reflectionIndex == 1) {
+	// Reflected case
+	cy = yr - (cy - yr);
+
+	int rectangleHeight = ry2 - ry1;
+	ry1 = yr - (ry1 - yr) - rectangleHeight;
+	ry2 = yr - (ry2 - yr) + rectangleHeight;
+
+	if (arrow) { // arrow implies that there is no canonical orientation
+	  ly1 = yr - (ly1 - yr);
+	  ly2 = yr - (ly2 - yr);
+	} else { // reflect while preserving canonical orientation
+	  if (lx2 == lx1) { // vertical line: canonical determined by y
+	    int _ly1 = ly1;
+	    int _ly2 = ly2;
+	    ly1 = yr - (_ly1 - yr);
+	    ly2 = yr - (_ly2 - yr);
+	  }
+	}
+      }
+      hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
+    }
+
+    cost = reflection_cost + 1;
+    return hit;
+    
+  } else if (??) {
     identity = LOOP;
     
     int loop_bound_cost,loop_body_cost;
