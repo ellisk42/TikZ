@@ -166,7 +166,7 @@ class Line(Program):
 #            raise Exception('Attempt to create line with zero length')
             pass
 
-    def logPrior(self): return math.log(14*14*14*14*2*2)
+    def logPrior(self): return -math.log(14*14*14*14*2*2)
 
     def isDiagonal(self):
         return not (len(set(self.usedXCoordinates())) == 1 or len(set(self.usedYCoordinates())) == 1)
@@ -289,7 +289,7 @@ class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
-    def logPrior(self): return math.log(14*14*14*14)
+    def logPrior(self): return -math.log(14*14*14*14)
     @staticmethod
     def absolute(x1,y1,x2,y2):
         return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
@@ -407,7 +407,7 @@ class Circle(Program):
         self.center = center
         self.radius = radius
 
-    def logPrior(self): return math.log(14*14)
+    def logPrior(self): return -math.log(14*14)
 
     def children(self): return [self.center,self.radius]
     def substitute(self, old, new):
@@ -506,6 +506,9 @@ class Sequence(Program):
         suffix = "\n".join(map(str, isLines))
         return prefix + "\n" + suffix
 
+    def logPrior(self):
+        return sum([l.logPrior() for l in self.lines ]) - (len(self.lines) + 1)*math.log(4)
+
     def children(self): return self.lines
     def substitute(self, old, new):
         replacement = []
@@ -562,7 +565,10 @@ class Sequence(Program):
     def mutate(self):
         r = random()
         if r < 0.3 or self.lines == []:
-            return Sequence(self.lines + [Sequence.samplePart()])
+            n = randomLineOfCode()
+            if n == None: n = []
+            else: n = [n]
+            return Sequence(self.lines + n)
         elif r < 0.6:
             r = choice(self.lines)
             return Sequence([ l for l in self.lines if l != r ])
@@ -570,7 +576,14 @@ class Sequence(Program):
             r = choice(self.lines)
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
 
-
+def randomLineOfCode():
+    k = choice(range(4))
+    if k == 0: return None
+    if k == 1: return Circle.sample()
+    if k == 2: return Line.sample()
+    if k == 3: return Rectangle.sample()
+    assert False
+    
 if __name__ == '__main__':
     print Sequence([DefineConstant(Number(1)),
                     Circle(AbsolutePoint(Variable(0),Variable(0)), Number(1))]).TikZ()

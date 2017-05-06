@@ -6,10 +6,16 @@ import pickle
 import os
 import numpy as np
 
+def thresholdPrecomputed(a):
+    a = np.copy(a)
+    a[a > 0.5] = 1.0
+    a[a <= 0.5] = 0.0
+    return 1.0 - a
+
 def precomputedRenderings():
     # exactly one rendering of a circle
     c = Sequence([Circle(AbsolutePoint(Number(2),Number(2)),Number(1))]).TikZ()
-    c = 1.0 - render([c],yieldsPixels = True)[0]
+    c = thresholdPrecomputed(render([c],yieldsPixels = True)[0])
 
     rectangles = {}
     for dx in range(1,15):
@@ -21,7 +27,7 @@ def precomputedRenderings():
     rectangleRenders = render([rectangles[k] for k in rectangleKeys ], yieldsPixels = True)
     for j,k in enumerate(rectangleKeys):
 #        print k
-        rectangles[k] = 1.0 - rectangleRenders[j]
+        rectangles[k] = thresholdPrecomputed(rectangleRenders[j])
         #        showImage(rectangles[k])
 
     lines = {} # keys: (dx,dy, solid, arrow). arrow is one of {None,True,False}. True = flip from canonical
@@ -53,7 +59,7 @@ def precomputedRenderings():
     lineKeys = lines.keys()
     lineRenders = render([lines[k] for k in lineKeys ], yieldsPixels = True)
     for j,k in enumerate(lineKeys):
-        lines[k] = 1.0 - lineRenders[j]
+        lines[k] = thresholdPrecomputed(lineRenders[j])
     return {'c':c,'r':rectangles,'l':lines}
 
 globalFastRenderTable = None
@@ -135,7 +141,8 @@ def loadPrecomputedRenderings():
     
     if os.path.exists("precomputedRenderings.p"):
         globalFastRenderTable = pickle.load(open("precomputedRenderings.p",'rb'))
-#        print "Loaded %d renderings."%(len(t['l']) + len(t['r']) + len(t['c']))
+    elif os.path.exists("/om/user/ellisk/precomputedRenderings.p"):
+        globalFastRenderTable = pickle.load(open("/om/user/ellisk/precomputedRenderings.p",'rb'))
     else:
         globalFastRenderTable = precomputedRenderings()
         pickle.dump(globalFastRenderTable,open("precomputedRenderings.p",'wb'))
@@ -143,7 +150,7 @@ def loadPrecomputedRenderings():
 
 if __name__ == '__main__':
     for _ in range(20):
-        p = Line.sample() #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
+        p = Rectangle.sample() #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
     #    p.solid = True
     #    p.arrow = False
         print p

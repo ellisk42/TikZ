@@ -32,6 +32,15 @@ def asymmetricBlurredDistance(a,b, show = False):
     # if you see a pixel and target that isn't an current, that's not so bad
     import cv2
     kernelSize = blurKernelSize
+
+    # threshold the images
+    a = np.copy(a)
+    a[a > 0.5] = 1.0
+    a[a <= 0.5] = 0.0
+
+    b = np.copy(b)
+    b[b > 0.5] = 1.0
+    b[b <= 0.5] = 0.0
     
     a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
     b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)

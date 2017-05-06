@@ -1,16 +1,14 @@
-pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 3 --bnd-arr-size 3";
+
 
 #define SHAPEVARIABLES int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2
 #define SHAPEARGUMENTS shapeIdentity,cx,cy,lx1,ly1,lx2,ly2,dashed,arrow,rx1,ry1,rx2,ry2
 #define CIRCLE 0
 #define LINE 1
 #define RECTANGLE 2
+#define LOOP 3
+#define REFLECT 4
 
 // Which figure we are trying to explain
-#define CIRCLEGRID
-//#define LADDER
-//#define HMM
-//#define ICINGMODEL
 
 int [n + 1] push([int n], int [n] environment, int j) {
   int [n + 1] ep = environment;
@@ -26,26 +24,66 @@ int [n + 1] push([int n], int [n] environment, int j) {
 
 generator int expression([int n], int[n] environment, ref int cost) {
   cost = 1;
-  return {| ??(4) | ??(3)*environment[??] + ??(4) |};
+  return {| ?? | ??*environment[??] + ?? |};
 }
 
 // blocks are sequences of commands; can also introduce local variables.
 generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
   cost = 0;
   bit hit = 0;
+  int identity = 0;
   repeat(??) {
-    int newCost;
-    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost);
+    int newCost,newIdentity;
+    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    assert newIdentity >= identity;
+    identity = newIdentity;
     cost += newCost;
     hit = hit || newHit;
   }
   return hit;
 }
 
-generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
+generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity){
   assert d > 0;
   bit hit = 0;
+
+  
   if (??) {
+    identity = REFLECT;
+    int yr = ??; // y axis of reflection
+    int reflection_cost;
+	
+    // loop wrapper around the generator to make it only be called once
+    for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
+      if (reflectionIndex == 1) {
+	// Reflected case
+	cy = yr - (cy - yr);
+
+	int rectangleHeight = ry2 - ry1;
+	ry1 = yr - (ry1 - yr) - rectangleHeight;
+	ry2 = yr - (ry2 - yr) + rectangleHeight;
+
+	if (arrow) { // arrow implies that there is no canonical orientation
+	  ly1 = yr - (ly1 - yr);
+	  ly2 = yr - (ly2 - yr);
+	} else { // reflect while preserving canonical orientation
+	  if (lx2 == lx1) { // vertical line: canonical determined by y
+	    int _ly1 = ly1;
+	    int _ly2 = ly2;
+	    ly1 = yr - (_ly1 - yr);
+	    ly2 = yr - (_ly2 - yr);
+	  }
+	}
+      }
+      hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
+    }
+
+    cost = reflection_cost + 1;
+    return hit;
+    
+  } else if (??) {
+    identity = LOOP;
+    
     int loop_bound_cost,loop_body_cost;
     int loop_bound = expression(environment,loop_bound_cost);
     for (int j = 0; j < loop_bound; j++) {
@@ -60,15 +98,28 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
     int y = expression(environment, yc);
     cost += (xc + yc);
     if (??) { // draw a circle
+      assert HASCIRCLES;
+      identity = CIRCLE;
 	hit = _c(x,y);
     } else {  // draw a line or rectangle
       int x2 = expression(environment, xc);
       int y2 = expression(environment, yc);
       cost += (xc + yc);
-      if (??) 
-	hit = _l(x,y,x2,y2,??,??);
-      else
+      if (??) {
+	assert HASLINES;
+	bit da = ??;
+	if (!HASSOLID) da = 1; // we don't have anything that is solid so it must be forced to be --
+	if (!HASDASHED) da = 0;// ditto
+	bit ar = ??;
+	if (!HASARROW) ar = 0;
+	if (!HASNOARROW) ar = 1;
+	hit = _l(x,y,x2,y2,da,ar);
+	identity = LINE;
+      } else {
+	assert HASRECTANGLES;
+	identity = RECTANGLE;
 	hit = _r(x,y,x2,y2);
+      }
     }
     return hit;
   }
@@ -77,8 +128,15 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
 
 bit render(SHAPEVARIABLES) implements renderSpecification{
   assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
+  if (!HASCIRCLES) assume shapeIdentity != CIRCLE;
+  if (!HASRECTANGLES) assume shapeIdentity != RECTANGLE;
+  if (!HASLINES) assume shapeIdentity != LINE;
+  if (!HASSOLID) assume dashed;
+  if (!HASDASHED) assume !dashed;
+  if (!HASARROW) assume !arrow;
+  if (!HASNOARROW) assume arrow;
   int cost;
-  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},2,cost);
   minimize(cost);
   return inScene;
 }

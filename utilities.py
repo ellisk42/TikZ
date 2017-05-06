@@ -1,3 +1,4 @@
+from random import random
 import math
 import sys
 import io
@@ -105,3 +106,17 @@ def sampleLogMultinomial(logLikelihoods):
 def flushEverything():
     sys.stdout.flush()
     sys.stderr.flush()
+
+
+def perturbNoisyIntensities(b):
+    # b: None*256*256
+    p = np.copy(b)
+    for j in range(b.shape[0]):
+        f = random()*2 + 0.25
+        p[j,:,:] = f*b[j,:,:]
+    p[p > 1] = 1.0
+    return p
+
+    
+    
+    
