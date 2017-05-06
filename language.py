@@ -166,7 +166,7 @@ class Line(Program):
 #            raise Exception('Attempt to create line with zero length')
             pass
 
-    def logPrior(self): return math.log(14*14*14*14*2*2)
+    def logPrior(self): return -math.log(14*14*14*14*2*2)
 
     def isDiagonal(self):
         return not (len(set(self.usedXCoordinates())) == 1 or len(set(self.usedYCoordinates())) == 1)
@@ -289,7 +289,7 @@ class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
-    def logPrior(self): return math.log(14*14*14*14)
+    def logPrior(self): return -math.log(14*14*14*14)
     @staticmethod
     def absolute(x1,y1,x2,y2):
         return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
@@ -407,7 +407,7 @@ class Circle(Program):
         self.center = center
         self.radius = radius
 
-    def logPrior(self): return math.log(14*14)
+    def logPrior(self): return -math.log(14*14)
 
     def children(self): return [self.center,self.radius]
     def substitute(self, old, new):
@@ -505,6 +505,9 @@ class Sequence(Program):
         prefix = "\n".join([ str(l) for j,l in enumerate(notLines) ])
         suffix = "\n".join(map(str, isLines))
         return prefix + "\n" + suffix
+
+    def logPrior(self):
+        return sum([l.logPrior() for l in self.lines ]) - (len(self.lines) + 1)*math.log(4)
 
     def children(self): return self.lines
     def substitute(self, old, new):
