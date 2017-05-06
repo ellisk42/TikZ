@@ -5,6 +5,7 @@
 #define CIRCLE 0
 #define LINE 1
 #define RECTANGLE 2
+#define LOOP 3
 
 // Which figure we are trying to explain
 
@@ -29,19 +30,24 @@ generator int expression([int n], int[n] environment, ref int cost) {
 generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
   cost = 0;
   bit hit = 0;
+  int identity = 0;
   repeat(??) {
-    int newCost;
-    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost);
+    int newCost,newIdentity;
+    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    assert newIdentity >= identity;
+    identity = newIdentity;
     cost += newCost;
     hit = hit || newHit;
   }
   return hit;
 }
 
-generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
+generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity){
   assert d > 0;
   bit hit = 0;
   if (??) {
+    identity = LOOP;
+    
     int loop_bound_cost,loop_body_cost;
     int loop_bound = expression(environment,loop_bound_cost);
     for (int j = 0; j < loop_bound; j++) {
@@ -57,6 +63,7 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
     cost += (xc + yc);
     if (??) { // draw a circle
       assert HASCIRCLES;
+      identity = CIRCLE;
 	hit = _c(x,y);
     } else {  // draw a line or rectangle
       int x2 = expression(environment, xc);
@@ -71,8 +78,10 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
 	if (!HASARROW) ar = 0;
 	if (!HASNOARROW) ar = 1;
 	hit = _l(x,y,x2,y2,da,ar);
+	identity = LINE;
       } else {
 	assert HASRECTANGLES;
+	identity = RECTANGLE;
 	hit = _r(x,y,x2,y2);
       }
     }

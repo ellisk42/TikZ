@@ -513,11 +513,7 @@ class RecognitionModel():
                 
 
     def SMC(self, targetImage, checkpoint = "/tmp/model.checkpoint", beamSize = 10, beamLength = 10):
-        # place where we will save the parses
-        parseDirectory = targetImage[:-4] + "-parses"
-        
         totalNumberOfRenders = 0
-        targetImage = loadImage(targetImage)
         #showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [Particle(program = [],
@@ -621,7 +617,7 @@ class RecognitionModel():
                 if beam == []:
                     print "Empty beam."
                     break
-            self.saveParticles(finishedPrograms, parseDirectory, targetImage)
+            return finishedPrograms
 
     # helper functions for particle search
     def removeParticlesWithCollisions(self,particles):
@@ -703,10 +699,16 @@ class RecognitionModel():
 def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
-    RecognitionModel(arguments).SMC(f,
-                                    beamSize = arguments.beamWidth,
-                                    beamLength = arguments.beamLength,
-                                    checkpoint = arguments.checkpoint)
+    model = RecognitionModel(arguments)
+    targetImage = loadImage(f)
+    particles = model.SMC(targetImage,
+                          beamSize = arguments.beamWidth,
+                          beamLength = arguments.beamLength,
+                          checkpoint = arguments.checkpoint)
+    # place where we will save the parses
+    parseDirectory = targetImage[:-4] + "-parses"
+    model.saveParticles(particles, parsedDirectory, targetImage)
+    
 def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
     if not d.endswith('/'): d = d + '/'
