@@ -166,6 +166,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
     
     def __init__(self, imageRepresentation):
         self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
+        self.hiddenSizes = [None, 32]
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
@@ -186,6 +187,10 @@ class RectangleDecoder(StandardPrimitiveDecoder):
 
     def __init__(self, imageRepresentation):
         self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
+        self.hiddenSizes = [None,
+                            32,
+                            32,
+                            32]
         self.makeNetwork(imageRepresentation)
             
 
