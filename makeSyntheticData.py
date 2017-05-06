@@ -153,7 +153,13 @@ def sampleLine(attachedLines = []):
 
 def sampleWithoutIntersection(n, existingObjects, f):
     targetLength = len(existingObjects) + n
+    maximumAttempts = 10000
+    attemptsSoFar = 0
     while len(existingObjects) < targetLength:
+        attemptsSoFar += 1
+        if attemptsSoFar > maximumAttempts:
+            break
+        
         newObject = f()
         if not any([o.intersects(newObject) for o in existingObjects ]):
             existingObjects += [newObject]
@@ -171,7 +177,10 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0):
 
 def randomScene(maximumNumberOfObjects):
     def sampler():
-        n = choice(range(maximumNumberOfObjects)) + 1
+        if 'extrapolate' in sys.argv:
+            n = choice(range(maximumNumberOfObjects + 1, 20))
+        else:
+            n = choice(range(maximumNumberOfObjects)) + 1
 
         shapeIdentities = [choice(range(3)) for _ in range(n) ]
         return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
@@ -257,7 +266,7 @@ if __name__ == '__main__':
         Image.fromarray(255*x).convert('L').save('challenge.png')
         assert False
 
-    if len(sys.argv) == 2:
+    if len(sys.argv) > 1:
         totalNumberOfExamples = int(sys.argv[1])
     else:
         totalNumberOfExamples = 100000
