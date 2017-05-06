@@ -63,10 +63,12 @@ bit renderSpecification(SHAPEVARIABLES) {
   if (!HASCIRCLES) assume shapeIdentity != CIRCLE;
   if (!HASRECTANGLES) assume shapeIdentity != RECTANGLE;
   if (!HASLINES) assume shapeIdentity != LINE;
-  if (!HASSOLID) assume dashed;
-  if (!HASDASHED) assume !dashed;
-  if (!HASARROW) assume !arrow;
-  if (!HASNOARROW) assume arrow;
+  else {
+    if (!HASSOLID) assume dashed;
+    if (!HASDASHED) assume !dashed;
+    if (!HASARROW) assume !arrow;
+    if (!HASNOARROW) assume arrow;
+  }
   return %s;
 }
 '''%(biggestNumber,
@@ -95,7 +97,11 @@ bit renderSpecification(SHAPEVARIABLES) {
     os.remove(outputFile)
 
     # Recover the program length from the sketch output
-    programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ][-1]
+    programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
+    if programSize == []:
+        print output
+        return None
+    programSize = programSize[-1]
     print programSize
     m = re.match('.*=([0-9]+),',programSize)
     cost = int(m.group(1))

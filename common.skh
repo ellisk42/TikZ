@@ -51,28 +51,47 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
   if (??) {
     identity = REFLECT;
     int yr = ??; // y axis of reflection
+    int xr = ??;
+    assert yr == 0 || xr == 0;
+    assert !(yr == 0 && xr == 0);
     int reflection_cost;
 	
     // loop wrapper around the generator to make it only be called once
     for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
       if (reflectionIndex == 1) {
 	// Reflected case
-	cy = yr - (cy - yr);
+
+	// reflection of a point is easy
+	cy = yr == 0 ? cy : yr - (cy - yr);
+	cx = xr == 0 ? cx : xr - (cx - xr);
 
 	int rectangleHeight = ry2 - ry1;
-	ry1 = yr - (ry1 - yr) - rectangleHeight;
-	ry2 = yr - (ry2 - yr) + rectangleHeight;
+	int rectangleWidth = rx2 - rx1;
+	ry1 = yr == 0 ? ry1 : yr - (ry1 - yr) - rectangleHeight;
+	ry2 = yr == 0 ? ry2 : yr - (ry2 - yr) + rectangleHeight;
+	rx1 = xr == 0 ? rx1 : xr - (rx1 - xr) - rectangleWidth;
+	rx2 = xr == 0 ? rx2 : xr - (rx2 - xr) + rectangleWidth;
 
 	if (arrow) { // arrow implies that there is no canonical orientation
-	  ly1 = yr - (ly1 - yr);
-	  ly2 = yr - (ly2 - yr);
+	  ly1 = yr == 0 ? ly1 : yr - (ly1 - yr);
+	  ly2 = yr == 0 ? ly2 : yr - (ly2 - yr);
+	  lx1 = xr  == 0? lx1 : xr - (lx1 - xr);
+	  lx2 = xr == 0 ? lx2 : xr - (lx2 - xr);
 	} else { // reflect while preserving canonical orientation
+	  int _ly1 = ly1;
+	  int _ly2 = ly2;
+	  int _lx1 = lx1;
+	  int _lx2 = lx2;
+	  
 	  if (lx2 == lx1) { // vertical line: canonical determined by y
-	    int _ly1 = ly1;
-	    int _ly2 = ly2;
-	    ly1 = yr - (_ly1 - yr);
-	    ly2 = yr - (_ly2 - yr);
+	    ly1 = yr == 0 ? ly1 : yr - (_ly2 - yr);
+	    ly2 = yr == 0 ? ly2 : yr - (_ly1 - yr);
+	  } else { // arbitrary line: canonical determined by x
+	    ly1 = yr == 0 ? _ly2 : yr - (ly1 - yr);
+	    ly2 = yr == 0 ? _ly1 : yr - (ly2 - yr);
 	  }
+	  lx1 = xr == 0 ? lx1 : xr - (_lx2 - xr);
+	  lx2 = xr == 0 ? lx2 : xr - (_lx1 - xr);
 	}
       }
       hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
@@ -84,8 +103,8 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
   } else if (??) {
     identity = LOOP;
     
-    int loop_bound_cost,loop_body_cost;
-    int loop_bound = expression(environment,loop_bound_cost);
+    int loop_bound_cost = 1,loop_body_cost;
+    int loop_bound = ??;
     for (int j = 0; j < loop_bound; j++) {
       hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
     }
@@ -131,12 +150,14 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   if (!HASCIRCLES) assume shapeIdentity != CIRCLE;
   if (!HASRECTANGLES) assume shapeIdentity != RECTANGLE;
   if (!HASLINES) assume shapeIdentity != LINE;
-  if (!HASSOLID) assume dashed;
-  if (!HASDASHED) assume !dashed;
-  if (!HASARROW) assume !arrow;
-  if (!HASNOARROW) assume arrow;
+  else {
+    if (!HASSOLID) assume dashed;
+    if (!HASDASHED) assume !dashed;
+    if (!HASARROW) assume !arrow;
+    if (!HASNOARROW) assume arrow;
+  }
   int cost;
-  bit inScene = block(SHAPEARGUMENTS,{},2,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
   minimize(cost);
   return inScene;
 }
