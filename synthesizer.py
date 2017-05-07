@@ -10,20 +10,22 @@ import pickle
 def loadParses(directory):
     particles = []
     if directory.endswith('/'): directory = directory[:-1]
-    for f in os.listdir(directory):
-        if f.endswith('.p'):
-            particles.append(pickle.load(open(directory + '/' + f,'rb')))
-            print " [+] Loaded %s/%s"%(directory,f)
+    for j in range(100):
+        f = directory + '/particle' + str(j) + '.p'
+        if not os.path.isfile(f): break
+        particles.append(pickle.load(open(f,'rb')))
+        print " [+] Loaded %s"%(f)
 
-            
+    distanceWeight = 0.1
+    priorWeight = 0.0
 
-    particles.sort(key = lambda p: p.logLikelihood,reverse = True)
+    particles.sort(key = lambda p: p.logLikelihood - distanceWeight*p.distance + p.program.logPrior()*priorWeight,
+                   reverse = True)
 
-    for p in particles:
+    for p in particles[:5]:
         if not p.finished():
             print "Warning: unfinished program object"
             p.program = Sequence(p.program)
-#        if len(p.program.lines) != 6: continue
         
         showImage(p.output)
         print p.program
