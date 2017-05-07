@@ -49,6 +49,15 @@ for priorWeight in range(0,30):
         rs = ranks(w)
         print w
         print len([r for r in rs if r < 11 ])
-        topTen[str(w)] = len([r for r in rs if r < 11 ])
+        topTen[tuple(w.tolist())] = len([r for r in rs if r < 11 ])
 
 print "\n".join(map(str,list(sorted(topTen.items(),key = lambda kv: kv[1]))))
+# use the weights they give us the best in the top ten
+w,_ = max(topTen.items(),key = lambda kv: kv[1])
+w = np.array(w)
+r = ranks(w)
+print r
+for j in range(1,50):
+    print "Top",j,":", len([x for x in r if x < j+1 ])
+print "# examples:",len(r)
+print "Average rank:",sum(r)/float(len(r))
