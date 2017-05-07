@@ -366,6 +366,10 @@ class Particle():
         self.logLikelihood = logLikelihood
     # once a program is finished we wrap it up in a sedquence object
     def finished(self): return isinstance(self.program, Sequence)
+    # wraps it up in a sequence object if it hasn't already
+    def sequence(self):
+        if self.finished(): return self.program
+        return Sequence(self.program)
 
 class RecognitionModel():
     def __init__(self, arguments):
@@ -562,7 +566,9 @@ class RecognitionModel():
                     kids = self.decoder.beam(s, feed, childCount*2)
                 else:
                     # no neural network guide: sample from the prior
-                    kids = [ (0.0, randomLineOfCode()) for _ in range(childCount) ]
+                    kids = [ (0.0, randomCode) for _ in range(childCount)
+                             for randomCode in [randomLineOfCode()] if randomCode != None ]
+                    kids += [(0.0, None)]
 
                 # remove children that duplicate an existing line of code
                 existingLinesOfCode = map(str,parent.program)
@@ -580,7 +586,8 @@ class RecognitionModel():
                                              parent = parent,
                                              time = time() - searchStartTime))
                 
-            print "Ran neural network beam in %f seconds"%(time() - startTime)
+            if not self.arguments.quiet:
+                print "Ran neural network beam in %f seconds"%(time() - startTime)
 
             beam = children
 
@@ -591,7 +598,8 @@ class RecognitionModel():
             self.renderParticles(beam)
             totalNumberOfRenders += len(beam)
 
-            print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
+            if not self.arguments.quiet:
+                print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
             for n in beam:
                 if self.arguments.task == 'evaluate':
@@ -600,6 +608,8 @@ class RecognitionModel():
                     n.distance = np.sum(np.abs(targetImage - n.output))
                 else:
                     n.distance = asymmetricBlurredDistance(targetImage, n.output)
+
+            if not self.arguments.quiet: print "Computed distances"
 
             # record/remove all of the finished programs
             finishedPrograms += [ n for n in beam if n.finished() ]
@@ -624,18 +634,21 @@ class RecognitionModel():
             for n,c in zip(beam,cs):
                 n.count = c
 
+            if not self.arguments.quiet: print "Resampled."
+
             beam = self.consolidateIdenticalParticles(beam)
 
-            for n in beam:
-#                if n.count == 0 and not self.arguments.beam: continue
+            if not self.arguments.quiet:
+                for n in beam:
+                    if n.count == 0 and not self.arguments.beam: continue
 
-                p = n.program
-                if not n.finished(): p = Sequence(p)
-                print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
-                print "Blurred distance: %f"%n.distance
-                if n.count > beamSize/5 and False:
-                    showImage(n.output + targetImage)
-                print "\n"
+                    p = n.program
+                    if not n.finished(): p = Sequence(p)
+                    print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
+                    print "Blurred distance: %f"%n.distance
+                    if n.count > beamSize/5 and False:
+                        showImage(n.output + targetImage)
+                    print "\n"
 
             # Remove all of the dead particles, and less were doing a straight beam decoding
             if not self.arguments.beam:
@@ -661,17 +674,39 @@ class RecognitionModel():
         return [ n for n in particles
                  if not (n.program if n.finished() else Sequence(n.program)).hasCollisions() ]
     def consolidateIdenticalParticles(self,particles):
-        consolidated = []
-        for p in sorted(particles,key = lambda p: -p.logLikelihood):
-            duplicate = False
-            for c in consolidated:
-                if np.array_equal(p.output, c.output) and p.finished() == c.finished():
-                    c.count += p.count
-                    c.logLikelihood = max([c.logLikelihood,p.logLikelihood])
-                    duplicate = True
+        # we need to do this in linear time
+        startTime = time()
+        startingParticles = len(particles)
+        # map from the hash code of an image to the particles with that hash
+        particleMap = {}
+        for p in particles:
+            p.output.flags.writeable = False
+            p.outputHash = hash(p.output.data)
+            if not (p.outputHash in particleMap):
+                particleMap[p.outputHash] = [p]
+                continue
+
+            collision = None # None = no collision, True = collided better, particle = remove it
+            for q in particleMap[p.outputHash]:
+                if np.array_equal(p.output, q.output) and p.finished() == q.finished():
+                    # collision
+                    if p.logLikelihood > q.logLikelihood: # prefer p
+                        p.count += q.count
+                        collision = q
+                    else:
+                        collision = True
+                        q.count += p.count
                     break
-            if not duplicate: consolidated.append(p)
-        return consolidated
+            if collision  == True: continue
+            if collision == None: particleMap[p.outputHash].append(p)
+            else: particleMap[p.outputHash].remove(collision)
+
+        finalParticles = [ p for ps in particleMap.values() for p in ps  ]
+        if not self.arguments.quiet:
+            print "Consolidated %d particles into %d particles in %f seconds."%(startingParticles,
+                                                                                len(finalParticles),
+                                                                                time() - startTime)
+        return finalParticles
     
     def renderParticles(self,particles):
         startTime = time()
@@ -681,14 +716,22 @@ class RecognitionModel():
                              yieldsPixels = True,
                              canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
         else:
-            outputs = [ fastRender(n.program if n.finished() else Sequence(n.program))
-                        for n in particles ]
+            # optimization: add the rendering of last command to the parent
+            outputs = []
+            for n in particles:
+                program = n.sequence().lines
+                o = n.parent.output
+                if len(program) > 0:
+                    o = fastRender(program[-1]) + o
+                    o[o > 1] = 1
+                outputs.append(o)
             
-        print "Rendered in %f seconds"%(time() - startTime)
+        if not self.arguments.quiet: print "Rendered in %f seconds"%(time() - startTime)
         for n,o in zip(particles,outputs):
             n.output = o
             if not self.arguments.fastRender:
                 n.output = 1.0 - n.output
+
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
         os.system('rm -r %s'%(parseDirectory))
@@ -781,7 +824,7 @@ class RecognitionModel():
             
             # find the pixel distance of the preferred particle
             preferred = particles[0]
-            d = np.sum(np.abs(targetImage - preferred.output))
+            d = np.sum(np.abs(targetImage - fastRender(preferred.program)))
             pixelDistance[k].append(d)
 
             # find the program distance of the preferred particle
@@ -844,6 +887,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', action="store_true", default=False)
     parser.add_argument('-m','--cores', default = 1, type = int)
     parser.add_argument('--noisy',action = "store_true", default = False)
+    parser.add_argument('--quiet',action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
