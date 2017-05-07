@@ -633,7 +633,7 @@ class RecognitionModel():
                 if not n.finished(): p = Sequence(p)
                 print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
                 print "Blurred distance: %f"%n.distance
-                if n.count > beamSize/5:
+                if n.count > beamSize/5 and False:
                     showImage(n.output + targetImage)
                 print "\n"
 
@@ -650,6 +650,10 @@ class RecognitionModel():
             # showImage(targetImage)
             # for p in beam:
             #     showImage(p.output)
+        # Remove these pointers so that they can be garbage collected
+        for p in finishedPrograms:
+            p.output = None
+            p.parent = None
         return finishedPrograms
 
     # helper functions for particle search
