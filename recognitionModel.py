@@ -604,9 +604,10 @@ class RecognitionModel():
 
             for n in beam:
                 if self.arguments.task == 'evaluate':
-                    # evaluation is on data
+                    # evaluation is  on noiseless data
                     assert not self.arguments.noisy
-                    n.distance = np.sum(np.abs(targetImage - n.output))
+                    difference = targetImage - n.output
+                    n.distance = np.sum(np.abs(difference[difference > 0])) + 20*np.sum(np.abs(difference[difference < 0]))
                 else:
                     n.distance = asymmetricBlurredDistance(targetImage, n.output)
 
