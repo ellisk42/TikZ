@@ -50,7 +50,7 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
   
   if (??) {
     identity = REFLECT;
-    int yr = ??; // y axis of reflection
+    int yr = ??; // y axis of reflection, multiplied by 2
     int xr = ??;
     assert yr == 0 || xr == 0;
     assert !(yr == 0 && xr == 0);
@@ -62,21 +62,21 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
 	// Reflected case
 
 	// reflection of a point is easy
-	cy = yr == 0 ? cy : yr - (cy - yr);
-	cx = xr == 0 ? cx : xr - (cx - xr);
+	cy = yr == 0 ? cy : yr - (cy - 0);
+	cx = xr == 0 ? cx : xr - (cx - 0);
 
 	int rectangleHeight = ry2 - ry1;
 	int rectangleWidth = rx2 - rx1;
-	ry1 = yr == 0 ? ry1 : yr - (ry1 - yr) - rectangleHeight;
-	ry2 = yr == 0 ? ry2 : yr - (ry2 - yr) + rectangleHeight;
-	rx1 = xr == 0 ? rx1 : xr - (rx1 - xr) - rectangleWidth;
-	rx2 = xr == 0 ? rx2 : xr - (rx2 - xr) + rectangleWidth;
+	ry1 = yr == 0 ? ry1 : yr - (ry1 - 0) - rectangleHeight;
+	ry2 = yr == 0 ? ry2 : yr - (ry2 - 0) + rectangleHeight;
+	rx1 = xr == 0 ? rx1 : xr - (rx1 - 0) - rectangleWidth;
+	rx2 = xr == 0 ? rx2 : xr - (rx2 - 0) + rectangleWidth;
 
 	if (arrow) { // arrow implies that there is no canonical orientation
-	  ly1 = yr == 0 ? ly1 : yr - (ly1 - yr);
-	  ly2 = yr == 0 ? ly2 : yr - (ly2 - yr);
-	  lx1 = xr  == 0? lx1 : xr - (lx1 - xr);
-	  lx2 = xr == 0 ? lx2 : xr - (lx2 - xr);
+	  ly1 = yr == 0 ? ly1 : yr - (ly1 - 0);
+	  ly2 = yr == 0 ? ly2 : yr - (ly2 - 0);
+	  lx1 = xr  == 0? lx1 : xr - (lx1 - 0);
+	  lx2 = xr == 0 ? lx2 : xr - (lx2 - 0);
 	} else { // reflect while preserving canonical orientation
 	  int _ly1 = ly1;
 	  int _ly2 = ly2;
@@ -84,14 +84,14 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
 	  int _lx2 = lx2;
 	  
 	  if (lx2 == lx1) { // vertical line: canonical determined by y
-	    ly1 = yr == 0 ? ly1 : yr - (_ly2 - yr);
-	    ly2 = yr == 0 ? ly2 : yr - (_ly1 - yr);
+	    ly1 = yr == 0 ? ly1 : yr - (_ly2 - 0);
+	    ly2 = yr == 0 ? ly2 : yr - (_ly1 - 0);
 	  } else { // arbitrary line: canonical determined by x
-	    ly1 = yr == 0 ? _ly2 : yr - (ly1 - yr);
-	    ly2 = yr == 0 ? _ly1 : yr - (ly2 - yr);
+	    ly1 = yr == 0 ? _ly2 : yr - (ly1 - 0);
+	    ly2 = yr == 0 ? _ly1 : yr - (ly2 - 0);
 	  }
-	  lx1 = xr == 0 ? lx1 : xr - (_lx2 - xr);
-	  lx2 = xr == 0 ? lx2 : xr - (_lx1 - xr);
+	  lx1 = xr == 0 ? lx1 : xr - (_lx2 - 0);
+	  lx2 = xr == 0 ? lx2 : xr - (_lx1 - 0);
 	}
       }
       hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
@@ -101,6 +101,7 @@ generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref i
     return hit;
     
   } else if (??) {
+    assert 0;
     identity = LOOP;
     
     int loop_bound_cost = 1,loop_body_cost;
@@ -157,7 +158,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
     if (!HASNOARROW) assume arrow;
   }
   int cost;
-  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},2,cost);
   minimize(cost);
   return inScene;
 }

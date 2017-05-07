@@ -56,7 +56,7 @@ def loadFullPrograms(numberOfExamples, f = 'extrapolation.tar'):
     outputs = [ "./randomScene-%d-%d.png"%(j,len(programs[j].lines) - 1)
                 for j in range(numberOfExamples) ]
     for o in outputs: cacheImage(o,members[o])
-    return zip(outputs,programs)
+    return [ (o,p) for o,p in zip(outputs,programs) if len(p.lines) < 17 ]
 
 def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
     noisyTrainingData = noisy
@@ -584,7 +584,7 @@ class RecognitionModel():
 
             beam = children
 
-            beam = self.removeParticlesWithCollisions(beam)
+            #beam = self.removeParticlesWithCollisions(beam)
             if self.arguments.beam:
                 beam = sorted(beam, key = lambda p: p.logLikelihood,reverse = True)[:beamSize]
             assert len(beam) <= beamSize
@@ -627,13 +627,13 @@ class RecognitionModel():
             beam = self.consolidateIdenticalParticles(beam)
 
             for n in beam:
-                if n.count == 0 and not self.arguments.beam: continue
+#                if n.count == 0 and not self.arguments.beam: continue
 
                 p = n.program
                 if not n.finished(): p = Sequence(p)
                 print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
                 print "Blurred distance: %f"%n.distance
-                if n.count > beamSize/5 and iteration > 4 and False:
+                if n.count > beamSize/5:
                     showImage(n.output + targetImage)
                 print "\n"
 
@@ -821,8 +821,8 @@ def handleTest(a):
                               beamSize = arguments.beamWidth,
                               beamLength = arguments.beamLength)
     # place where we will save the parses
-    parseDirectory = targetImage[:-4] + "-parses"
-    model.saveParticles(particles, parsedDirectory, targetImage)
+    parseDirectory = f[:-4] + "-parses"
+    model.saveParticles(particles, parseDirectory, targetImage)
     
 def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
