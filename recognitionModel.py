@@ -563,7 +563,7 @@ class RecognitionModel():
                     # neural network guide: decoding
                     feed = {self.currentPlaceholder: np.array([parent.output]),
                             self.goalPlaceholder: np.array([targetImage])}
-                    kids = self.decoder.beam(s, feed, childCount*2)
+                    kids = self.decoder.beam(s, feed, childCount)
                 else:
                     # no neural network guide: sample from the prior
                     kids = [ (0.0, randomCode) for _ in range(childCount)
@@ -591,7 +591,8 @@ class RecognitionModel():
 
             beam = children
 
-            #beam = self.removeParticlesWithCollisions(beam)
+            if self.arguments.noIntersections:
+                beam = self.removeParticlesWithCollisions(beam)
             if self.arguments.beam:
                 beam = sorted(beam, key = lambda p: p.logLikelihood,reverse = True)[:beamSize]
             assert len(beam) <= beamSize
@@ -622,9 +623,10 @@ class RecognitionModel():
                     n.score += math.log(n.parent.count) # simulate affect of drawing repeatedly from previous distribution
                 else:
                     assert self.arguments.beam # should only occur in straight up beam search
-                n.score += self.arguments.proposalCoefficient *(n.logLikelihood)
+                n.score += self.arguments.proposalCoefficient *(n.logLikelihood - n.parent.logLikelihood)
                 n.score += self.arguments.distanceCoefficient *(- n.distance)
-                n.score += self.arguments.parentCoefficient   *(n.parent.distance)
+                if self.arguments.parentCoefficient:
+                    n.score += self.arguments.distanceCoefficient   *(n.parent.distance)
                 n.score += self.arguments.priorCoefficient    *(n.program[-1].logPrior())
                 n.score /= self.arguments.temperature
 
@@ -636,25 +638,25 @@ class RecognitionModel():
 
             if not self.arguments.quiet: print "Resampled."
 
+            # Remove all of the dead particles, and less were doing a straight beam decoding
+            if not self.arguments.beam:
+                beam = [ n for n in beam if n.count > 0 ]
+
             beam = self.consolidateIdenticalParticles(beam)
 
             if not self.arguments.quiet:
                 for n in beam:
-                    if n.count == 0 and not self.arguments.beam: continue
-
                     p = n.program
                     if not n.finished(): p = Sequence(p)
                     print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
                     print "Blurred distance: %f"%n.distance
-                    if n.count > beamSize/5 and False:
+                    if n.count > beamSize/5 and self.arguments.showParticles:
                         showImage(n.output + targetImage)
                     print "\n"
 
-            # Remove all of the dead particles, and less were doing a straight beam decoding
-            if not self.arguments.beam:
-                beam = [ n for n in beam if n.count > 0 ]
             if beam == []:
                 print "Empty beam."
+                assert False
                 break
 
 
@@ -698,8 +700,9 @@ class RecognitionModel():
                         q.count += p.count
                     break
             if collision  == True: continue
-            if collision == None: particleMap[p.outputHash].append(p)
-            else: particleMap[p.outputHash].remove(collision)
+            particleMap[p.outputHash].append(p)
+            if collision != None:
+                particleMap[p.outputHash].remove(collision)
 
         finalParticles = [ p for ps in particleMap.values() for p in ps  ]
         if not self.arguments.quiet:
@@ -741,7 +744,7 @@ class RecognitionModel():
             n.parent = None
             print "Finished program: log likelihood %f"%(n.logLikelihood)
             print n.program
-            saveMatrixAsImage(n.output*255, "%s/%d.png"%(parseDirectory, j))
+            saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'w'))
             print "Distance: %f"%(n.distance)
             #asymmetricBlurredDistance(targetImage, n['output'], True)
@@ -892,13 +895,14 @@ if __name__ == '__main__':
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
     parser.add_argument('--proposalCoefficient', default = 0.0, type = float)
-    parser.add_argument('--parentCoefficient', default = 1.0/25.0, type = float)
+    parser.add_argument('--parentCoefficient', action = "store_true", default = False)
     parser.add_argument('--distanceCoefficient', default = 1.0/25.0, type = float)
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
     parser.add_argument('--beam', action = "store_true", default = False)
     parser.add_argument('--fastRender', action = "store_true", default = True)
     parser.add_argument('--unguided', action = "store_true", default = False)
-    
+    parser.add_argument('--noIntersections', action = "store_true", default = False)
+    parser.add_argument('--showParticles', action = "store_true", default = False)
 
     arguments = parser.parse_args()
     if arguments.fastRender:

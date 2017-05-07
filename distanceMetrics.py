@@ -34,13 +34,15 @@ def asymmetricBlurredDistance(a,b, show = False):
     kernelSize = blurKernelSize
 
     # threshold the images
-    a = np.copy(a)
-    a[a > 0.5] = 1.0
-    a[a <= 0.5] = 0.0
+    a = np.copy(a*2)
+    a[a > 0.35] = 1.0
+    a[a <= 0.35] = 0.0
+#    showImage(a)
 
     b = np.copy(b)
     b[b > 0.5] = 1.0
     b[b <= 0.5] = 0.0
+#    showImage(b)
     
     a = cv2.GaussianBlur(a,(kernelSize,kernelSize),sigmaX = 0)
     b = cv2.GaussianBlur(b,(kernelSize,kernelSize),sigmaX = 0)
