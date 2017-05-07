@@ -656,7 +656,6 @@ class RecognitionModel():
 
             if beam == []:
                 print "Empty beam."
-                assert False
                 break
 
 
