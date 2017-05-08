@@ -576,6 +576,11 @@ class RecognitionModel():
                 kids = [ child for child in kids
                          if not (str(child[1]) in existingLinesOfCode) ] 
                 kids.sort(key = lambda k: k[0], reverse = True)
+                
+                # in evaluation mode we want to make sure that there are at least some finished programs
+                if self.arguments.task == 'evaluate' and (not [ k for k in kids[:childCount] if k[1] == None]) and childCount > 1:
+                    kids = [ k for k in kids if k[1] == None] + kids
+                    
                 for childScore,suffix in kids[:childCount]:
                     if suffix == None:
                         k = Sequence(parent.program)
