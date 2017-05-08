@@ -89,8 +89,10 @@ def proposeAttachmentLines(objects):
     return arbitraryAttachments + alignedAttachments
 
 def samplePoint(objects):
+    ls = [ p for o in objects for p in (o.points if isinstance(o,Line) else []) ]
     xs = list(set([ x for o in objects for x in o.usedXCoordinates() ]))
     ys = list(set([ y for o in objects for y in o.usedYCoordinates() ]))
+    if ls != [] and random() < 0.1: return choice(ls)
     option = choice(range(3))
     if option == 0 and len(xs) > 0:
         return AbsolutePoint(Number(choice(xs)),Number(randomCoordinate()))
@@ -119,14 +121,15 @@ def sampleRectangle(objects):
             return Rectangle(p1, p2)
                                 
 
-def sampleLine(attachedLines = []):
+def sampleLine(objects, attachedLines = []):
     concentration = 2.0
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
         points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
     elif random() < 1.0: # horizontal or vertical line: diagonals only allowed as attachments
-        x1 = randomCoordinate()
-        y1 = randomCoordinate()
+        p1 = samplePoint(objects)
+        x1 = p1.x.n
+        y1 = p1.y.n
         if choice([True,False]):
             # x1 == x2; y1 != y2
             y2 = y1
@@ -148,7 +151,7 @@ def sampleLine(attachedLines = []):
     if not arrow: # without an arrow there is no canonical orientation
         points = list(sorted(points, key = lambda p: (p.x.n,p.y.n)))
     return Line(points,
-                solid = random() > 0.5,
+                solid = random() > 0.33,
                 arrow = arrow)
 
 def sampleWithoutIntersection(n, existingObjects, f):
@@ -171,7 +174,7 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0):
         objects = sampleWithoutIntersection(circles, objects, lambda: sampleCircle(objects))
         objects = sampleWithoutIntersection(rectangles, objects, lambda: sampleRectangle(objects))
         attachedLines = proposeAttachmentLines(objects)
-        objects = sampleWithoutIntersection(lines, objects, lambda: sampleLine(attachedLines))
+        objects = sampleWithoutIntersection(lines, objects, lambda: sampleLine(objects,attachedLines))
         return Sequence(canonicalOrdering(objects))
     return sampler
 
