@@ -852,6 +852,14 @@ class RecognitionModel():
         print pixelDistance
         print programDistance
         print searchTime
+
+        n = len([ r for rs in programRank.values() for r in rs ])
+        ranks = [ r for rs in programRank.values() for r in rs if r != None]
+        programDistances = [ r for rs in programDistance.values() for r in rs if r != None]
+        pixelDistances = [ r for rs in pixelDistance.values() for r in rs if r != None]
+        print "Got the correct program %d/%d times"%(len(ranks),n)
+        print "Average program distance: %f"%(sum(programDistances)/float(len(programDistances)))
+        print "Average pixel distance: %f"%(sum(pixelDistances)/float(len(pixelDistances)))
         
         session.close()
                     
