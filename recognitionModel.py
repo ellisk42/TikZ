@@ -905,6 +905,10 @@ if __name__ == '__main__':
     parser.add_argument('--showParticles', action = "store_true", default = False)
 
     arguments = parser.parse_args()
+
+    if arguments.task == 'evaluate':
+        assert 'clean' in arguments.checkpoint
+    
     if arguments.fastRender:
         loadPrecomputedRenderings()
     

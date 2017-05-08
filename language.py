@@ -11,6 +11,8 @@ Expressions: evaluator maps environment to value
 MAXIMUMCOORDINATE = 16
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
+NOISYXOFFSET = 0.0
+NOISYYOFFSET = 0.0
 
 def setRadiusNoise(n):
     global RADIUSNOISE
@@ -18,6 +20,12 @@ def setRadiusNoise(n):
 def setCoordinateNoise(n):
     global COORDINATENOISE
     COORDINATENOISE = n
+
+def sampleNoisyOffset():
+    global NOISYXOFFSET
+    global NOISYYOFFSET
+    NOISYYOFFSET = truncatedNormal(-1,1)*0.2
+    NOISYXOFFSET = truncatedNormal(-1,1)*0.2
 
 def makeLabel(j): return 'L'+str(j)
 LABELS = [ makeLabel(j) for j in range(4) ]
@@ -114,8 +122,8 @@ class AbsolutePoint(Expression):
     def noisyEvaluate(self, environment):
         y = self.y.evaluate(environment)
         x = self.x.evaluate(environment)
-        x += truncatedNormal(-1,1)*COORDINATENOISE
-        y += truncatedNormal(-1,1)*COORDINATENOISE
+        x += truncatedNormal(-1,1)*COORDINATENOISE + NOISYXOFFSET
+        y += truncatedNormal(-1,1)*COORDINATENOISE + NOISYYOFFSET
         return "(%.2f,%.2f)"%(x,y)
     
     def mutate(self):
@@ -373,10 +381,10 @@ class Rectangle(Program):
         h = y2 - y1
         cx = (x2 + x1)/2.0 + centerNoise()
         cy = (y2 + y1)/2.0 + centerNoise()
-        x1 = cx - w/2.0 + vertexNoise()
-        x2 = cx + w/2.0 + vertexNoise()
-        y1 = cy - h/2.0 + vertexNoise()
-        y2 = cy + h/2.0 + vertexNoise()
+        x1 = cx - w/2.0 + vertexNoise() + NOISYXOFFSET
+        x2 = cx + w/2.0 + vertexNoise() + NOISYXOFFSET
+        y1 = cy - h/2.0 + vertexNoise() + NOISYYOFFSET
+        y2 = cy + h/2.0 + vertexNoise() + NOISYYOFFSET
         
         p1 = "(%.2f,%.2f)"%(x1,y1)
         p2 = "(%.2f,%.2f)"%(x2,y1)
@@ -531,6 +539,7 @@ class Sequence(Program):
             environment = e
         return (trace, environment)
     def noisyEvaluate(self,environment):
+        sampleNoisyOffset()
         trace = []
         for p in self.lines:
             cs,e = p.noisyEvaluate(environment)
