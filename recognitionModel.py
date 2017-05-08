@@ -470,7 +470,10 @@ class RecognitionModel():
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
-                testingAccuracy = [ s.run(self.averageAccuracy, feed_dict = feed) for feed in iterator.testingFeeds() ]
+                testingAccuracy = []
+                for feed in iterator.testingFeeds():
+                    feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
+                    testingAccuracy.append(s.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
                 flushEverything()
