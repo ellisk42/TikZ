@@ -4,7 +4,7 @@ from render import render,animateMatrices
 from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
 from fastRender import fastRender,loadPrecomputedRenderings
-
+from makeSyntheticData import randomScene
 
 import argparse
 import tarfile
@@ -16,6 +16,7 @@ from time import time
 import pickle
 import cProfile
 from multiprocessing import Pool
+import random
 
 # The data is generated on a  MAXIMUMCOORDINATExMAXIMUMCOORDINATE grid
 # We can interpolate between stochastic search and neural networks by downsampling to a smaller grid
@@ -794,7 +795,13 @@ class RecognitionModel():
         session = tf.Session()
         saver.restore(session, self.arguments.checkpoint)
 
-        for targetImage,targetProgram in loadFullPrograms(self.arguments.numberOfExamples):
+        # generate target programs with the same random seed so that
+        # we get consistent validation sets across models
+        random.seed(42)
+        targetPrograms = [ randomScene(16)() for _ in range(self.arguments.numberOfExamples) ]
+        
+        for targetProgram in targetPrograms:
+            targetImage = fastRender(targetProgram)
             k = len(targetProgram.lines)
             if not k in pixelDistance:
                 pixelDistance[k] = []
@@ -802,7 +809,6 @@ class RecognitionModel():
                 programDistance[k] = []
                 searchTime[k] = []
             
-            targetImage = loadImage(targetImage)
             startTime = time()
             particles = self.SMC(session,
                                  targetImage,
