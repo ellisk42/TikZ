@@ -22,7 +22,6 @@ def synthesizeProgram(parse):
     x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ]) - x0
     y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ]) - y0
     biggestNumber = -1 #max([x1,y1,4])
-    print biggestNumber
     
     for p in parse.lines:
         if isinstance(p,Circle):
@@ -47,8 +46,10 @@ def synthesizeProgram(parse):
                                                   1 if p.arrow else 0))
     
     source = '''
-pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
-
+pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
+    
+#define MAXIMUMXCOORDINATE %d
+#define MAXIMUMYCOORDINATE %d
 #define HASCIRCLES %d
 #define HASRECTANGLES %d
 #define HASLINES %d
@@ -72,13 +73,12 @@ bit renderSpecification(SHAPEVARIABLES) {
   return %s;
 }
 '''%(biggestNumber,
+     x1,y1,
      hasCircles,hasRectangles,hasLines,
      (True in solid),(False in solid),
      (True in arrows),(False in arrows),
      " || ".join(parts))
 
-    print source
-    
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
     fd.close()
@@ -92,21 +92,16 @@ bit renderSpecification(SHAPEVARIABLES) {
     os.system('sketch -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
-#    print output
     os.remove(fd.name)
     os.remove(outputFile)
 
     # Recover the program length from the sketch output
     programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
     if programSize == []:
-        print output
         return None
     programSize = programSize[-1]
-    print programSize
     m = re.match('.*=([0-9]+),',programSize)
     cost = int(m.group(1))
-
-    print "Program cost:",cost
 
     # find the body of the synthesized code
     body = None
@@ -117,5 +112,5 @@ bit renderSpecification(SHAPEVARIABLES) {
             body.append(l)
             if 'minimize' in l:
                 break
-    print "\n".join(body)
-    return cost
+    body = "\n".join(body)
+    return cost,body

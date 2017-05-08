@@ -29,120 +29,136 @@ generator int expression([int n], int[n] environment, ref int cost) {
 
 // blocks are sequences of commands; can also introduce local variables.
 generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
+  assert d > 0;
+  
   cost = 0;
   bit hit = 0;
   int identity = 0;
+  bit newHit;
+  int newCost,newIdentity;
   repeat(??) {
-    int newCost,newIdentity;
-    bit newHit = command(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    newHit = primitive(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     assert newIdentity >= identity;
     identity = newIdentity;
     cost += newCost;
     hit = hit || newHit;
   }
+  
+  if (??) {
+    hit = hit || iterator(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    cost += newCost;
+  }
+  
+  if (??) {
+    hit = hit || reflection(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    cost += newCost;
+  }
   return hit;
 }
 
-generator bit command([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity){
+generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
   assert d > 0;
   bit hit = 0;
-
-  
-  if (??) {
-    identity = REFLECT;
-    int yr = ??; // y axis of reflection, multiplied by 2
-    int xr = ??;
-    assert yr == 0 || xr == 0;
-    assert !(yr == 0 && xr == 0);
-    int reflection_cost;
-	
-    // loop wrapper around the generator to make it only be called once
-    for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
-      if (reflectionIndex == 1) {
-	// Reflected case
-
-	// reflection of a point is easy
-	cy = yr == 0 ? cy : yr - (cy - 0);
-	cx = xr == 0 ? cx : xr - (cx - 0);
-
-	int rectangleHeight = ry2 - ry1;
-	int rectangleWidth = rx2 - rx1;
-	ry1 = yr == 0 ? ry1 : yr - (ry1 - 0) - rectangleHeight;
-	ry2 = yr == 0 ? ry2 : yr - (ry2 - 0) + rectangleHeight;
-	rx1 = xr == 0 ? rx1 : xr - (rx1 - 0) - rectangleWidth;
-	rx2 = xr == 0 ? rx2 : xr - (rx2 - 0) + rectangleWidth;
-
-	if (arrow) { // arrow implies that there is no canonical orientation
-	  ly1 = yr == 0 ? ly1 : yr - (ly1 - 0);
-	  ly2 = yr == 0 ? ly2 : yr - (ly2 - 0);
-	  lx1 = xr  == 0? lx1 : xr - (lx1 - 0);
-	  lx2 = xr == 0 ? lx2 : xr - (lx2 - 0);
-	} else { // reflect while preserving canonical orientation
-	  int _ly1 = ly1;
-	  int _ly2 = ly2;
-	  int _lx1 = lx1;
-	  int _lx2 = lx2;
-	  
-	  if (lx2 == lx1) { // vertical line: canonical determined by y
-	    ly1 = yr == 0 ? ly1 : yr - (_ly2 - 0);
-	    ly2 = yr == 0 ? ly2 : yr - (_ly1 - 0);
-	  } else { // arbitrary line: canonical determined by x
-	    ly1 = yr == 0 ? _ly2 : yr - (ly1 - 0);
-	    ly2 = yr == 0 ? _ly1 : yr - (ly2 - 0);
-	  }
-	  lx1 = xr == 0 ? lx1 : xr - (_lx2 - 0);
-	  lx2 = xr == 0 ? lx2 : xr - (_lx1 - 0);
-	}
-      }
-      hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
-    }
-
-    cost = reflection_cost + 1;
-    return hit;
+  identity = LOOP;
     
-  } else if (??) {
-    assert 0;
-    identity = LOOP;
-    
-    int loop_bound_cost = 1,loop_body_cost;
-    int loop_bound = ??;
-    for (int j = 0; j < loop_bound; j++) {
-      hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
-    }
-    cost = loop_body_cost + loop_bound_cost;
-    return hit;
-  } else if (??) {
-    cost = 1;
-    int xc,yc;
-    int x = expression(environment, xc);
-    int y = expression(environment, yc);
-    cost += (xc + yc);
-    if (??) { // draw a circle
-      assert HASCIRCLES;
-      identity = CIRCLE;
-	hit = _c(x,y);
-    } else {  // draw a line or rectangle
-      int x2 = expression(environment, xc);
-      int y2 = expression(environment, yc);
-      cost += (xc + yc);
-      if (??) {
-	assert HASLINES;
-	bit da = ??;
-	if (!HASSOLID) da = 1; // we don't have anything that is solid so it must be forced to be --
-	if (!HASDASHED) da = 0;// ditto
-	bit ar = ??;
-	if (!HASARROW) ar = 0;
-	if (!HASNOARROW) ar = 1;
-	hit = _l(x,y,x2,y2,da,ar);
-	identity = LINE;
-      } else {
-	assert HASRECTANGLES;
-	identity = RECTANGLE;
-	hit = _r(x,y,x2,y2);
-      }
-    }
-    return hit;
+  int loop_bound_cost = 1,loop_body_cost;
+  int loop_bound = ??;
+  for (int j = 0; j < loop_bound; j++) {
+    hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
   }
+  cost = loop_body_cost + loop_bound_cost;
+  return hit;
+}
+
+generator bit primitive([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
+  assert d > 0;
+  bit hit = 0;
+  cost = 1;
+  int xc,yc;
+  int x = expression(environment, xc);
+  int y = expression(environment, yc);
+  cost += (xc + yc);
+  if (??) { // draw a circle
+    assert HASCIRCLES;
+    identity = CIRCLE;
+    hit = _c(x,y);
+  } else {  // draw a line or rectangle
+    int x2 = expression(environment, xc);
+    int y2 = expression(environment, yc);
+    cost += (xc + yc);
+    if (??) {
+      assert HASLINES;
+      bit da = ??;
+      if (!HASSOLID) da = 1; // we don't have anything that is solid so it must be forced to be --
+      if (!HASDASHED) da = 0;// ditto
+      bit ar = ??;
+      if (!HASARROW) ar = 0;
+      if (!HASNOARROW) ar = 1;
+      hit = _l(x,y,x2,y2,da,ar);
+      identity = LINE;
+    } else {
+      assert HASRECTANGLES;
+      identity = RECTANGLE;
+      hit = _r(x,y,x2,y2);
+    }
+  }
+  return hit;
+}
+
+generator bit reflection([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
+  assert d > 0;
+  bit hit = 0;
+  
+  identity = REFLECT;
+  int yr = ??; // y axis of reflection, multiplied by 2
+  int xr = ??;
+  assert yr == 0 || xr == 0;
+  assert !(yr == 0 && xr == 0);
+  int reflection_cost;
+	
+  // loop wrapper around the generator to make it only be called once
+  for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
+    if (reflectionIndex == 1) {
+      // Reflected case
+
+      // reflection of a point is easy
+      cy = yr == 0 ? cy : yr - (cy - 0);
+      cx = xr == 0 ? cx : xr - (cx - 0);
+
+      int rectangleHeight = ry2 - ry1;
+      int rectangleWidth = rx2 - rx1;
+      ry1 = yr == 0 ? ry1 : yr - (ry1 - 0) - rectangleHeight;
+      ry2 = yr == 0 ? ry2 : yr - (ry2 - 0) + rectangleHeight;
+      rx1 = xr == 0 ? rx1 : xr - (rx1 - 0) - rectangleWidth;
+      rx2 = xr == 0 ? rx2 : xr - (rx2 - 0) + rectangleWidth;
+
+      if (arrow) { // arrow implies that there is no canonical orientation
+	ly1 = yr == 0 ? ly1 : yr - (ly1 - 0);
+	ly2 = yr == 0 ? ly2 : yr - (ly2 - 0);
+	lx1 = xr  == 0? lx1 : xr - (lx1 - 0);
+	lx2 = xr == 0 ? lx2 : xr - (lx2 - 0);
+      } else { // reflect while preserving canonical orientation
+	int _ly1 = ly1;
+	int _ly2 = ly2;
+	int _lx1 = lx1;
+	int _lx2 = lx2;
+	  
+	if (lx2 == lx1) { // vertical line: canonical determined by y
+	  ly1 = yr == 0 ? ly1 : yr - (_ly2 - 0);
+	  ly2 = yr == 0 ? ly2 : yr - (_ly1 - 0);
+	} else { // arbitrary line: canonical determined by x
+	  ly1 = yr == 0 ? _ly2 : yr - (ly1 - 0);
+	  ly2 = yr == 0 ? _ly1 : yr - (ly2 - 0);
+	}
+	lx1 = xr == 0 ? lx1 : xr - (_lx2 - 0);
+	lx2 = xr == 0 ? lx2 : xr - (_lx1 - 0);
+      }
+    }
+    hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
+  }
+
+  cost = reflection_cost + 1;
+  return hit;
 }
 
 
@@ -158,7 +174,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
     if (!HASNOARROW) assume arrow;
   }
   int cost;
-  bit inScene = block(SHAPEARGUMENTS,{},2,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},3,cost);
   minimize(cost);
   return inScene;
 }

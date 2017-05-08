@@ -1,3 +1,4 @@
+import re
 from utilities import *
 from recognitionModel import Particle
 from language import *
@@ -30,7 +31,7 @@ expertSolutions = [None, # I accidentally deleted this one
                    23,
                    1,
                    None,
-                   74,
+                   57,
                    None,
                    0,
                    1,
@@ -151,3 +152,19 @@ groundTruth['drawings/expert-66.png'] = set(['Line((4,12), (7,12), arrow = False
 groundTruth['drawings/expert-67.png'] = set(['Line((4,15), (8,11), arrow = False, solid = True)', 'Line((4,14), (8,10), arrow = False, solid = True)', 'Rectangle((8,10), (9,11))', 'Rectangle((3,14), (4,15))'])
 groundTruth['drawings/expert-68.png'] = set(['Circle(center = (10,14), radius = 1)', 'Rectangle((5,13), (7,15))', 'Rectangle((9,13), (11,15))', 'Circle(center = (2,14), radius = 1)', 'Circle(center = (6,14), radius = 1)', 'Rectangle((1,13), (3,15))'])
 groundTruth['drawings/expert-69.png'] = set(['Circle(center = (5,10), radius = 1)', 'Line((5,13), (5,11), arrow = True, solid = True)', 'Line((8,13), (8,11), arrow = True, solid = True)', 'Circle(center = (8,10), radius = 1)', 'Rectangle((4,13), (9,15))'])
+
+def parseLineOfCode(l):
+    points = [ AbsolutePoint(Number(int(x)),Number(int(y))) for x,y in re.findall('\(([0-9]+),([0-9]+)\)',l) ]
+    if l.startswith('Line'):
+        arrow = 'arrow = True' in l
+        solid = 'solid = True' in l
+        return Line(points,arrow, solid)
+    if l.startswith('Circle'):
+        return Circle(points[0],Number(1))
+    if l.startswith('Rectangle'):
+        return Rectangle(points[0],points[1])
+    assert False
+
+groundTruthSequence = {}
+for k in groundTruth:
+    groundTruthSequence[k] = Sequence([ parseLineOfCode(l) for l in groundTruth[k] ])

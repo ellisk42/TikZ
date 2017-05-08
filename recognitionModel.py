@@ -743,8 +743,10 @@ class RecognitionModel():
 
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
-        os.system('rm -r %s'%(parseDirectory))
-        os.system('mkdir %s'%(parseDirectory))
+        if os.path.exists(parseDirectory):
+            os.system('rm -rf %s/*'%(parseDirectory))
+        else:
+            os.system('mkdir %s'%(parseDirectory))
         finishedPrograms.sort(key = lambda n: -n.logLikelihood)
         for j,n in enumerate(finishedPrograms):
             n.parent = None

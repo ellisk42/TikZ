@@ -1,12 +1,24 @@
+from fastRender import fastRender
 from sketch import synthesizeProgram
 from language import *
-from utilities import showImage
+from utilities import showImage,loadImage
 from recognitionModel import Particle
+from groundTruthParses import groundTruthSequence
 
 import os
 import argparse
 import pickle
+import time
+from multiprocessing import Pool
 
+class SynthesisResult():
+    def __init__(self, parse, time = None, source = None, cost = None):
+        self.parse = parse
+        self.time = time
+        self.source = source
+        self.cost = cost
+
+        
 def loadParses(directory):
     particles = []
     if directory.endswith('/'): directory = directory[:-1]
@@ -30,12 +42,37 @@ def loadParses(directory):
         showImage(p.output)
         print p.program
 
-        synthesizeProgram(p.program)
+        result = synthesizeProgram(p.program)
+
+
+
+def synthesizeFromSequence((parse,whereToPickle)):
+    print parse
+    showImage(fastRender(parse))
+    startTime = time.time()
+    result = synthesizeProgram(parse)
+    if result == None: print "Failure to synthesize."
+    else:
+        result = SynthesisResult(source = result[1],
+                                 cost = result[0],
+                                 parse = parse,
+                                 time = time.time() - startTime)
+        pickle.dump(result,open(whereToPickle,'wb'))
     
+def synthesizeGroundTruthPrograms(arguments):
+    Pool(arguments.cores).map(synthesizeFromSequence,
+                             [(groundTruthSequence[k], '%s-synthesizerOutput.p'%k)
+                              for k in groundTruthSequence ])
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
-    parser.add_argument('directory')
+    parser.add_argument('-d', '--directory', default = None)
+    parser.add_argument('-m', '--cores', default = 1, type = int)
 
     arguments = parser.parse_args()
-    loadParses(arguments.directory)
-    
+
+    if arguments.directory != None:
+        loadParses(arguments.directory)
+    else:
+        synthesizeGroundTruthPrograms(arguments)
+        
