@@ -124,9 +124,7 @@ def perturbOffset(b):
     for j in range(b.shape[0]):
         dx = int(random()*(w*2 + 1)) - w
         dy = int(random()*(w*2 + 1)) - w
-        showImage(p[j,:,:])
         p[j,:,:] = np.roll(np.roll(p[j,:,:], dx, axis = 1), dy, axis = 0)
-        showImage(p[j,:,:])
     return p
 
 def augmentData(b): return perturbOffset(perturbNoisyIntensities(b))
