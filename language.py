@@ -539,7 +539,7 @@ class Sequence(Program):
             environment = e
         return (trace, environment)
     def noisyEvaluate(self,environment):
-        sampleNoisyOffset()
+#        sampleNoisyOffset()
         trace = []
         for p in self.lines:
             cs,e = p.noisyEvaluate(environment)

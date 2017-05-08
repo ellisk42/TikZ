@@ -118,5 +118,16 @@ def perturbNoisyIntensities(b):
     return p
 
     
-    
+def perturbOffset(b):
+    p = np.copy(b)
+    w = 5
+    for j in range(b.shape[0]):
+        dx = int(random()*(w*2 + 1)) - w
+        dy = int(random()*(w*2 + 1)) - w
+        showImage(p[j,:,:])
+        p[j,:,:] = np.roll(np.roll(p[j,:,:], dx, axis = 0), dy, axis = 1)
+        showImage(p[j,:,:])
+    return p
+
+def augmentData(b): return perturbOffset(perturbNoisyIntensities(b))
     

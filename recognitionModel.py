@@ -464,7 +464,7 @@ class RecognitionModel():
                 epicAccuracy = []
                 for feed in iterator.epochFeeds():
                     if self.arguments.noisy:
-                        feed[self.goalPlaceholder] = perturbNoisyIntensities(feed[self.goalPlaceholder])
+                        feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
                     _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     epicLoss.append(l)
