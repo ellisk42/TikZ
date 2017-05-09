@@ -5,6 +5,7 @@ from utilities import showImage,loadImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence
 
+import re
 import os
 import argparse
 import pickle
@@ -18,17 +19,39 @@ class SynthesisResult():
         self.source = source
         self.cost = cost
 
-def viewSynthesisResults(d):
+def viewSynthesisResults(arguments):
+    d = arguments.view
     if d.endswith('.p'): files = [d]
     elif d.endswith('/'): files = [ d + f for f in os.listdir(d) if f.endswith('.p') ]
     else: assert False
+
+    latex = []
 
     for f in files:
         result = pickle.load(open(f,'rb'))
         print f
         print result.source
         print parseSketchOutput(result.source)
-        print 
+        expertIndex = re.search('(\d+)', f)
+        print expertIndex.group(1)
+        expertIndex = int(expertIndex.group(1))
+        latex.append('''
+        \\begin{tabular}{ll}
+\\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
+        \\begin{minipage}{10cm}
+        \\begin{verbatim}
+%s
+        \\end{verbatim}
+\\end{minipage}
+\\end{tabular}        
+        '''%(expertIndex, parseSketchOutput(result.source)))
+        print
+
+    if arguments.latex:
+        latex = '%s'%("\\\\\n".join(latex))
+        with open('../TikZpaper/synthesizerOutputs.tex','w') as handle:
+            handle.write(latex)
+        print "Wrote output to ../TikZpaper/synthesizerOutputs.tex"
 
         
 def loadParses(directory):
@@ -85,11 +108,12 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--directory', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
     parser.add_argument('--view', default = None, type = str)
+    parser.add_argument('--latex', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
 
     if arguments.view:
-        viewSynthesisResults(arguments.view)
+        viewSynthesisResults(arguments)
     elif arguments.directory != None:
         loadParses(arguments.directory)
     else:

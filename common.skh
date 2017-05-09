@@ -14,6 +14,14 @@ int [n + 1] push([int n], int [n] environment, int j) {
   return ep;
 }
 
+int validateY(int x) {
+  assert x >= 0 && x <= MAXIMUMYCOORDINATE;
+  return x;
+}
+int validateX(int x) {
+  assert x >= 0 && x <= MAXIMUMXCOORDINATE;
+  return x;
+}
 
 #define _c(x,y) (shapeIdentity == CIRCLE && cx == x && cy == y)
 #define _l(x1,y1,x2,y2,d,a) (shapeIdentity == LINE && x1 == lx1 && y1 == ly1 && x2 == lx2 && y2 == ly2 && d == dashed && a == arrow)
@@ -88,16 +96,16 @@ generator bit primitive([int n], SHAPEVARIABLES , int[n] environment, int d, ref
   bit hit = 0;
   cost = 1;
   int xc,yc;
-  int x = expression(environment, xc);
-  int y = expression(environment, yc);
+  int x = validateX(expression(environment, xc));
+  int y = validateY(expression(environment, yc));
   cost += (xc + yc);
   if (??) { // draw a circle
     assert HASCIRCLES;
     identity = CIRCLE;
     hit = _c(x,y);
   } else {  // draw a line or rectangle
-    int x2 = expression(environment, xc);
-    int y2 = expression(environment, yc);
+    int x2 = validateX(expression(environment, xc));
+    int y2 = validateY(expression(environment, yc));
     cost += (xc + yc);
     if (??) {
       assert HASLINES;

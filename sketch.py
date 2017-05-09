@@ -123,6 +123,8 @@ def parseSketchOutput(output):
     commands = []
     
     for l in output.split('\n'):
+        if 'void renderSpecification' in l: break
+        
         nestingDepth = 0
         while nestingDepth < len(l) and l[nestingDepth] == ' ': nestingDepth += 1
         #nest = ' '*nestingDepth
@@ -217,9 +219,24 @@ def parseExpression(e):
         variable = re.search('\[(\d)\]',e)
         if variable != None: variable = ['i','j'][int(variable.group(1))]
 
-        return "%s * %s + %s"%(str(factor),
-                               str(variable),
-                               str(offset))
+        if factor == None: factor = 0
+        if offset == None: offset = 0
+        if variable == None:
+            print e
+            assert False
+
+        if factor == 0: return str(offset)
+
+        representation = variable
+        if factor != 1: representation = "%d*%s"%(factor,representation)
+
+        if offset != 0: representation += " + %d"%offset
+
+        return representation
+
+        # return "%s * %s + %s"%(str(factor),
+        #                        str(variable),
+        #                        str(offset))
 
 
 
