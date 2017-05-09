@@ -121,9 +121,22 @@ bit renderSpecification(SHAPEVARIABLES) {
 
 def parseSketchOutput(output):
     commands = []
+    environment = {} # variable bindings introduced by the sketch: we have to resolve them
     
     for l in output.split('\n'):
         if 'void renderSpecification' in l: break
+
+        m = re.search('validate[X|Y]\((.*), (.*)\);',l)
+        if m:
+            environment[m.group(2)] = m.group(1)
+            continue
+
+        # apply the environment
+        for v in sorted(environment.keys(), key = lambda v: -len(v)):
+            # if v in l:
+            #     print "Replacing %s w/ %s in %s gives %s"%(v,environment[v],l,l.replace(v,environment[v]))
+            l = l.replace(v,environment[v])
+
         
         nestingDepth = 0
         while nestingDepth < len(l) and l[nestingDepth] == ' ': nestingDepth += 1
@@ -153,6 +166,7 @@ def parseSketchOutput(output):
         pattern = '\(\(\(\(\(shapeIdentity == 2\) && \((.+) == rx1.*\)\) && \((.+) == ry1.*\)\) && \((.+) == rx2.*\)\) && \((.+) == ry2.*\)\)'
         m = re.search(pattern,l)
         if m:
+            # print m,m.group(1),m.group(2),m.group(3),m.group(4)
             commands += [(nestingDepth, "Rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
                                             parseExpression(m.group(2)),
                                             parseExpression(m.group(3)),
