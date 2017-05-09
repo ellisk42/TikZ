@@ -123,7 +123,7 @@ def processHandout(name):
 
 def processExpert(name):
     os.system('convert -density 150 %s -quality 90 /tmp/output.png'%name)
-    for j in range(100):
+    for j in range(200):
         _j = j
         p = '/tmp/output-%d.png'%j
         if not os.path.isfile(p): break
@@ -263,5 +263,5 @@ def processDrawing(name, export = False):
     return x
 
 if __name__ == '__main__':
-#    processExpert(sys.argv[1])
-    processHandout(sys.argv[1])
+    processExpert(sys.argv[1])
+#    processHandout(sys.argv[1])

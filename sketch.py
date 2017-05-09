@@ -173,6 +173,37 @@ def parseSketchOutput(output):
         if m:
             commands += [(nestingDepth, "reflect(y = %d)"%(int(m.group(1))))]
             continue
+
+        pattern = 'ry1.* = \((\d+) - \(ry1.* - rectangleHeight;'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(y = %d)"%(int(m.group(1))))]
+            continue
+        pattern = 'rx1.* = \((\d+) - \(rx1.* - rectangleWidth'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(x = %d)"%(int(m.group(1))))]
+            continue
+
+        #lx1_0 = 7 - (lx1_0 - 0);
+        pattern = 'ly1.* = (\d+) - \(ly1.* - 0;'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(y = %d)"%(int(m.group(1))))]
+            continue
+        pattern = 'lx1.* = (\d+) - \(lx1.* - 0;'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(x = %d)"%(int(m.group(1))))]
+            continue
+
+    # we can pick up redundant reflections. remove them.
+    noStutter = []
+    for j,(d,c) in enumerate(commands):
+        if j > 0 and 'reflect' in c and c == commands[j - 1][1]:
+            continue
+        noStutter.append((d,c))
+    commands = noStutter
         
     return "\n".join([ " "*d+c for d,c in commands ])
 
