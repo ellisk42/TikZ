@@ -428,8 +428,9 @@ class RecognitionModel():
         print "fully connected input dimensionality:",c1d
 
         f1 = tf.reshape(c1, [-1, c1d])
-        f1 = tf.layers.dropout(f1,
-                               training = self.trainingPredicatePlaceholder)
+        if self.arguments.dropout:
+            f1 = tf.layers.dropout(f1,
+                                   training = self.trainingPredicatePlaceholder)
 
         self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder)
         self.loss = self.decoder.loss()
@@ -914,6 +915,7 @@ if __name__ == '__main__':
     parser.add_argument('-m','--cores', default = 1, type = int)
     parser.add_argument('--noisy',action = "store_true", default = False)
     parser.add_argument('--quiet',action = "store_true", default = False)
+    parser.add_argument('--dropout',action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
