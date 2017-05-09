@@ -18,6 +18,8 @@ class SynthesisResult():
         self.source = source
         self.cost = cost
 
+b
+
         
 def loadParses(directory):
     particles = []
@@ -65,7 +67,7 @@ def synthesizeFromSequence((parse,whereToPickle)):
     
 def synthesizeGroundTruthPrograms(arguments):
     Pool(arguments.cores).map(synthesizeFromSequence,
-                             [(groundTruthSequence[k], '%s-synthesizerOutput.p'%(k.replace('/','-')))
+                             [(groundTruthSequence[k], 'synthesisResults/%s-synthesizerOutput.p'%(k.replace('/','-')))
                               for k in groundTruthSequence ])
 
 if __name__ == '__main__':
