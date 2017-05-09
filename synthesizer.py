@@ -18,7 +18,17 @@ class SynthesisResult():
         self.source = source
         self.cost = cost
 
-b
+def viewSynthesisResults(d):
+    if d.endswith('.p'): files = [d]
+    elif d.endswith('/'): files = [ d + f for f in os.listdir(d) if f.endswith('.p') ]
+    else: assert False
+
+    for f in files:
+        result = pickle.load(open(f,'rb'))
+        print f
+        print source
+        print parseSketchOutput(source)
+        print 
 
         
 def loadParses(directory):
@@ -74,10 +84,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
     parser.add_argument('-d', '--directory', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
+    parser.add_argument('--view', default = None, type = str)
 
     arguments = parser.parse_args()
 
-    if arguments.directory != None:
+    if arguments.view:
+        viewSynthesisResults(arguments.view)
+    elif arguments.directory != None:
         loadParses(arguments.directory)
     else:
         synthesizeGroundTruthPrograms(arguments)
