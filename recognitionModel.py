@@ -49,16 +49,6 @@ def loadTar(f = 'syntheticTrainingData.tar'):
     print "Loaded tar file into RAM: %d entries."%len(members)
     return members
 
-def loadFullPrograms(numberOfExamples, f = 'extrapolation.tar'):
-    members = loadTar(f)
-    programNames = [ "./randomScene-%d.p"%(j)
-                     for j in range(numberOfExamples) ]
-    programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
-    outputs = [ "./randomScene-%d-%d.png"%(j,len(programs[j].lines) - 1)
-                for j in range(numberOfExamples) ]
-    for o in outputs: cacheImage(o,members[o])
-    return [ (o,p) for o,p in zip(outputs,programs) if len(p.lines) < 17 ]
-
 def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
     noisyTrainingData = noisy
     
@@ -232,9 +222,9 @@ class LineDecoder(StandardPrimitiveDecoder):
     def __init__(self, imageRepresentation):
         self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,2,2] # x,y for beginning and end; arrow/-
         self.hiddenSizes = [None,
-                            None,
-                            None,
-                            None,
+                            32,
+                            32,
+                            32,
                             None,
                             None]
         self.makeNetwork(imageRepresentation)
@@ -277,7 +267,7 @@ class PrimitiveDecoder():
                       RectangleDecoder,
                       LineDecoder,
                       StopDecoder]
-    def __init__(self, imageRepresentation):
+    def __init__(self, imageRepresentation, trainingPredicatePlaceholder):
         self.decoders = [k(imageRepresentation) for k in PrimitiveDecoder.decoderClasses]
 
         self.prediction = tf.layers.dense(imageRepresentation, len(self.decoders))
@@ -285,6 +275,7 @@ class PrimitiveDecoder():
         self.soft = tf.nn.log_softmax(self.prediction)
         self.targetPlaceholder = tf.placeholder(tf.int32, [None])
         self.imageRepresentation = imageRepresentation
+        self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
 
     def loss(self):
         # the first label is for the primitive category
@@ -325,6 +316,7 @@ class PrimitiveDecoder():
         return t
 
     def beam(self, session, feed, beamSize):
+        feed[self.trainingPredicatePlaceholder] = False
         # to accelerate beam decoding, we can cash the image representation
         [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
         tokenScores = tokenScores[0]
@@ -380,6 +372,8 @@ class RecognitionModel():
         self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
         self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
 
+        self.trainingPredicatePlaceholder = tf.placeholder(tf.bool)
+
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
         initialDilation = 1
@@ -434,8 +428,10 @@ class RecognitionModel():
         print "fully connected input dimensionality:",c1d
 
         f1 = tf.reshape(c1, [-1, c1d])
+        f1 = tf.layers.dropout(f1,
+                               training = self.trainingPredicatePlaceholder)
 
-        self.decoder = PrimitiveDecoder(f1)
+        self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder)
         self.loss = self.decoder.loss()
         self.averageAccuracy = self.decoder.accuracy()
 
@@ -465,6 +461,7 @@ class RecognitionModel():
                 for feed in iterator.epochFeeds():
                     if self.arguments.noisy:
                         feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
+                    feed[self.trainingPredicatePlaceholder] = True
                     _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     epicLoss.append(l)
@@ -473,6 +470,7 @@ class RecognitionModel():
                 testingAccuracy = []
                 for feed in iterator.testingFeeds():
                     feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
+                    feed[self.trainingPredicatePlaceholder] = False
                     testingAccuracy.append(s.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
