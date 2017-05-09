@@ -78,7 +78,7 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
   for (int j = 0; j < loop_bound; j++) {
     hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
   }
-  cost = loop_body_cost + loop_bound_cost;
+  cost = loop_body_cost + loop_bound_cost + 1;
   return hit;
 }
 
@@ -119,7 +119,6 @@ generator bit primitive([int n], SHAPEVARIABLES , int[n] environment, int d, ref
 }
 
 generator bit reflection([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
-  assert 0;
   assert d > 0;
   bit hit = 0;
   

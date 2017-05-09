@@ -1,5 +1,5 @@
 from fastRender import fastRender
-from sketch import synthesizeProgram
+from sketch import synthesizeProgram,parseSketchOutput
 from language import *
 from utilities import showImage,loadImage
 from recognitionModel import Particle
@@ -43,16 +43,16 @@ def loadParses(directory):
         print p.program
 
         result = synthesizeProgram(p.program)
-        print result
         print result[0]
         print result[1]
+        print parseSketchOutput(result[1])
         assert False
 
 
 
 def synthesizeFromSequence((parse,whereToPickle)):
     print parse
-    showImage(fastRender(parse))
+#    showImage(fastRender(parse))
     startTime = time.time()
     result = synthesizeProgram(parse)
     if result == None: print "Failure to synthesize."
@@ -65,7 +65,7 @@ def synthesizeFromSequence((parse,whereToPickle)):
     
 def synthesizeGroundTruthPrograms(arguments):
     Pool(arguments.cores).map(synthesizeFromSequence,
-                             [(groundTruthSequence[k], '%s-synthesizerOutput.p'%k)
+                             [(groundTruthSequence[k], '%s-synthesizerOutput.p'%(k.replace('/','-')))
                               for k in groundTruthSequence ])
 
 if __name__ == '__main__':

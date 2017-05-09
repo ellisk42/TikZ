@@ -78,7 +78,6 @@ bit renderSpecification(SHAPEVARIABLES) {
      (True in solid),(False in solid),
      (True in arrows),(False in arrows),
      " || ".join(parts))
-    print source
 
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
@@ -115,34 +114,68 @@ bit renderSpecification(SHAPEVARIABLES) {
             if 'minimize' in l:
                 break
     body = "\n".join(body)
+    # print body
+    # parseSketchOutput(body)
+    # assert False
     return cost,body
 
 def parseSketchOutput(output):
+    commands = []
+    
     for l in output.split('\n'):
-        pattern = '\(\(\(shapeIdentity == 0\) && \(cx == (.+)\)\) && \(cy == (.+)\)\)'
+        nestingDepth = 0
+        while nestingDepth < len(l) and l[nestingDepth] == ' ': nestingDepth += 1
+        #nest = ' '*nestingDepth
+        
+        pattern = '\(\(\(shapeIdentity == 0\) && \(cx.* == (.+)\)\) && \(cy.* == (.+)\)\)'
         m = re.findall(pattern,l)
         assert len(m) < 2
         if m != []:
             x = parseExpression(m[0][0])
             y = parseExpression(m[0][1])
-            print "Circle(%s,%s)"%(x,y)
+            commands += [(nestingDepth, "Circle(%s,%s)"%(x,y))]
             continue
 
-        pattern = '\(\(\(\(\(shapeIdentity == 2\) && \((.+) == rx1\)\) && \((.+) == ry1\)\) && \((.+) == rx2\)\) && \((.+) == ry2\)\)'
+        pattern = 'shapeIdentity == 1\) && \((.*) == lx1.*\)\) && \((.*) == ly1.*\)\) && \((.*) == lx2.*\)\) && \((.*) == ly2.*\)\) && \(([01]) == dashed\)\) && \(([01]) == arrow'
         m = re.search(pattern,l)
         if m:
-            print "Rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
-                                            parseExpression(m.group(2)),
-                                            parseExpression(m.group(3)),
-                                            parseExpression(m.group(4)))
-            continue
-
-        pattern = 'for\(int .* = 0; .* < (.*); .* = .* \+ 1\)'
-        m = re.search(pattern,l)
-        if m:
-            print "for (%s)"%(parseExpression(m.group(1)))
+            commands += [(nestingDepth, "Line(%s,%s,%s,%s,arrow = %s,solid = %s)"%(parseExpression(m.group(1)),
+                                                                                   parseExpression(m.group(2)),
+                                                                                   parseExpression(m.group(3)),
+                                                                                   parseExpression(m.group(4)),
+                                                                                   m.group(6) == '1',
+                                                                                   m.group(5) == '0'))]
             continue
         
+
+        pattern = '\(\(\(\(\(shapeIdentity == 2\) && \((.+) == rx1.*\)\) && \((.+) == ry1.*\)\) && \((.+) == rx2.*\)\) && \((.+) == ry2.*\)\)'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "Rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
+                                            parseExpression(m.group(2)),
+                                            parseExpression(m.group(3)),
+                                                                  parseExpression(m.group(4))))]
+            continue
+
+        pattern = 'for\(int (.*) = 0; .* < (.*); .* = .* \+ 1\)'
+        m = re.search(pattern,l)
+        if m and (not ('reflectionIndex' in m.group(1))):
+            commands += [(nestingDepth, "for (%s)"%(parseExpression(m.group(2))))]
+            continue
+
+        pattern = 'cx_.* = (\d+) - \(cx'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(x = %d)"%(int(m.group(1))))]
+            continue
+        pattern = 'cy_.* = (\d+) - \(cy'
+        m = re.search(pattern,l)
+        if m:
+            commands += [(nestingDepth, "reflect(y = %d)"%(int(m.group(1))))]
+            continue
+        
+    return "\n".join([ " "*d+c for d,c in commands ])
+
 def parseExpression(e):
     try: return int(e)
     except:
@@ -159,48 +192,3 @@ def parseExpression(e):
 
 
 
-# parseSketchOutput('''
-# void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpWsAXFS.sk:179*/
-# {
-#   _out = 0;
-#   assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpWsAXFS.sk:180"; //Assume at tmpWsAXFS.sk:180
-#   assume (shapeIdentity != 1): "Assume at tmpWsAXFS.sk:183"; //Assume at tmpWsAXFS.sk:183
-#   int[0] environment = {};
-#   int loop_body_cost = 0;
-#   bit _pac_sc_s6_s8 = 0;
-#   for(int j = 0; j < 4; j = j + 1)/*Canonical*/
-#   {
-#     bit _pac_sc_s17 = _pac_sc_s6_s8;
-#     if(!(_pac_sc_s6_s8))/*tmpWsAXFS.sk:79*/
-#     {
-#       int[1] _pac_sc_s17_s19 = {0};
-#       push(0, environment, j, _pac_sc_s17_s19);
-#       bit _pac_sc_s17_s21 = 0 || (((((shapeIdentity == 2) && (((-3 * (_pac_sc_s17_s19[0])) + 9) == rx1)) && (((2 * (_pac_sc_s17_s19[0])) + -2) == ry1)) && (((-3 * (_pac_sc_s17_s19[0])) + 11) == rx2)) && (6 == ry2));
-#       bit _pac_sc_s6 = _pac_sc_s17_s21;
-#       int newCost_0 = 1;
-#       if(!(_pac_sc_s17_s21))/*tmpWsAXFS.sk:59*/
-#       {
-#         int loop_body_cost_0 = 0;
-#         bit _pac_sc_s6_s8_0 = 0;
-#         for(int j_0 = 0; j_0 < (_pac_sc_s17_s19[0]); j_0 = j_0 + 1)/*Canonical*/
-#         {
-#           bit _pac_sc_s17_0 = _pac_sc_s6_s8_0;
-#           if(!(_pac_sc_s6_s8_0))/*tmpWsAXFS.sk:79*/
-#           {
-#             int[2] _pac_sc_s17_s19_0 = {0,0};
-#             push(1, _pac_sc_s17_s19, j_0, _pac_sc_s17_s19_0);
-#             loop_body_cost_0 = 1;
-#             _pac_sc_s17_0 = 0 || (((shapeIdentity == 0) && (cx == ((3 * (_pac_sc_s17_s19_0[0])) + -2))) && (cy == ((-2 * (_pac_sc_s17_s19_0[1])) + 5)));
-#           }
-#           _pac_sc_s6_s8_0 = _pac_sc_s17_0;
-#         }
-#         newCost_0 = loop_body_cost_0 + 1;
-#         _pac_sc_s6 = _pac_sc_s6_s8_0;
-#       }
-#       loop_body_cost = 1 + newCost_0;
-#       _pac_sc_s17 = _pac_sc_s6;
-#     }
-#     _pac_sc_s6_s8 = _pac_sc_s17;
-#   }
-#   _out = _pac_sc_s6_s8;
-#   minimize(loop_body_cost + 1)''')
