@@ -26,8 +26,8 @@ def viewSynthesisResults(d):
     for f in files:
         result = pickle.load(open(f,'rb'))
         print f
-        print source
-        print parseSketchOutput(source)
+        print result.source
+        print parseSketchOutput(result.source)
         print 
 
         
