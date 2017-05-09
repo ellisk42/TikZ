@@ -43,8 +43,13 @@ def crossEntropyWithMask(labels, masks, predictions):
     l = tf.reduce_sum(masked)
     print "l = ",l
     return l
-    
-def linesIntersect(p1,q1,p2,q2):
+
+def linesIntersect(p1,q1,p2,q2,precision = 2):
+    for p in [p1,p2,q1,q2]:
+        p.x = round(p.x,precision)
+        p.y = round(p.y,precision)
+    return linesIntersect_(p1,q1,p2,q2)    
+def linesIntersect_(p1,q1,p2,q2):
     def onSegment(p,q,r):
         return q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x) and q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y)
     def orientation(p,q,r):
