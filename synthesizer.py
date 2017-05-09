@@ -43,6 +43,10 @@ def loadParses(directory):
         print p.program
 
         result = synthesizeProgram(p.program)
+        print result
+        print result[0]
+        print result[1]
+        assert False
 
 
 

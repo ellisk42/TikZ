@@ -8,8 +8,6 @@
 #define LOOP 3
 #define REFLECT 4
 
-// Which figure we are trying to explain
-
 int [n + 1] push([int n], int [n] environment, int j) {
   int [n + 1] ep = environment;
   ep[n] = j;
@@ -21,10 +19,11 @@ int [n + 1] push([int n], int [n] environment, int j) {
 #define _l(x1,y1,x2,y2,d,a) (shapeIdentity == LINE && x1 == lx1 && y1 == ly1 && x2 == lx2 && y2 == ly2 && d == dashed && a == arrow)
 #define _r(x1,y1,x2,y2) (shapeIdentity == RECTANGLE && x1 == rx1 && y1 == ry1 && x2 == rx2 && y2 == ry2)
 
-
+generator int number() { return {| 0 (+|-) ?? |}; }
 generator int expression([int n], int[n] environment, ref int cost) {
   cost = 0;
-  return {| ?? | ??*environment[??] + ?? |};
+  if (??) return ??;
+  return number() * {| environment[0] | environment[1] |} + number();
 }
 
 // blocks are sequences of commands; can also introduce local variables.
@@ -36,6 +35,18 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
   int identity = 0;
   bit newHit;
   int newCost,newIdentity;
+
+  //  return _c(1,5) || _c(4,3) || _c(4,5) || _c(7,1) || _c(7,5) || _c(7,3);
+  /* for (int j = 0; j < 3; j++) { */
+  /*   for (int k = 0; k < j + 1; k++) { */
+  /*     hit = hit || primitive(SHAPEARGUMENTS, {j,k}, d, newCost, newIdentity); */
+  /*     /\* hit = hit || _c((j-1)*3 + 1, *\/ */
+  /*     /\* 		      5 - (k-1)*2); *\/ */
+  /*     cost = 0; */
+  /*   } */
+  /* } */
+  /* return hit; */
+  
   repeat(??) {
     newHit = primitive(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     assert newIdentity >= identity;
@@ -62,7 +73,8 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
   identity = LOOP;
     
   int loop_bound_cost = 1,loop_body_cost;
-  int loop_bound = ??;
+  int _;
+  int loop_bound = expression(environment, _);
   for (int j = 0; j < loop_bound; j++) {
     hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
   }
@@ -72,6 +84,7 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
 
 generator bit primitive([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
   assert d > 0;
+  
   bit hit = 0;
   cost = 1;
   int xc,yc;
@@ -106,6 +119,7 @@ generator bit primitive([int n], SHAPEVARIABLES , int[n] environment, int d, ref
 }
 
 generator bit reflection([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost, ref int identity) {
+  assert 0;
   assert d > 0;
   bit hit = 0;
   

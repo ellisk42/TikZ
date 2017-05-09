@@ -78,6 +78,7 @@ bit renderSpecification(SHAPEVARIABLES) {
      (True in solid),(False in solid),
      (True in arrows),(False in arrows),
      " || ".join(parts))
+    print source
 
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
@@ -98,6 +99,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     # Recover the program length from the sketch output
     programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
     if programSize == []:
+        print output
         return None
     programSize = programSize[-1]
     m = re.match('.*=([0-9]+),',programSize)
@@ -114,3 +116,91 @@ bit renderSpecification(SHAPEVARIABLES) {
                 break
     body = "\n".join(body)
     return cost,body
+
+def parseSketchOutput(output):
+    for l in output.split('\n'):
+        pattern = '\(\(\(shapeIdentity == 0\) && \(cx == (.+)\)\) && \(cy == (.+)\)\)'
+        m = re.findall(pattern,l)
+        assert len(m) < 2
+        if m != []:
+            x = parseExpression(m[0][0])
+            y = parseExpression(m[0][1])
+            print "Circle(%s,%s)"%(x,y)
+            continue
+
+        pattern = '\(\(\(\(\(shapeIdentity == 2\) && \((.+) == rx1\)\) && \((.+) == ry1\)\) && \((.+) == rx2\)\) && \((.+) == ry2\)\)'
+        m = re.search(pattern,l)
+        if m:
+            print "Rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
+                                            parseExpression(m.group(2)),
+                                            parseExpression(m.group(3)),
+                                            parseExpression(m.group(4)))
+            continue
+
+        pattern = 'for\(int .* = 0; .* < (.*); .* = .* \+ 1\)'
+        m = re.search(pattern,l)
+        if m:
+            print "for (%s)"%(parseExpression(m.group(1)))
+            continue
+        
+def parseExpression(e):
+    try: return int(e)
+    except:
+        factor = re.search('([\-0-9]+) * ',e)
+        if factor != None: factor = int(factor.group(1))
+        offset = re.search(' \+ ([\-0-9]+)',e)
+        if offset != None: offset = int(offset.group(1))
+        variable = re.search('\[(\d)\]',e)
+        if variable != None: variable = ['i','j'][int(variable.group(1))]
+
+        return "%s * %s + %s"%(str(factor),
+                               str(variable),
+                               str(offset))
+
+
+
+# parseSketchOutput('''
+# void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpWsAXFS.sk:179*/
+# {
+#   _out = 0;
+#   assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpWsAXFS.sk:180"; //Assume at tmpWsAXFS.sk:180
+#   assume (shapeIdentity != 1): "Assume at tmpWsAXFS.sk:183"; //Assume at tmpWsAXFS.sk:183
+#   int[0] environment = {};
+#   int loop_body_cost = 0;
+#   bit _pac_sc_s6_s8 = 0;
+#   for(int j = 0; j < 4; j = j + 1)/*Canonical*/
+#   {
+#     bit _pac_sc_s17 = _pac_sc_s6_s8;
+#     if(!(_pac_sc_s6_s8))/*tmpWsAXFS.sk:79*/
+#     {
+#       int[1] _pac_sc_s17_s19 = {0};
+#       push(0, environment, j, _pac_sc_s17_s19);
+#       bit _pac_sc_s17_s21 = 0 || (((((shapeIdentity == 2) && (((-3 * (_pac_sc_s17_s19[0])) + 9) == rx1)) && (((2 * (_pac_sc_s17_s19[0])) + -2) == ry1)) && (((-3 * (_pac_sc_s17_s19[0])) + 11) == rx2)) && (6 == ry2));
+#       bit _pac_sc_s6 = _pac_sc_s17_s21;
+#       int newCost_0 = 1;
+#       if(!(_pac_sc_s17_s21))/*tmpWsAXFS.sk:59*/
+#       {
+#         int loop_body_cost_0 = 0;
+#         bit _pac_sc_s6_s8_0 = 0;
+#         for(int j_0 = 0; j_0 < (_pac_sc_s17_s19[0]); j_0 = j_0 + 1)/*Canonical*/
+#         {
+#           bit _pac_sc_s17_0 = _pac_sc_s6_s8_0;
+#           if(!(_pac_sc_s6_s8_0))/*tmpWsAXFS.sk:79*/
+#           {
+#             int[2] _pac_sc_s17_s19_0 = {0,0};
+#             push(1, _pac_sc_s17_s19, j_0, _pac_sc_s17_s19_0);
+#             loop_body_cost_0 = 1;
+#             _pac_sc_s17_0 = 0 || (((shapeIdentity == 0) && (cx == ((3 * (_pac_sc_s17_s19_0[0])) + -2))) && (cy == ((-2 * (_pac_sc_s17_s19_0[1])) + 5)));
+#           }
+#           _pac_sc_s6_s8_0 = _pac_sc_s17_0;
+#         }
+#         newCost_0 = loop_body_cost_0 + 1;
+#         _pac_sc_s6 = _pac_sc_s6_s8_0;
+#       }
+#       loop_body_cost = 1 + newCost_0;
+#       _pac_sc_s17 = _pac_sc_s6;
+#     }
+#     _pac_sc_s6_s8 = _pac_sc_s17;
+#   }
+#   _out = _pac_sc_s6_s8;
+#   minimize(loop_body_cost + 1)''')
