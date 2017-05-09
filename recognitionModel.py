@@ -470,7 +470,8 @@ class RecognitionModel():
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
                 testingAccuracy = []
                 for feed in iterator.testingFeeds():
-                    feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
+                    if self.arguments.noisy:
+                        feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
                     feed[self.trainingPredicatePlaceholder] = False
                     testingAccuracy.append(s.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
