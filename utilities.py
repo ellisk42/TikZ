@@ -134,3 +134,5 @@ def perturbOffset(b):
 
 def augmentData(b): return perturbOffset(perturbNoisyIntensities(b))
     
+def translateArray(a,dx,dy):
+    return np.roll(np.roll(a,dx,axis = 1),dy,axis = 0)

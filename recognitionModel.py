@@ -919,7 +919,7 @@ if __name__ == '__main__':
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
-    parser.add_argument('--proposalCoefficient', default = 0.0, type = float)
+    parser.add_argument('--proposalCoefficient', default = 1.0, type = float)
     parser.add_argument('--parentCoefficient', action = "store_true", default = False)
     parser.add_argument('--distanceCoefficient', default = 1.0/25.0, type = float)
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
