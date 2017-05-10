@@ -81,8 +81,11 @@ def expertSynthesisJobs(k):
 
 def synthesizeTopK(k):
     jobs = expertSynthesisJobs(k)
-    for j in jobs:
-        print j
+    results = parallelExecute(jobs)
+    with open('topSynthesisResults.p','wb') as handle:
+        pickle.dump(results, handle)
+    print "Dumped %d results to topSynthesisResults.p"%(len(results))
+        
 
 def viewSynthesisResults(arguments):
     d = arguments.view
