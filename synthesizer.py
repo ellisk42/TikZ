@@ -13,11 +13,76 @@ import time
 from multiprocessing import Pool
 
 class SynthesisResult():
-    def __init__(self, parse, time = None, source = None, cost = None):
+    def __init__(self, parse, time = None, source = None, cost = None, originalDrawing = None):
+        self.originalDrawing = originalDrawing
         self.parse = parse
         self.time = time
         self.source = source
         self.cost = cost
+
+class SynthesisJob():
+    def __init__(self, parse, originalDrawing):
+        self.parse = parse
+        self.originalDrawing = originalDrawing
+    def __str__(self):
+        return "%s:\n%s"%(self.originalDrawing,str(self.parse))
+    def execute(self):
+        startTime = time.time()
+        result = synthesizeProgram(self.parse)
+        elapsedTime = time.time() - startTime
+        
+        return SynthesisResult(parse = self.parse,
+                               time = elapsedTime,
+                               originalDrawing = self.originalDrawing,
+                               source = result[1] if result != None else None,
+                               cost = result[0] if result != None else None)
+def invokeExecuteMethod(k): return k.execute()
+
+def parallelExecute(jobs):
+    if arguments.cores == 1:
+        return map(invokeExecuteMethod,jobs)
+    else:
+        return Pool(arguments.cores).map(invokeExecuteMethod,jobs)
+
+
+# Loads all of the particles in the directory, up to the first 200
+# Returns the top K as measured by a linear combination of image distance and neural network likelihood
+def loadTopParticles(directory, k):
+    particles = []
+    if directory.endswith('/'): directory = directory[:-1]
+    for j in range(200):
+        f = directory + '/particle' + str(j) + '.p'
+        if not os.path.isfile(f): break
+        particles.append(pickle.load(open(f,'rb')))
+        print " [+] Loaded %s"%(f)
+
+    distanceWeight = 0.1
+    priorWeight = 0.0
+
+    particles.sort(key = lambda p: p.logLikelihood - distanceWeight*p.distance + p.program.logPrior()*priorWeight,
+                   reverse = True)
+
+    return particles[:k]
+
+# Synthesize based on the top k particles in drawings/expert*
+# Just returns the jobs to synthesize these things
+def expertSynthesisJobs(k):
+    jobs = []
+    for j in range(200):
+        originalDrawing = 'drawings/expert-%d.png'%j
+        particleDirectory = 'drawings/expert-%d-parses'%j
+        if not os.path.exists(originalDrawing) or not os.path.exists(particleDirectory):
+            continue
+        
+        for p in loadTopParticles(particleDirectory, k):
+            jobs.append(SynthesisJob(p.sequence(), originalDrawing))
+
+    return jobs
+
+def synthesizeTopK(k):
+    jobs = expertSynthesisJobs(k)
+    for j in jobs:
+        print j
 
 def viewSynthesisResults(arguments):
     d = arguments.view
@@ -54,40 +119,10 @@ def viewSynthesisResults(arguments):
         print "Wrote output to ../TikZpaper/synthesizerOutputs.tex"
 
         
-def loadParses(directory):
-    particles = []
-    if directory.endswith('/'): directory = directory[:-1]
-    for j in range(100):
-        f = directory + '/particle' + str(j) + '.p'
-        if not os.path.isfile(f): break
-        particles.append(pickle.load(open(f,'rb')))
-        print " [+] Loaded %s"%(f)
-
-    distanceWeight = 0.1
-    priorWeight = 0.0
-
-    particles.sort(key = lambda p: p.logLikelihood - distanceWeight*p.distance + p.program.logPrior()*priorWeight,
-                   reverse = True)
-
-    for p in particles[:5]:
-        if not p.finished():
-            print "Warning: unfinished program object"
-            p.program = Sequence(p.program)
-        
-        showImage(p.output)
-        print p.program
-
-        result = synthesizeProgram(p.program)
-        print result[0]
-        print result[1]
-        print parseSketchOutput(result[1])
-        assert False
 
 
-
-def synthesizeFromSequence((parse,whereToPickle)):
+def synthesizeFromSequence((parse,originalDrawing,whereToPickle)):
     print parse
-#    showImage(fastRender(parse))
     startTime = time.time()
     result = synthesizeProgram(parse)
     if result == None: print "Failure to synthesize."
@@ -95,12 +130,15 @@ def synthesizeFromSequence((parse,whereToPickle)):
         result = SynthesisResult(source = result[1],
                                  cost = result[0],
                                  parse = parse,
-                                 time = time.time() - startTime)
+                                 time = time.time() - startTime,
+                                 originalDrawing = originalDrawing)
         pickle.dump(result,open(whereToPickle,'wb'))
     
 def synthesizeGroundTruthPrograms(arguments):
     Pool(arguments.cores).map(synthesizeFromSequence,
-                             [(groundTruthSequence[k], 'synthesisResults/%s-synthesizerOutput.p'%(k.replace('/','-')))
+                             [(groundTruthSequence[k],
+                               k,
+                               'synthesisResults/%s-synthesizerOutput.p'%(k.replace('/','-')))
                               for k in groundTruthSequence ])
 
 if __name__ == '__main__':
@@ -109,13 +147,16 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--cores', default = 1, type = int)
     parser.add_argument('--view', default = None, type = str)
     parser.add_argument('--latex', default = False, action = 'store_true')
+    parser.add_argument('--synthesizeTopK', default = None,type = int)
 
     arguments = parser.parse_args()
 
     if arguments.view:
         viewSynthesisResults(arguments)
+    elif arguments.synthesizeTopK != None:
+        synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.directory != None:
-        loadParses(arguments.directory)
+        (arguments.directory)
     else:
         synthesizeGroundTruthPrograms(arguments)
         

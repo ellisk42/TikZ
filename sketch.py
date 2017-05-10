@@ -148,13 +148,13 @@ def parseSketchOutput(output):
         if m != []:
             x = parseExpression(m[0][0])
             y = parseExpression(m[0][1])
-            commands += [(nestingDepth, "Circle(%s,%s)"%(x,y))]
+            commands += [(nestingDepth, "circle(%s,%s)"%(x,y))]
             continue
 
         pattern = 'shapeIdentity == 1\) && \((.*) == lx1.*\)\) && \((.*) == ly1.*\)\) && \((.*) == lx2.*\)\) && \((.*) == ly2.*\)\) && \(([01]) == dashed\)\) && \(([01]) == arrow'
         m = re.search(pattern,l)
         if m:
-            commands += [(nestingDepth, "Line(%s,%s,%s,%s,arrow = %s,solid = %s)"%(parseExpression(m.group(1)),
+            commands += [(nestingDepth, "line(%s,%s,%s,%s,arrow = %s,solid = %s)"%(parseExpression(m.group(1)),
                                                                                    parseExpression(m.group(2)),
                                                                                    parseExpression(m.group(3)),
                                                                                    parseExpression(m.group(4)),
@@ -167,7 +167,7 @@ def parseSketchOutput(output):
         m = re.search(pattern,l)
         if m:
             # print m,m.group(1),m.group(2),m.group(3),m.group(4)
-            commands += [(nestingDepth, "Rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
+            commands += [(nestingDepth, "rectangle(%s,%s,%s,%s)"%(parseExpression(m.group(1)),
                                             parseExpression(m.group(2)),
                                             parseExpression(m.group(3)),
                                                                   parseExpression(m.group(4))))]

@@ -753,10 +753,11 @@ class RecognitionModel():
         finishedPrograms.sort(key = lambda n: -n.logLikelihood)
         for j,n in enumerate(finishedPrograms):
             n.parent = None
+            n.output = None
             print "Finished program: log likelihood %f"%(n.logLikelihood)
             print n.program
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
-            pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'w'))
+            pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
             print "Distance: %f"%(n.distance)
             #asymmetricBlurredDistance(targetImage, n['output'], True)
             print ""
