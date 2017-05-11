@@ -89,7 +89,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     od.close()
     outputFile = od.name
 
-    os.system('sketch -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
+    os.system('sketch --fe-timeout 60 -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
     os.remove(fd.name)
