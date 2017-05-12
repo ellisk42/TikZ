@@ -1,3 +1,5 @@
+from distanceMetrics import *
+from fastRender import fastRender
 from recognitionModel import Particle
 from groundTruthParses import groundTruth
 from utilities import *
@@ -7,11 +9,14 @@ import numpy as np
 import os
 import pickle
 
-def featuresOfParticle(p):
+def featuresOfParticle(p, target):
     return [p.logLikelihood, p.program.logPrior(), -p.distance]
 
+distanceTrainingData = []
 trainingData = []
+print groundTruth.keys()
 for k in groundTruth:
+    target = loadImage(k)
     print k
     parseDirectory = k[:k.index('.')] + '-parses/'
 
@@ -32,8 +37,34 @@ for k in groundTruth:
     print "Got %d positive examples"%(len(positives))
 
     if len(positives) > 0:
-        trainingData.append((np.array(map(featuresOfParticle,positives)),
-                             np.array(map(featuresOfParticle,negatives))))
+        trainingData.append((np.array(map(lambda p: featuresOfParticle(p,target),positives)),
+                             np.array(map(lambda p: featuresOfParticle(p,target),negatives))))
+        distanceTrainingData.append((target,
+                                     [ fastRender(p.program) for p in positives ],
+                                     [ fastRender(p.program) for p in negatives ]))
+
+print "Calibrating distance function..."
+def ranks(kernelSize, factor, invariance):
+    rs = []
+    for t,positives,negatives in distanceTrainingData:
+        positiveScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
+                           for p in positives  ]
+        negativeScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
+                           for p  in negatives ]
+        bestPositive = min(positiveScores)
+        rs.append(len([ None for n in negativeScores if n <=  bestPositive ]) + 1)
+    return rs
+
+for k in [1,3,5,7]:
+    for i in [0,1,2,3]:
+        for f in [0.5,1,2,5,10]:
+            rs = ranks(k,f,i)
+            print (k,i,f),
+            print len([ None for r in rs if r < 2 ]),
+            print len([ None for r in rs if r < 5+1 ]),
+            print len([ None for r in rs if r < 10+1 ])
+assert False
+
 
 def ranks(w):
     rs = []

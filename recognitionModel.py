@@ -750,8 +750,15 @@ class RecognitionModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
+        # Recalculate the distance
+        for p in finishedPrograms:
+            p.distance = asymmetricBlurredDistance(targetImage, p.output,
+                                                   kernelSize = 7,
+                                                   factor = 1,
+                                                   invariance = 2)
+            # todo: calibrate this again
         finishedPrograms.sort(key = lambda n: -n.logLikelihood)
-        for j,n in enumerate(finishedPrograms):
+        for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
             n.output = None
             print "Finished program: log likelihood %f"%(n.logLikelihood)

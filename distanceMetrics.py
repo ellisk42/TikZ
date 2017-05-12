@@ -20,13 +20,13 @@ def blurredDistance(a,b, show = False):
 
 
 
-def asymmetricBlurredDistance(a,b, show = False):
+def asymmetricBlurredDistance(a,b, show = False, kernelSize = None, factor = 2, invariance = 0):
     # a = target
     # b = current
     # if you see a pixel in current that isn't in target, that's really bad
     # if you see a pixel and target that isn't an current, that's not so bad
     import cv2
-    kernelSize = blurKernelSize
+    kernelSize = blurKernelSize if kernelSize == None else kernelSize
 
     # threshold the images
     a = np.copy(a*2)
@@ -47,7 +47,7 @@ def asymmetricBlurredDistance(a,b, show = False):
         showImage(b)
 
     bestDistance = None
-    PERTURBATIONINVARIANCE = 0
+    PERTURBATIONINVARIANCE = invariance
     for dx in range(2*PERTURBATIONINVARIANCE + 1):
         for dy in range(2*PERTURBATIONINVARIANCE + 1):
             d = translateArray(a,dy - PERTURBATIONINVARIANCE, dx - PERTURBATIONINVARIANCE) - b
