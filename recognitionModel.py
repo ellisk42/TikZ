@@ -400,16 +400,16 @@ class RecognitionModel():
                                              strides = 1)
         c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
         c1 = tf.layers.max_pooling2d(inputs = c1,
-                                     pool_size = 4,
+                                     pool_size = 8,
                                      strides = 4,
                                      padding = "same")
         print c1
 
-        numberOfFilters = [10,10]
-        kernelSizes = [4,4]
+        numberOfFilters = [10]
+        kernelSizes = [8]
         
-        poolSizes = [2,2]
-        poolStrides = [2,2]
+        poolSizes = [4]
+        poolStrides = [4]
         nextInput = c1
         for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
             c1 = tf.layers.conv2d(inputs = nextInput,
