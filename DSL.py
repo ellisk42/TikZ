@@ -138,7 +138,11 @@ def programFeatures(source):
             source.count('line'),
             source.count('rectangle'),
             source.count('line')]
-
+def extrapolate(source):
+    p = re.compile(r'range\(([^)]*)\)')
+    return p.sub(r'range(-1, \1 +1)', source)
+def renderEvaluation(s):
+    render([evaluate(eval(s)).TikZ()],showImage = True)
 
 if __name__ == '__main__':
     sequence = evaluate(eval(sketchToDSL('''

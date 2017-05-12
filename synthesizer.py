@@ -5,6 +5,8 @@ from utilities import showImage,loadImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence
 
+from DSL import extrapolate,sketchToDSL,renderEvaluation
+
 import traceback
 import re
 import os
@@ -110,6 +112,10 @@ def viewSynthesisResults(arguments):
         expertIndex = re.search('(\d+)', f)
         print expertIndex.group(1)
         expertIndex = int(expertIndex.group(1))
+        e = extrapolate(sketchToDSL(parseSketchOutput(result.source)))
+        if e != sketchToDSL(parseSketchOutput(result.source)):
+            print e
+            renderEvaluation(e)
         latex.append('''
         \\begin{tabular}{ll}
 \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
@@ -158,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--view', default = None, type = str)
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
+    parser.add_argument('--extrapolate', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
 
