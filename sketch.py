@@ -113,8 +113,11 @@ bit renderSpecification(SHAPEVARIABLES) {
             body.append(l)
             if 'minimize' in l:
                 break
-    body = "\n".join(body)
-    # print body
+    if body != None:
+        body = "\n".join(body)
+    else:
+        print "WARNING: Could not parse body."
+        # print body
     # parseSketchOutput(body)
     # assert False
     return cost,body
