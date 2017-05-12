@@ -5,6 +5,7 @@ from utilities import showImage,loadImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence
 
+import traceback
 import re
 import os
 import argparse
@@ -40,7 +41,8 @@ def invokeExecuteMethod(k):
     try:
         return k.execute()
     except Exception as exception:
-        print "Exception while executing job:\n%s\n%s\n"%(exception,k)
+        t = traceback.format_exc()
+        print "Exception while executing job:\n%s\n%s\n%s\n"%(exception,t,k)
         return exception
 
 def parallelExecute(jobs):
