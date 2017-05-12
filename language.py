@@ -211,11 +211,13 @@ class Line(Program):
     @staticmethod
     def lineCommand(points, arrow, solid, noisy = False):
         if noisy:
-            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.04)]
         else:
             attributes = ["line width = 0.1cm"]
         if arrow:
-            attributes += ["-{>[scale = 1.5]}"]
+            scale = 1.5
+            if noisy: scale = 1.0 + random()
+            attributes += ["-{>[scale = %f]}"%(round(scale,1))]
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
@@ -344,7 +346,7 @@ class Rectangle(Program):
     def command(p1,p2, noisy = False):
         attributes = ["line width = 0.1cm"]
         if noisy:
-            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.04)]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         (x1,y1) = eval(p1)
@@ -359,7 +361,7 @@ class Rectangle(Program):
     def noisyLineCommand(p1,p2,p3,p4, noisy = True):
         attributes = ["line width = 0.1cm"]
         if noisy:
-            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.03)]
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.04)]
         if noisy: attributes += ["pencildraw"]
         attributes = ",".join(attributes)
         return "\\draw [%s] %s -- %s -- %s -- %s -- cycle;"%(attributes,
