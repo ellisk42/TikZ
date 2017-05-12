@@ -36,7 +36,12 @@ class SynthesisJob():
                                originalDrawing = self.originalDrawing,
                                source = result[1] if result != None else None,
                                cost = result[0] if result != None else None)
-def invokeExecuteMethod(k): return k.execute()
+def invokeExecuteMethod(k):
+    try:
+        return k.execute()
+    except Exception as exception:
+        print "Exception while executing job:\n%s\n%s\n"%(exception,k)
+        return exception
 
 def parallelExecute(jobs):
     if arguments.cores == 1:
