@@ -31,7 +31,7 @@ generator int number() { return {| 0 (+|-) ?? |}; }
 generator int expression([int n], int[n] environment, ref int cost) {
   cost = 0;
   if (??) return ??;
-  return number() * {| environment[0] | environment[1] |} + number();
+  return ?? * {| environment[0] | environment[1] |} + number();
 }
 
 // blocks are sequences of commands; can also introduce local variables.
