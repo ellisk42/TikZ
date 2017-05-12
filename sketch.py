@@ -15,6 +15,9 @@ def synthesizeProgram(parse):
     hasLines = False
     arrows = [] #}settings of the arrow parameters that are observed in the data
     solid = [] # settings of the solid parameters are so served in the data
+    
+    if parse.lines == []:
+        return None
 
     # translate drawing the lower left-hand corner
     x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
