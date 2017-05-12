@@ -436,7 +436,7 @@ class RecognitionModel():
         self.loss = self.decoder.loss()
         self.averageAccuracy = self.decoder.accuracy()
 
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(self.loss)        
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)        
 
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
@@ -924,6 +924,7 @@ if __name__ == '__main__':
     parser.add_argument('--noisy',action = "store_true", default = False)
     parser.add_argument('--quiet',action = "store_true", default = False)
     parser.add_argument('--dropout',action = "store_true", default = False)
+    parser.add_argument('--learningRate', default = 0.001, type = float)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
