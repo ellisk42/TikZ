@@ -131,6 +131,15 @@ def sketchToDSL(trace, loopd = 0):
             assert False
     return accumulator
 
+def programFeatures(source):
+    return [source.count('range'),
+            source.count('reflect(x'),
+            source.count('reflect(y'),
+            source.count('line'),
+            source.count('rectangle'),
+            source.count('line')]
+
+
 if __name__ == '__main__':
     sequence = evaluate(eval(sketchToDSL('''
       circle(9,1)
