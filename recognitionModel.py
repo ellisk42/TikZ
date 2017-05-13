@@ -971,7 +971,7 @@ if __name__ == '__main__':
         else:
             gt = Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
         gt = [ g for g in gt if g != None ]
-        print "Got a ground truth parse correct %f"%(float(len([None for g in gt if gt ]))/float(len(gt)))
+        print "Got a ground truth parse correct %f"%(float(len([None for g in gt if g ]))/float(len(gt)))
     
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
