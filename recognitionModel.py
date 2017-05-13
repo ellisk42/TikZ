@@ -760,12 +760,14 @@ class RecognitionModel():
         for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
             n.output = None
-            print "Finished program: log likelihood %f"%(n.logLikelihood)
-            print n.program
+            if j < 10:
+                print "Finished program: log likelihood %f"%(n.logLikelihood)
+                print n.program
+                print "Distance: %f"%(n.distance)
+                print ""
+
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
-            print "Distance: %f"%(n.distance)
-            print ""
 
         
     def visualizeFilters(self,checkpoint):
