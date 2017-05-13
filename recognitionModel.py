@@ -673,8 +673,14 @@ class RecognitionModel():
             # showImage(targetImage)
             # for p in beam:
             #     showImage(p.output)
-        # Remove these pointers so that they can be garbage collected
+        # Remove these pointers so that they can be garbage collected. Replaced distance with something more meaningful.
         for p in finishedPrograms:
+            p.distance = asymmetricBlurredDistance(targetImage,
+                                                   p.output,
+                                                   kernelSize = 7,
+                                                   factor = 1,
+                                                   invariance = 2)
+            # todo: calibrate this again
             p.output = None
             p.parent = None
         return finishedPrograms
@@ -749,13 +755,6 @@ class RecognitionModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
-        # Recalculate the distance
-        for p in finishedPrograms:
-            p.distance = asymmetricBlurredDistance(targetImage, p.output,
-                                                   kernelSize = 7,
-                                                   factor = 1,
-                                                   invariance = 2)
-            # todo: calibrate this again
         finishedPrograms.sort(key = lambda n: -n.logLikelihood)
         for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
@@ -765,7 +764,6 @@ class RecognitionModel():
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
             print "Distance: %f"%(n.distance)
-            #asymmetricBlurredDistance(targetImage, n['output'], True)
             print ""
 
         
