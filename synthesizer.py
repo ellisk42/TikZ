@@ -1,7 +1,7 @@
 from fastRender import fastRender
 from sketch import synthesizeProgram,parseSketchOutput
 from language import *
-from utilities import showImage,loadImage
+from utilities import showImage,loadImage,saveMatrixAsImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence
 
@@ -113,9 +113,9 @@ def viewSynthesisResults(arguments):
         print expertIndex.group(1)
         expertIndex = int(expertIndex.group(1))
         e = extrapolate(sketchToDSL(parseSketchOutput(result.source)))
-        if e != sketchToDSL(parseSketchOutput(result.source)):
+        if e != sketchToDSL(parseSketchOutput(result.source)) and arguments.extrapolate:
             print e
-            renderEvaluation(e)
+            image = renderEvaluation(e, exportTo = "~/projects/TikZ/extrapolations/expert-%d-extrapolation.png"%expertIndex)
         latex.append('''
         \\begin{tabular}{ll}
 \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&

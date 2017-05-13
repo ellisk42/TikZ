@@ -138,11 +138,27 @@ def programFeatures(source):
             source.count('line'),
             source.count('rectangle'),
             source.count('line')]
-def extrapolate(source):
+def extrapolate(source, forward = True, backward = True):
     p = re.compile(r'range\(([^)]*)\)')
-    return p.sub(r'range(-1, \1 +1)', source)
-def renderEvaluation(s):
-    render([evaluate(eval(s)).TikZ()],showImage = True)
+    if forward and backward:
+        return p.sub(r'range(-1, \1 +1)', source)
+    elif forward:
+        return p.sub(r'range(\1 +1)', source)
+    elif backward:
+        return p.sub(r'range(-1, \1)', source)
+    else:
+        assert False
+def equivalentLinearTransformations(source):
+    yield source
+
+def renderEvaluation(s, exportTo = None):
+    parse = evaluate(eval(s))
+    x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
+    y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
+    x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ])
+    y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ])
+
+    render([parse.TikZ()],showImage = exportTo == None,exportTo = exportTo,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))
 
 if __name__ == '__main__':
     sequence = evaluate(eval(sketchToDSL('''

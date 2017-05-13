@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 
-def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), resolution = 256):
+def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x0y0 = (0,0), resolution = 256, exportTo = None):
     # definitely do not try to render too much at once - I think this causes memory problems
     if len(sources) > 100:
         prefix = render(sources[:100], showImage, yieldsPixels, canvas, resolution)
@@ -16,8 +16,8 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     if sources == []: return []
     if canvas == None: canvas = ""
     else: canvas = '''
-\draw[fill = white, white] (0,0) rectangle (%d,%d);
-'''%(canvas[0],canvas[1])
+\draw[fill = white, white] (%d,%d) rectangle (%d,%d);
+'''%(x0y0[0],x0y0[1],canvas[0],canvas[1])
 
     preamble = "\\begin{tikzpicture}"
     preamble += "[pencildraw/.style={black,decorate,decoration={random steps,segment length=4pt,amplitude=1pt}}]"
@@ -63,6 +63,9 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), r
     if showImage:
         for temporaryImage in temporaryImages:
             os.system("feh %s" % temporaryImage)
+    if exportTo:
+        assert len(temporaryImages) == 1
+        os.system("cp %s %s"%(temporaryImages[0],exportTo))
 
     returnValue = []
     if yieldsPixels:

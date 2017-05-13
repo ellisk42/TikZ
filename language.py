@@ -420,6 +420,9 @@ class Circle(Program):
         self.center = center
         self.radius = radius
 
+    @staticmethod
+    def absolute(x,y): return Circle(AbsolutePoint(Number(x),Number(y)),Number(1))
+
     def logPrior(self): return -math.log(14*14)
 
     def children(self): return [self.center,self.radius]
