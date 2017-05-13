@@ -158,6 +158,6 @@ def annotate(f):
 if len(sys.argv[1:]) > 0:
     fs = ["drawings/expert-%s.png"%sys.argv[1:]]
 else:
-    fs = ["drawings/expert-%s.png"%j for j in range(88) ]
+    fs = ["drawings/expert-%s.png"%j for j in range(100) ]
     fs = [f for f in fs if not f in groundTruth ]
 print "\n".join(map(annotate,fs))

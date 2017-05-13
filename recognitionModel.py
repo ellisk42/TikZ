@@ -5,6 +5,7 @@ from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
 from fastRender import fastRender,loadPrecomputedRenderings
 from makeSyntheticData import randomScene
+from groundTruthParses import getGroundTruthParse
 
 import argparse
 import tarfile
@@ -892,16 +893,34 @@ def handleTest(a):
     model = RecognitionModel(arguments)
     targetImage = loadImage(f)
 
+    # l = 0 implies that we should look at the ground truth and use that to abound the length
+    l = arguments.beamLength
+    if l == 0:
+        l = len(getGroundTruthParse(f).lines) + 1        
+
     saver = tf.train.Saver()
     with tf.Session() as s:
         saver.restore(s,arguments.checkpoint)
         particles = model.SMC(s,
                               targetImage,
                               beamSize = arguments.beamWidth,
-                              beamLength = arguments.beamLength)
+                              beamLength = l)
+    gotGroundTruth = None
+    groundTruth = getGroundTruthParse(f)
+    if groundTruth != None:
+        groundTruth = set(map(str,groundTruth.lines))
+        gotGroundTruth = False
+        for p in particles:
+            if len(set(map(str,p.sequence().lines)) ^ groundTruth) == 0:
+                print "Got ground truth for %s"%f
+                gotGroundTruth = True
+                break
+        if not gotGroundTruth:
+            print "Did not get ground truth for %s"%f
     # place where we will save the parses
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
+    return gotGroundTruth
     
 def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
@@ -946,9 +965,11 @@ if __name__ == '__main__':
     if arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)
         if arguments.cores == 1:
-            map(handleTest, [ (f,arguments) for f in fs ])
+            gt = map(handleTest, [ (f,arguments) for f in fs ])
         else:
-            Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
+            gt = Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
+        gt = [ g for g in gt if g != None ]
+        print "Got a ground truth parse correct %f"%(float(len([None for g in gt if gt ]))/float(len(gt)))
     
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)

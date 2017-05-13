@@ -1,104 +1,8 @@
 import re
 from utilities import *
-from recognitionModel import Particle
 from language import *
 
 import pickle
-
-expertSolutions = [None, # I accidentally deleted this one
-                   None,
-                   0,
-                   0,
-                   None,
-                   1,
-                   5,
-                   12,
-                   14,
-                   None,
-                   0,
-                   0,
-                   1,
-                   3,
-                   1,
-                   152,
-                   1,
-                   0,
-                   None,
-                   0,
-                   None,
-                   0,
-                   0, # 23: wrong
-                   23,
-                   1,
-                   None,
-                   57,
-                   None,
-                   0,
-                   1,
-                   None,
-                   2,
-                   None,
-                   None,
-                   None,
-                   2,
-                   0,
-                   0,
-                   None,
-                   None,
-                   0,
-                   0,
-                   92,
-                   0,
-                   1,
-                   0,
-                   None,
-                   0,
-                   None,
-                   None,  # wrong: 49
-                   9,
-                   0,
-                   None,
-                   None,
-                   None,
-                   0,
-                   None,
-                   0,
-                   6,
-                   38,
-                   0,
-                   None,
-                   0,
-                   0,
-                   0,
-                   0,
-                   0,
-                   4,
-                   0,
-                   0]
-
-scanSolutions = [None, # there is no scan0
-                 None,
-                 7,
-                 0,
-                 None,
-                 None,
-                 None,
-                 0,
-                 None,
-                 None, # illusory contour
-                 None,
-                 0]
-if __name__ == '__main__':                   
-    for j,c in enumerate(expertSolutions):
-        if c != None:
-    #        print 
-    #        print "Index %d"%j
-            lines = pickle.load(open("drawings/expert-%d-parses/particle%d.p"%(j,c),'rb')).program.lines
-            print "groundTruth['drawings/expert-%d.png'] = %s"%(j,str(set(map(str,lines))))
-            # showImage(loadImage("drawings/expert-%d.png"%j))
-            # showImage(loadImage("drawings/expert-%d-parses/%d.png"%(j,c)))
-    print len([s for s in expertSolutions if s != None ])/float(len(expertSolutions))
-
 
 
 
@@ -108,6 +12,7 @@ groundTruth['drawings/expert-0.png'] = set(['Line((7,8), (4,8), arrow = True, so
 groundTruth['drawings/expert-1.png'] = set(['Line((4,7), (6,9), arrow = True, solid = True)', 'Line((4,13), (6,11), arrow = True, solid = True)', 'Line((9,11), (9,13), arrow = False, solid = False)', 'Rectangle((12,9), (13,11))', 'Line((9,13), (4,13), arrow = True, solid = False)', 'Rectangle((2,12), (4,14))', 'Line((7,10), (8,10), arrow = True, solid = True)', 'Rectangle((2,6), (4,8))', 'Circle(center = (9,10), radius = 1)', 'Line((11,10), (12,10), arrow = True, solid = True)', 'Rectangle((14,9), (15,11))', 'Line((13,10), (14,10), arrow = True, solid = True)', 'Rectangle((6,8), (7,12))', 'Rectangle((1,5), (11,15))'])
 groundTruth['drawings/expert-2.png'] = set(['Line((3,14), (5,12), arrow = True, solid = True)', 'Rectangle((5,10), (7,13))', 'Rectangle((1,13), (3,15))', 'Line((3,9), (5,11), arrow = True, solid = True)', 'Rectangle((1,8), (3,10))'])
 groundTruth['drawings/expert-3.png'] = set(['Line((4,7), (6,9), arrow = True, solid = True)', 'Rectangle((6,8), (8,12))', 'Line((4,13), (6,11), arrow = True, solid = True)', 'Rectangle((1,5), (13,15))', 'Rectangle((2,12), (4,14))', 'Rectangle((2,6), (4,8))', 'Circle(center = (11,10), radius = 1)', 'Line((8,10), (10,10), arrow = True, solid = True)'])
+groundTruth['drawings/expert-4.png'] = set(['Line((12,8), (4,8), arrow = True, solid = False)', 'Rectangle((2,7), (4,9))', 'Line((12,8), (12,10), arrow = False, solid = False)', 'Line((9,11), (11,11), arrow = True, solid = True)', 'Circle(center = (12,11), radius = 1)', 'Rectangle((6,9), (9,13))', 'Line((4,14), (6,12), arrow = True, solid = True)', 'Rectangle((2,13), (4,15))', 'Line((4,8), (6,10), arrow = True, solid = True)'])
 groundTruth['drawings/expert-5.png'] = set(['Line((14,14), (14,5), arrow = True, solid = True)', 'Rectangle((11,8), (13,14))', 'Rectangle((5,13), (7,14))', 'Rectangle((8,10), (10,14))', 'Rectangle((2,12), (4,14))'])
 groundTruth['drawings/expert-6.png'] = set(['Line((7,13), (9,12), arrow = False, solid = True)', 'Line((4,10), (4,13), arrow = False, solid = True)', 'Rectangle((6,9), (9,12))', 'Line((4,10), (6,9), arrow = False, solid = True)', 'Line((4,13), (7,13), arrow = False, solid = True)', 'Line((4,13), (6,12), arrow = False, solid = True)'])
 groundTruth['drawings/expert-7.png'] = set(['Line((5,11), (5,13), arrow = False, solid = True)', 'Circle(center = (5,9), radius = 1)', 'Circle(center = (5,14), radius = 1)', 'Circle(center = (2,9), radius = 1)', 'Circle(center = (2,14), radius = 1)', 'Circle(center = (8,14), radius = 1)', 'Circle(center = (8,9), radius = 1)', 'Line((2,10), (2,13), arrow = False, solid = True)', 'Line((8,12), (8,13), arrow = False, solid = True)'])
@@ -207,3 +112,6 @@ def parseLineOfCode(l):
 groundTruthSequence = {}
 for k in groundTruth:
     groundTruthSequence[k] = Sequence([ parseLineOfCode(l) for l in groundTruth[k] ])
+
+def getGroundTruthParse(f):
+    return groundTruthSequence.get(f,None)
