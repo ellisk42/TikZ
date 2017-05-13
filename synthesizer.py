@@ -90,6 +90,13 @@ def expertSynthesisJobs(k):
 
 def synthesizeTopK(k):
     jobs = expertSynthesisJobs(k)
+    # Also synthesized from the ground truth
+    for k in groundTruthSequence:
+        sequence = groundTruthSequence[k]
+        if all([ set(map(str,sequence.lines)) != set(map(str,j.parse.lines))
+                for j in jobs ]):
+            jobs.append(SynthesisJob(sequence,k))
+            
     results = parallelExecute(jobs)
     with open('topSynthesisResults.p','wb') as handle:
         pickle.dump(results, handle)
