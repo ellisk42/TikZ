@@ -1,3 +1,4 @@
+from fastRender import fastRender
 import re
 from utilities import *
 from language import *
@@ -118,3 +119,13 @@ def getGroundTruthParse(f):
     if f.startswith(openMindPrefix):
         f = f[len(openMindPrefix):]
     return groundTruthSequence.get(f,None)
+
+
+if __name__ == '__main__':
+    for k in groundTruthSequence:
+        x = np.zeros((256*2,256))
+        print k
+        print groundTruthSequence[k]
+        x[0:256,:] = loadImage(k)
+        x[256:,:] = fastRender(groundTruthSequence[k])
+        showImage(x)

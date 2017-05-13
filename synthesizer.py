@@ -120,26 +120,35 @@ def viewSynthesisResults(arguments):
         print expertIndex.group(1)
         expertIndex = int(expertIndex.group(1))
         e = extrapolate(sketchToDSL(parseSketchOutput(result.source)))
-        if e != sketchToDSL(parseSketchOutput(result.source)) and arguments.extrapolate:
-            print e
-            image = renderEvaluation(e, exportTo = "~/projects/TikZ/extrapolations/expert-%d-extrapolation.png"%expertIndex)
-        latex.append('''
-        \\begin{tabular}{ll}
-\\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
+        if not arguments.extrapolate:
+            rightEntryOfTable = '''
         \\begin{minipage}{10cm}
         \\begin{verbatim}
 %s
         \\end{verbatim}
 \\end{minipage}
-\\end{tabular}        
-        '''%(expertIndex, parseSketchOutput(result.source)))
-        print
+'''%(parseSketchOutput(result.source))
+        else:
+            rightEntryOfTable = ""
+        if e != sketchToDSL(parseSketchOutput(result.source)) and arguments.extrapolate:
+            print e
+            image = renderEvaluation(e, exportTo = "~/projects/TikZ/extrapolations/expert-%d-extrapolation.png"%expertIndex)
+            rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
+        if rightEntryOfTable != "":
+            latex.append('''
+            \\begin{tabular}{ll}
+    \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
+    %s
+    \\end{tabular}        
+            '''%(expertIndex, rightEntryOfTable))
+            print
 
     if arguments.latex:
         latex = '%s'%("\\\\\n".join(latex))
-        with open('../TikZpaper/synthesizerOutputs.tex','w') as handle:
+        name = "extrapolations.tex" if arguments.extrapolate else "synthesizerOutputs.tex"
+        with open('../TikZpaper/%s'%name,'w') as handle:
             handle.write(latex)
-        print "Wrote output to ../TikZpaper/synthesizerOutputs.tex"
+        print "Wrote output to ../TikZpaper/%s"%name
 
         
 
