@@ -1,3 +1,5 @@
+from groundTruthParses import groundTruth
+
 import os
 
 from language import *
@@ -45,81 +47,91 @@ def annotate(f):
     lastLine = None
     lastRectangle = None
 
+    mode = 'c'
+
     output = fastRender(Sequence(program))
 
     while True:
         modified = False
         for event in pygame.event.get():
-            if not hasattr(event, 'key'): continue
+#            if not hasattr(event, 'key'): continue
             down = event.type == KEYDOWN     # key down or up?
-            if down:
-                print event.key
-                if event.key == K_RETURN: done = True
-                if event.key == 117: #}u
-                    program = program[:-1]
-                    modified = True
-                if event.key == 99: # c
-                    modified = True
-                    x,y = mouse_position()
-                    print "Circle@",x,y
-                    if x in range(1,16) and y in range(1,16):
-                        program.append(Circle.absolute(x,y))
-                if event.key == 114:#r
-                    x,y = mouse_position()
-                    if x in range(1,16) and y in range(1,16):
-                        if rectangle:
-                            x1 = min([x,rectangle[0]])
-                            x2 = max([x,rectangle[0]])
-                            y1 = min([y,rectangle[1]])
-                            y2 = max([y,rectangle[1]])
-                            if x1 != x2 and y1 != y2:
-                                program.append(Rectangle.absolute(x1,y1,x2,y2))
+            if down: print event.key
+            if down and event.key == 120:
+                mode = 'c'
+                print "CIRCLEMODE"
+            if down and event.key == 121:
+                mode = 'r'
+                print "RECTANGLEMODE"
+            if down and event.key == 122:
+                mode = 'l'
+                print "LINEMODE"
+            if down and event.key == K_RETURN: done = True
+            if down and event.key == 117: #}u
+                program = program[:-1]
+                modified = True
+            if down and event.key == 99 or mode == 'c' and event.type == MOUSEBUTTONDOWN: # c
+                modified = True
+                x,y = mouse_position()
+                print "Circle@",x,y
+                if x in range(1,16) and y in range(1,16):
+                    program.append(Circle.absolute(x,y))
+            if down and event.key == 114 or mode == 'r' and event.type == MOUSEBUTTONDOWN:#r
+                x,y = mouse_position()
+                if x in range(1,16) and y in range(1,16):
+                    if rectangle:
+                        x1 = min([x,rectangle[0]])
+                        x2 = max([x,rectangle[0]])
+                        y1 = min([y,rectangle[1]])
+                        y2 = max([y,rectangle[1]])
+                        if x1 != x2 and y1 != y2:
+                            program.append(Rectangle.absolute(x1,y1,x2,y2))
+                        modified = True
+                        rectangle = None
+                    else:
+                        rectangle = (x,y)
+            if down and event.key == 108 or mode == 'l' and event.type == MOUSEBUTTONDOWN:#l
+                x,y = mouse_position()
+                if x in range(1,16) and y in range(1,16):
+                    if line:
+                        [(x1,y1),(x2,y2)] = sorted([(x,y),line])
+                        if x1 != x2 or y1 != y2:
+                            program.append(Line.absoluteNumbered(x1,y1,x2,y2))
+                            line = None
                             modified = True
-                            rectangle = None
-                        else:
-                            rectangle = (x,y)
-                if event.key == 108:#l
-                    x,y = mouse_position()
-                    if x in range(1,16) and y in range(1,16):
-                        if line:
-                            [(x1,y1),(x2,y2)] = sorted([(x,y),line])
-                            if x1 != x2 or y1 != y2:
-                                program.append(Line.absoluteNumbered(x1,y1,x2,y2))
-                                line = None
-                                modified = True
-                        else:
-                            line = (x,y)
-                if event.key == 97:#a
-                    x,y = mouse_position()
-                    if x in range(1,16) and y in range(1,16):
-                        if line:
-                            if line[0] != x or line[1] != y:
-                                program.append(Line.absoluteNumbered(line[0],line[1],x,y,arrow = True))
-                                line = None
-                                modified = True
-                        else:
-                            line = (x,y)
-                if event.key == 100:#d
-                    x,y = mouse_position()
-                    if x in range(1,16) and y in range(1,16):
-                        if line:
-                            [(x1,y1),(x2,y2)] = sorted([(x,y),line])
-                            if x1 != x2 or y1 != y2:
-                                program.append(Line.absoluteNumbered(x1,y1,x2,y2,solid = False))
-                                line = None
-                                modified = True
-                        else:
-                            line = (x,y)
-                if event.key == 119:#w
-                    x,y = mouse_position()
-                    if x in range(1,16) and y in range(1,16):
-                        if line:
-                            if line[0] != x or line[1] != y:
-                                program.append(Line.absoluteNumbered(line[0],line[1],x,y,solid = False,arrow = True))
-                                line = None
-                                modified = True
-                        else:
-                            line = (x,y)
+                    else:
+                        line = (x,y)
+            if down and event.key == 97:#a
+                x,y = mouse_position()
+                if x in range(1,16) and y in range(1,16):
+                    if line:
+                        if line[0] != x or line[1] != y:
+                            program.append(Line.absoluteNumbered(line[0],line[1],x,y,arrow = True))
+                            line = None
+                            modified = True
+                    else:
+                        line = (x,y)
+            if down and event.key == 100:#d
+                x,y = mouse_position()
+                if x in range(1,16) and y in range(1,16):
+                    if line:
+                        [(x1,y1),(x2,y2)] = sorted([(x,y),line])
+                        if x1 != x2 or y1 != y2:
+                            program.append(Line.absoluteNumbered(x1,y1,x2,y2,solid = False))
+                            line = None
+                            modified = True
+                    else:
+                        line = (x,y)
+            if down and event.key == 119:#w
+                x,y = mouse_position()
+                if x in range(1,16) and y in range(1,16):
+                    if line:
+                        if line[0] != x or line[1] != y:
+                            program.append(Line.absoluteNumbered(line[0],line[1],x,y,solid = False,arrow = True))
+                            line = None
+                            modified = True
+                    else:
+                        line = (x,y)
         if modified:
             output = fastRender(Sequence(program))
             print "Current program:"
@@ -136,14 +148,16 @@ def annotate(f):
         lastRectangle = rectangle
         
 
-        drawTransparent((output + target)/2.0)
+        drawTransparent(0.7*output + 0.3*target)
 
         pygame.display.flip()
-    print "groundTruth['%s'] = %s"%(f, set(map(str,program)))
+    stuff = "groundTruth['%s'] = %s"%(f, set(map(str,program)))
+    print stuff
+    return stuff
 
-p = sys.argv[1]
-if p.endswith('png'):
-    annotate(p)
+if len(sys.argv[1:]) > 0:
+    fs = ["drawings/expert-%s.png"%sys.argv[1:]]
 else:
-    for j in range(100):
-        annotate(p + '/expert-%d.png'%j)
+    fs = ["drawings/expert-%s.png"%j for j in range(88) ]
+    fs = [f for f in fs if not f in groundTruth ]
+print "\n".join(map(annotate,fs))
