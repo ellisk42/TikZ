@@ -1,3 +1,4 @@
+from architectures import architectures
 from batch import BatchIterator
 from language import *
 from render import render,animateMatrices
@@ -376,23 +377,25 @@ class RecognitionModel():
 
         imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
+        architecture = architectures[self.arguments.architecture]
+
         initialDilation = 1
         horizontalKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = 4,
+                                             filters = architecture.rectangularFilters,
                                              kernel_size = [16/initialDilation,4/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              dilation_rate = initialDilation,
                                              strides = 1)
         verticalKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = 4,
+                                             filters = architecture.rectangularFilters,
                                              kernel_size = [4/initialDilation,16/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              dilation_rate = initialDilation,
                                              strides = 1)
         squareKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = 12,
+                                             filters = architecture.squareFilters,
                                              kernel_size = [8/initialDilation,8/initialDilation],
                                              padding = "same",
                                              activation = tf.nn.relu,
@@ -400,16 +403,16 @@ class RecognitionModel():
                                              strides = 1)
         c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
         c1 = tf.layers.max_pooling2d(inputs = c1,
-                                     pool_size = 8,
-                                     strides = 4,
+                                     pool_size = architecture.poolSizes[0],
+                                     strides = architecture.poolStrides[0],
                                      padding = "same")
         print c1
 
-        numberOfFilters = [10]
-        kernelSizes = [8]
+        numberOfFilters = architecture.numberOfFilters
+        kernelSizes = architecture.kernelSizes
         
-        poolSizes = [4]
-        poolStrides = [4]
+        poolSizes = architecture.poolSizes[1:]
+        poolStrides = architecture.poolStrides[1:]
         nextInput = c1
         for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
             c1 = tf.layers.conv2d(inputs = nextInput,
@@ -946,6 +949,7 @@ if __name__ == '__main__':
     parser.add_argument('--quiet',action = "store_true", default = False)
     parser.add_argument('--dropout',action = "store_true", default = False)
     parser.add_argument('--learningRate', default = 0.001, type = float)
+    parser.add_argument('--architecture', default = "original", type = str)    
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
