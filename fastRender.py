@@ -10,7 +10,7 @@ def thresholdPrecomputed(a):
     a = np.copy(a)
     a[a > 0.5] = 1.0
     a[a <= 0.5] = 0.0
-    return 1.0 - a
+    return (1.0 - a).astype(np.bool)
 
 def precomputedRenderings():
     # exactly one rendering of a circle
@@ -63,17 +63,18 @@ def precomputedRenderings():
     return {'c':c,'r':rectangles,'l':lines}
 
 globalFastRenderTable = None
+blankCanvas = np.zeros((256,256)).astype(np.bool)
 
-def fastRender(program):
+def fastRender(program, keepBinary = False):
     loadPrecomputedRenderings()
     
     if isinstance(program,Sequence):
-        output = sum([np.zeros((256,256))] + [fastRender(l) for l in program.lines ])
-        output[output > 1] = 1
+        output = sum([blankCanvas] + [fastRender(l) for l in program.lines ])
+        if not keepBinary: output = output.astype(np.float)
         return output
 
     if isinstance(program,Line):
-        if program.length() < 0.1: return np.zeros((256,256))
+        if program.length() < 0.1: return blankCanvas
         
         _x1 = program.points[0].x.n
         _y1 = program.points[0].y.n
@@ -149,6 +150,7 @@ def loadPrecomputedRenderings():
 
 
 if __name__ == '__main__':
+    loadPrecomputedRenderings()
     for _ in range(20):
         p = Rectangle.sample() #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
     #    p.solid = True
