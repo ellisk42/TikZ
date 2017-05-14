@@ -22,6 +22,8 @@ class SynthesisResult():
         self.time = time
         self.source = source
         self.cost = cost
+    def __str__(self):
+        return self.source
 
 class SynthesisJob():
     def __init__(self, parse, originalDrawing):
@@ -167,7 +169,7 @@ def viewSynthesisResults(arguments):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
-    parser.add_argument('-d', '--directory', default = None)
+    parser.add_argument('-f', '--file', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
     parser.add_argument('--view', default = False, action = 'store_true')
     parser.add_argument('--latex', default = False, action = 'store_true')
@@ -180,5 +182,8 @@ if __name__ == '__main__':
         viewSynthesisResults(arguments)
     elif arguments.synthesizeTopK != None:
         synthesizeTopK(arguments.synthesizeTopK)
-    elif arguments.directory != None:
-        (arguments.directory)
+    elif arguments.file != None:
+        j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'')
+        print j
+        print j.execute()
+                     

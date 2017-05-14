@@ -24,7 +24,6 @@ def learnToRank(examples):
         scores = tf.concat([positiveScores,negativeScores],axis = 1)
         print scores
 
-        smallNumber = 0.0000001
         maximumPositive = tf.reduce_logsumexp(positiveScores)
         maximumOverall = tf.reduce_logsumexp(scores)
         
@@ -37,7 +36,7 @@ def learnToRank(examples):
 
     with tf.Session() as s:
         s.run(tf.global_variables_initializer())
-        for j in range(1000**2):
+        for j in range(100000):
             l,_,parameters = s.run([loss,Optimizer,w])
             if j%1000 == 0:
                 print j,l,parameters

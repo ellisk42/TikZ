@@ -65,14 +65,13 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
   
   if (??) {
     hit = hit || iterator(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
-    @Native("ENDOFBLOCK();")
     cost += newCost;
   }
   
   if (??) {
+    //    @Native("{ ENDOFBLOCK(); }")
     hit = hit || reflection(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     cost += newCost;
-    @Native("ENDOFBLOCK();")
   }
   return hit;
 }
@@ -88,7 +87,7 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
   for (int j = 0; j < loop_bound; j++) {
     hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
   }
-  cost = loop_body_cost + loop_bound_cost + 1;
+  cost = loop_body_cost + loop_bound_cost;
   return hit;
 }
 

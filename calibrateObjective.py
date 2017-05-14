@@ -28,7 +28,7 @@ for k in groundTruth:
 
     negatives = []
     positives = []
-    for p in range(100):
+    for p in range(300):
         pkl = parseDirectory + 'particle%d.p'%p
         if not os.path.isfile(pkl):
             break
