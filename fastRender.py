@@ -69,7 +69,10 @@ def fastRender(program, keepBinary = False):
     loadPrecomputedRenderings()
     
     if isinstance(program,Sequence):
-        output = sum([blankCanvas] + [fastRender(l) for l in program.lines ])
+        if program.lines == []:
+            output = blankCanvas
+        else:
+            output = reduce(np.logical_or, [fastRender(l) for l in program.lines ])
         if not keepBinary: output = output.astype(np.float)
         return output
 
@@ -126,7 +129,7 @@ def fastRender(program, keepBinary = False):
         dx = x2 - x1
         dy = y2 - y1
 
-        if dx == 0 or dy == 0: return np.zeros((256,256))
+        if dx == 0 or dy == 0: return blankCanvas
         if not (dx,dy) in globalFastRenderTable['r']:
             print program
             render([program.TikZ()],showImage = True)
@@ -152,12 +155,12 @@ def loadPrecomputedRenderings():
 if __name__ == '__main__':
     loadPrecomputedRenderings()
     for _ in range(20):
-        p = Rectangle.sample() #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
+        p = [Rectangle.sample(), Circle.sample(), Line.sample()] #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
     #    p.solid = True
     #    p.arrow = False
         print p
-        correct = (1 - render([Sequence([p]).TikZ()],yieldsPixels = True)[0])
-        fast = (fastRender(p))
+        correct = (1 - render([Sequence(p).TikZ()],yieldsPixels = True)[0])
+        fast = (fastRender(Sequence(p)))
         showImage(correct)
         showImage(fast)
             # showImage(correct - fast)

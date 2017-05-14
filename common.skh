@@ -65,12 +65,14 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
   
   if (??) {
     hit = hit || iterator(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    @Native("ENDOFBLOCK();")
     cost += newCost;
   }
   
   if (??) {
     hit = hit || reflection(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     cost += newCost;
+    @Native("ENDOFBLOCK();")
   }
   return hit;
 }

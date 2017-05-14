@@ -7,13 +7,14 @@ import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 
-def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x0y0 = (0,0), resolution = 256, exportTo = None):
+def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x0y0 = None, resolution = 256, exportTo = None):
     # definitely do not try to render too much at once - I think this causes memory problems
     if len(sources) > 100:
-        prefix = render(sources[:100], showImage, yieldsPixels, canvas, resolution)
-        suffix = render(sources[100:], showImage, yieldsPixels, canvas, resolution)
+        prefix = render(sources[:100], showImage, yieldsPixels, canvas, x0y0, resolution)
+        suffix = render(sources[100:], showImage, yieldsPixels, canvas, x0y0, resolution)
         return prefix + suffix
     if sources == []: return []
+    if x0y0 == None: x0y0 = (0,0)
     if canvas == None: canvas = ""
     else: canvas = '''
 \draw[fill = white, white] (%d,%d) rectangle (%d,%d);

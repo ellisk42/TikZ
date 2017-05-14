@@ -24,9 +24,9 @@ def learnToRank(examples):
         scores = tf.concat([positiveScores,negativeScores],axis = 1)
         print scores
 
-        smallNumber = 0.0000000
-        maximumPositive = tf.log(tf.reduce_sum(tf.exp(positiveScores)) + smallNumber)
-        maximumOverall = tf.log(tf.reduce_sum(tf.exp(scores)) + smallNumber)
+        smallNumber = 0.0000001
+        maximumPositive = tf.reduce_logsumexp(positiveScores)
+        maximumOverall = tf.reduce_logsumexp(scores)
         
         loss += maximumOverall - maximumPositive
 
@@ -41,6 +41,7 @@ def learnToRank(examples):
             l,_,parameters = s.run([loss,Optimizer,w])
             if j%1000 == 0:
                 print j,l,parameters
+    return parameters
         
 if __name__ == '__main__':
     learnToRank([([[1,2],[0,4]],

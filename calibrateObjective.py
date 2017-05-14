@@ -1,3 +1,4 @@
+from learnedRanking import learnToRank
 from distanceMetrics import *
 from fastRender import fastRender
 from recognitionModel import Particle
@@ -9,8 +10,13 @@ import numpy as np
 import os
 import pickle
 
+MODE = 'ranking' # distance
+
 def featuresOfParticle(p, target):
-    return [p.logLikelihood, p.program.logPrior(), -p.distance]
+    return [p.logLikelihood, p.program.logPrior(), -0.01*asymmetricBlurredDistance(target,fastRender(p.program),
+                                                                              kernelSize = 7,
+                                                                              factor = 1,
+                                                                              invariance = 3)]
 
 distanceTrainingData = []
 trainingData = []
@@ -37,33 +43,38 @@ for k in groundTruth:
     print "Got %d positive examples"%(len(positives))
 
     if len(positives) > 0:
-        trainingData.append((np.array(map(lambda p: featuresOfParticle(p,target),positives)),
-                             np.array(map(lambda p: featuresOfParticle(p,target),negatives))))
-        distanceTrainingData.append((target,
-                                     [ fastRender(p.program) for p in positives ],
-                                     [ fastRender(p.program) for p in negatives ]))
+        if MODE == 'ranking':
+            trainingData.append((np.array(map(lambda p: featuresOfParticle(p,target),positives)),
+                                 np.array(map(lambda p: featuresOfParticle(p,target),negatives))))
+        else:
+            distanceTrainingData.append((target,
+                                         [ fastRender(p.program) for p in positives ],
+                                         [ fastRender(p.program) for p in negatives ]))
 
-print "Calibrating distance function..."
-def ranks(kernelSize, factor, invariance):
-    rs = []
-    for t,positives,negatives in distanceTrainingData:
-        positiveScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
-                           for p in positives  ]
-        negativeScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
-                           for p  in negatives ]
-        bestPositive = min(positiveScores)
-        rs.append(len([ None for n in negativeScores if n <=  bestPositive ]) + 1)
-    return rs
+if MODE == 'distance':
+    print "Calibrating distance function..."
+    def ranks(kernelSize, factor, invariance):
+        rs = []
+        for t,positives,negatives in distanceTrainingData:
+            positiveScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
+                               for p in positives  ]
+            negativeScores = [ asymmetricBlurredDistance(t,p,kernelSize = kernelSize,factor = factor,invariance = invariance)
+                               for p  in negatives ]
+            bestPositive = min(positiveScores)
+            rs.append(len([ None for n in negativeScores if n <=  bestPositive ]) + 1)
+        return rs
 
-for k in [1,3,5,7]:
-    for i in [0,1,2,3]:
-        for f in [0.5,1,2,5,10]:
-            rs = ranks(k,f,i)
-            print (k,i,f),
-            print len([ None for r in rs if r < 2 ]),
-            print len([ None for r in rs if r < 5+1 ]),
-            print len([ None for r in rs if r < 10+1 ])
+    for k in [1,3,5,7]:
+        for i in [0,1,2,3]:
+            for f in [0.5,1,2,5,10]:
+                rs = ranks(k,f,i)
+                print (k,i,f),
+                print len([ None for r in rs if r < 2 ]),
+                print len([ None for r in rs if r < 5+1 ]),
+                print len([ None for r in rs if r < 10+1 ])
+    assert False
 
+parameters = learnToRank(trainingData)
 
 def ranks(w):
     rs = []
@@ -72,6 +83,15 @@ def ranks(w):
         negativeScores = np.dot(negatives,w)
         rs.append((negativeScores > bestPositive).sum() + 1)
     return rs
+
+# evaluate learned parameters
+rs = ranks(parameters)
+print "Top 1/5/10:"
+print len([r for r in rs if r == 1 ])
+print len([r for r in rs if r < 6 ])
+print len([r for r in rs if r < 11 ])
+print
+
 topTen = {}
 for priorWeight in range(0,30):
     for distanceWeight in range(0,30):

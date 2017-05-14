@@ -3,7 +3,7 @@ from sketch import synthesizeProgram,parseSketchOutput
 from language import *
 from utilities import showImage,loadImage,saveMatrixAsImage
 from recognitionModel import Particle
-from groundTruthParses import groundTruthSequence
+from groundTruthParses import groundTruthSequence,getGroundTruthParse
 
 from DSL import extrapolate,sketchToDSL,renderEvaluation
 
@@ -104,21 +104,33 @@ def synthesizeTopK(k):
         
 
 def viewSynthesisResults(arguments):
-    d = arguments.view
-    if d.endswith('.p'): files = [d]
-    elif d.endswith('/'): files = [ d + f for f in os.listdir(d) if f.endswith('.p') ]
-    else: assert False
+    results = pickle.load(open('topSynthesisResults.p','rb'))
+    print " [+] Loaded %d synthesis results."%(len(results))
 
     latex = []
 
-    for f in files:
-        result = pickle.load(open(f,'rb'))
-        print f
-        print result.source
+    for expertIndex in range(100):
+        f = 'drawings/expert-%d.png'%expertIndex
+        parse = getGroundTruthParse(f)
+        if parse == None:
+            print "No ground truth for %d"%expertIndex
+            continue
+        parts = set(map(str,parse.lines))
+        result = None
+        for r in results:
+            if isinstance(r,SynthesisResult) and r.originalDrawing == f:
+                if set(map(str,r.parse.lines)) == parts:
+                    result = r
+                    break
+        if result == None:
+            print "No synthesis result for %s"%f
+            continue
+
+        if result.source == None:
+            print "Synthesis failure for %s"%f
+            continue
+            
         print parseSketchOutput(result.source)
-        expertIndex = re.search('(\d+)', f)
-        print expertIndex.group(1)
-        expertIndex = int(expertIndex.group(1))
         e = extrapolate(sketchToDSL(parseSketchOutput(result.source)))
         if not arguments.extrapolate:
             rightEntryOfTable = '''
@@ -153,31 +165,11 @@ def viewSynthesisResults(arguments):
         
 
 
-def synthesizeFromSequence((parse,originalDrawing,whereToPickle)):
-    print parse
-    startTime = time.time()
-    result = synthesizeProgram(parse)
-    if result == None: print "Failure to synthesize."
-    else:
-        result = SynthesisResult(source = result[1],
-                                 cost = result[0],
-                                 parse = parse,
-                                 time = time.time() - startTime,
-                                 originalDrawing = originalDrawing)
-        pickle.dump(result,open(whereToPickle,'wb'))
-    
-def synthesizeGroundTruthPrograms(arguments):
-    Pool(arguments.cores).map(synthesizeFromSequence,
-                             [(groundTruthSequence[k],
-                               k,
-                               'synthesisResults/%s-synthesizerOutput.p'%(k.replace('/','-')))
-                              for k in groundTruthSequence ])
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
     parser.add_argument('-d', '--directory', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
-    parser.add_argument('--view', default = None, type = str)
+    parser.add_argument('--view', default = False, action = 'store_true')
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
     parser.add_argument('--extrapolate', default = False, action = 'store_true')
@@ -190,6 +182,3 @@ if __name__ == '__main__':
         synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.directory != None:
         (arguments.directory)
-    else:
-        synthesizeGroundTruthPrograms(arguments)
-        
