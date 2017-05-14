@@ -109,6 +109,7 @@ groundTruth['drawings/expert-96.png'] = set(['Circle(center = (10,14), radius = 
 groundTruth['drawings/expert-97.png'] = set(['Circle(center = (6,6), radius = 1)', 'Line((3,14), (5,14), arrow = False, solid = True)', 'Circle(center = (2,6), radius = 1)', 'Line((6,11), (6,13), arrow = False, solid = True)', 'Line((3,6), (5,6), arrow = False, solid = True)', 'Circle(center = (6,10), radius = 1)', 'Line((6,7), (6,9), arrow = False, solid = True)', 'Circle(center = (2,14), radius = 1)', 'Circle(center = (6,14), radius = 1)', 'Line((2,7), (2,9), arrow = False, solid = True)', 'Line((3,10), (5,10), arrow = False, solid = True)', 'Circle(center = (2,10), radius = 1)'])
 groundTruth['drawings/expert-98.png'] = set(['Circle(center = (5,9), radius = 1)', 'Rectangle((3,3), (7,12))', 'Circle(center = (5,14), radius = 1)', 'Line((5,13), (5,10), arrow = True, solid = True)', 'Circle(center = (5,5), radius = 1)', 'Line((5,8), (5,6), arrow = True, solid = True)'])
 groundTruth['drawings/expert-99.png'] = set(['Circle(center = (2,8), radius = 1)', 'Rectangle((4,7), (6,9))', 'Rectangle((1,10), (3,12))', 'Rectangle((1,4), (3,6))', 'Circle(center = (2,14), radius = 1)', 'Circle(center = (5,11), radius = 1)', 'Rectangle((4,13), (6,15))', 'Circle(center = (5,5), radius = 1)'])
+
 def parseLineOfCode(l):
     points = [ AbsolutePoint(Number(int(x)),Number(int(y))) for x,y in re.findall('\(([0-9]+),([0-9]+)\)',l) ]
     if l.startswith('Line'):

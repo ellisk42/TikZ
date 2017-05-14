@@ -755,7 +755,11 @@ class RecognitionModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
-        finishedPrograms.sort(key = lambda n: -n.logLikelihood)
+        likelihoodCoefficient = 0.058
+        distanceCoefficient = 9.34*0.01
+        priorCoefficient = 0.38
+        finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient*n.distance + priorCoefficient*n.program.logPrior(),
+                              reverse = True)
         for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
             n.output = None
