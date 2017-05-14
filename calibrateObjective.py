@@ -63,7 +63,6 @@ for k in [1,3,5,7]:
             print len([ None for r in rs if r < 2 ]),
             print len([ None for r in rs if r < 5+1 ]),
             print len([ None for r in rs if r < 10+1 ])
-assert False
 
 
 def ranks(w):

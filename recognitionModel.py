@@ -680,8 +680,7 @@ class RecognitionModel():
                                                    p.output,
                                                    kernelSize = 7,
                                                    factor = 1,
-                                                   invariance = 2)
-            # todo: calibrate this again
+                                                   invariance = 3)
             p.output = None
             p.parent = None
         return finishedPrograms
