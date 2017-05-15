@@ -161,6 +161,8 @@ def viewSynthesisResults(arguments):
             a = np.zeros((256,256*len(framedExtrapolations)))
             for j,e in enumerate(framedExtrapolations):
                 a[:,j*256:(1+j)*256] = e
+                a[:,j*256] = 0
+                a[:,(1+j)*256-1] = 0
             showImage(a)
             
             
@@ -175,7 +177,7 @@ def viewSynthesisResults(arguments):
 '''%(parseSketchOutput(result.source))
         else:
             rightEntryOfTable = ""
-        if e != sketchToDSL(parseSketchOutput(result.source)) and arguments.extrapolate:
+        if extrapolations != [] and arguments.extrapolate:
             print e
             image = renderEvaluation(e, exportTo = "~/projects/TikZ/extrapolations/expert-%d-extrapolation.png"%expertIndex)
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
