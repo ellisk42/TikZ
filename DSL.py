@@ -81,11 +81,15 @@ class Reflection():
     def extrapolations(self):
         for b in self.body.extrapolations():
             yield Reflection(self.command, b)
+    def explode(self):
+        return Reflection(self.command, self.body.explode())
 class Primitive():
     def __init__(self, k): self.k = k
     def __str__(self): return "Primitive(%s)"%self.k
     def convertToPython(self): return "[%s]"%self.k
     def extrapolations(self): yield self
+    def explode(self):
+        return self
 class Loop():
     def __init__(self, v, bound, body, lowerBound = 0):
         self.v = v
@@ -105,6 +109,9 @@ class Loop():
         for b in self.body.extrapolations():
             for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
                 yield Loop(self.v, self.bound + ' + %d'%ub, b, lowerBound = self.lowerBound - lb)
+    def explode(self):
+        return Block([ Loop(self.v,self.bound,bodyExpression.explode(),lowerBound = self.lowerBound)
+                       for bodyExpression in self.body.items ])
                 
 class Block():
     def convertToSequence(self):
@@ -119,6 +126,8 @@ class Block():
             for e in self.items[0].extrapolations():
                 for s in Block(self.items[1:]).extrapolations():
                     yield Block([e] + s.items)
+    def explode(self):
+        return Block([ x.explode() for x in self.items ])
 
 # return something that resembles a syntax tree, built using the above classes
 def sketchToDSL(trace, loopd = 0):

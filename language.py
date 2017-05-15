@@ -1,3 +1,4 @@
+from render import render
 from random import random,choice
 import numpy as np
 from utilities import linesIntersect,truncatedNormal
@@ -601,6 +602,15 @@ class Sequence(Program):
         else:
             r = choice(self.lines)
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
+    def framedRendering(self):
+        parse = self
+        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
+        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
+        x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ])
+        y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ])
+
+        return render([self.TikZ()],yieldsPixels = True,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))[0]
+
 
 def randomLineOfCode():
     k = choice(range(4))

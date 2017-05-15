@@ -137,7 +137,7 @@ def viewSynthesisResults(arguments):
 #        print result.source
         print 
         print parseSketchOutput(result.source)
-        syntaxTree = sketchToDSL(parseSketchOutput(result.source))
+        syntaxTree = sketchToDSL(parseSketchOutput(result.source)).explode()
         print syntaxTree
         trace = syntaxTree.convertToSequence()
         print trace
@@ -145,15 +145,23 @@ def viewSynthesisResults(arguments):
         print "COLLISIONS",originalHasCollisions
 
         extrapolations = []
+        framedExtrapolations = []
         for e in syntaxTree.extrapolations():
             t = e.convertToSequence()
             if not originalHasCollisions and t.removeDuplicates().hasCollisions(): continue
             if t == trace: continue
-            extrapolations.append(e)
+            if any([t == o for o in extrapolations ]): continue
+            extrapolations.append(t)
 
-            render([t.TikZ()],showImage = True)
+            framedExtrapolations.append(t.framedRendering())
 
-            if len(extrapolations) > 10: break
+            if len(extrapolations) > 20: break
+
+        if framedExtrapolations != []:
+            a = np.zeros((256,256*len(framedExtrapolations)))
+            for j,e in enumerate(framedExtrapolations):
+                a[:,j*256:(1+j)*256] = e
+            showImage(a)
             
             
         
