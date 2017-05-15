@@ -50,6 +50,14 @@ class BatchIterator():
                 permutation = np.random.permutation(range(self.tensors[0].shape[0]))
                 self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in self.tensors ]
                 break
+    def epochExamples(self):
+        while True:
+            yield self.next()
+            if self.startingIndex == 0:
+                # rerandomize
+                permutation = np.random.permutation(range(self.tensors[0].shape[0]))
+                self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in self.tensors ]
+                break
             
 
     def testingExamples(self):
@@ -66,5 +74,12 @@ class BatchIterator():
         testingIndex = 0
         while True:
             yield dict(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize)))
+            testingIndex += self.batchSize
+            if testingIndex >= self.testingSetSize: break
+    def testingExamples(self):
+        '''Gives you feeds for smaller batches of the testing examples'''
+        testingIndex = 0
+        while True:
+            yield self.testingSlice(testingIndex, self.batchSize)
             testingIndex += self.batchSize
             if testingIndex >= self.testingSetSize: break

@@ -225,17 +225,22 @@ class Line(Program):
         return "\\draw [%s] %s;" % (a," -- ".join(points))
     
     def mutate(self):
-        if random() < 0.2: return Line(self.points, not self.arrow)
-        if random() < 0.2: return Line(self.points, self.arrow,not self.solid)
-        if random() < 0.2: return Line(list(reversed(self.points)), self.arrow,self.solid)
-        def mutatePoint(p):
-            return p.mutate()
+        a = self.arrow
+        s = self.solid
+        if random() < 0.2: a = not a
+        if random() < 0.2: s = not s
+        
         r = choice(self.points)
-        return Line([ (mutatePoint(p) if p == r else p) for p in self.points ], self.arrow,self.solid)
+        ps = [ (p.mutate() if p == r else p) for p in self.points ]
+        if not a: ps = sorted(ps,key = lambda p: (p.x.n,p.y.n))
+        return Line(ps, arrow = a, solid = s)
     @staticmethod
     def sample():
         while True:
-            l = Line([samplePoint(),samplePoint()], random() > 0.5, random() > 0.5)
+            a = random() > 0.5
+            ps = [samplePoint(),samplePoint()]
+            if not a: ps = sorted(ps,key = lambda p: (p.x.n,p.y.n))
+            l = Line(ps, solid = random() > 0.5, arrow = a)
             if l.length() > 0: return l
         
     def isValid(self, parents):
@@ -400,10 +405,16 @@ class Rectangle(Program):
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
     def mutate(self):
-        if random() > 0.5:
-            return Rectangle(self.p1.mutate(),self.p2)
-        else:
-            return Rectangle(self.p1,self.p2.mutate())
+        while True:
+            p1 = self.p1
+            p2 = self.p2
+            if random() > 0.5:
+                p1 = p1.mutate()
+            else:
+                p2 = p2.mutate()
+            if p1.x.n < p2.x.n and p1.y.n < p2.y.n:
+                return Rectangle(p1,p2)
+        
     @staticmethod
     def sample():
         while True:

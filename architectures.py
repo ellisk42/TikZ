@@ -29,3 +29,5 @@ architectures["v2"] = Architecture(20,2,
                                    kernelSizes = [4,2],
                                    poolSizes = [2,4,2],
                                    poolStrides = [2,4,2])
+# v1 was a little bit better
+architectures["original"] = architectures["v1"]

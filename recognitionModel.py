@@ -1,3 +1,4 @@
+from distanceExamples import *
 from architectures import architectures
 from batch import BatchIterator
 from language import *
@@ -50,7 +51,7 @@ def loadTar(f = 'syntheticTrainingData.tar'):
     print "Loaded tar file into RAM: %d entries."%len(members)
     return members
 
-def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
+def loadExamples(numberOfExamples, dummyImages = True, noisy = False, distance = False):
     noisyTrainingData = noisy
     
     members = loadTar()
@@ -59,6 +60,12 @@ def loadExamples(numberOfExamples, dummyImages = True, noisy = False):
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
 
     print "Loaded pickles."
+
+    if distance:
+        noisyTarget = [ "./randomScene-%d-noisy.png"%(j) for j in range(numberOfExamples) ]
+        for t in noisyTarget:
+            cacheImage(t,members[t])
+        return np.array(noisyTarget),np.array(programs)
 
     startingExamples = []
     endingExamples = []
@@ -439,8 +446,53 @@ class RecognitionModel():
         self.loss = self.decoder.loss()
         self.averageAccuracy = self.decoder.accuracy()
 
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)        
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
 
+        # Value function learning
+        self.valueTargets = tf.placeholder(tf.float32, [None,2])
+        self.distanceFunction = tf.layers.dense(f1, 2, activation = tf.nn.relu)
+        self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
+        self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
+
+    def trainDistance(self, numberOfExamples, checkpoint, restore = False):
+        assert self.noisy
+        targetImages,targetPrograms = loadExamples(numberOfExamples, noisy = self.noisy, distance = True)
+        initializer = tf.global_variables_initializer()
+        iterator = BatchIterator(5,tuple([targetImages,targetPrograms]),
+                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
+        saver = tf.train.Saver()
+
+        flushEverything()
+        with tf.Session() as s:
+            if not restore:
+                s.run(initializer)
+            else:
+                saver.restore(s, checkpoint)
+            for e in range(20):
+                runningAverage = 0.0
+                runningAverageCount = 0
+                lastUpdateTime = time()
+                for images,programs in iterator.epochExamples():
+                    targets, current, distances = makeDistanceExamples(images, programs)
+                    _,l = s.run([self.distanceOptimizer, self.distanceLoss],
+                                feed_dict = {self.currentPlaceholder: current,
+                                             self.goalPlaceholder: targets,
+                                             self.valueTargets: distances})
+                    runningAverage += l
+                    runningAverageCount += 1
+                    if time() - lastUpdateTime > 120:
+                        lastUpdateTime = time()
+                        print "\t\tRunning average loss: %f"%(runningAverage/runningAverageCount)
+                print "Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount)
+
+                testingLosses = [ s.run(self.distanceLoss,
+                                        feed_dict = {self.currentPlaceholder: current,
+                                                     self.goalPlaceholder: targets,
+                                                     self.valueTargets: distances})
+                                  for images,programs in iterator.testingExamples()
+                                  for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
+                testingLosses = sum(testingLosses)/len(testingLosses)
+                print "\tTesting loss: %f"%testingLosses
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
         partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples, noisy = self.noisy)
@@ -948,6 +1000,7 @@ if __name__ == '__main__':
     parser.add_argument('--noisy',action = "store_true", default = False)
     parser.add_argument('--quiet',action = "store_true", default = False)
     parser.add_argument('--dropout',action = "store_true", default = False)
+    parser.add_argument('--distance',action = "store_true", default = False)
     parser.add_argument('--learningRate', default = 0.001, type = float)
     parser.add_argument('--architecture', default = "original", type = str)    
 
@@ -985,7 +1038,11 @@ if __name__ == '__main__':
     elif arguments.task == 'analyze':
         RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
     elif arguments.task == 'train':
-        RecognitionModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+        worker = RecognitionModel(arguments)
+        if arguments.distance:
+            worker.trainDistance(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+        else:
+            worker.train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
     elif arguments.task == 'evaluate':
         RecognitionModel(arguments).evaluateAccuracy()
     elif arguments.task == 'profile':
