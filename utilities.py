@@ -117,7 +117,7 @@ def perturbNoisyIntensities(b):
     # b: None*256*256
     p = np.copy(b)
     for j in range(b.shape[0]):
-        f = random()*2 + 0.25
+        f = random() + 0.5
         p[j,:,:] = f*b[j,:,:]
     p[p > 1] = 1.0
     return p
