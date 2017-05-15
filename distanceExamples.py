@@ -36,6 +36,7 @@ def makeDistanceExamples(targets,programs):
             mutantShapes = set(map(str,mutant.lines))
             extraTarget.append(len(targetShapes - mutantShapes))
             extraCurrent.append(len(mutantShapes - targetShapes))
+    exampleTargets = augmentData(np.array(exampleTargets))
     if False:
         for j in range(len(extraCurrent)):
             print extraTarget[j]
@@ -46,5 +47,5 @@ def makeDistanceExamples(targets,programs):
             print 
     t = np.stack([np.array(extraTarget), np.array(extraCurrent)],axis = 1)
 
-    print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
-    return augmentData(np.array(exampleTargets)), np.array(exampleImages), t
+#    print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
+    return exampleTargets, np.array(exampleImages), t
