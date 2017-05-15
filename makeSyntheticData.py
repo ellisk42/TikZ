@@ -151,7 +151,7 @@ def sampleLine(objects, attachedLines = []):
     if not arrow: # without an arrow there is no canonical orientation
         points = list(sorted(points, key = lambda p: (p.x.n,p.y.n)))
     return Line(points,
-                solid = random() > 0.33,
+                solid = random() > 0.1,
                 arrow = arrow)
 
 def sampleWithoutIntersection(n, existingObjects, f):
