@@ -8,6 +8,13 @@
 #define LOOP 3
 #define REFLECT 4
 
+void dummyStartLoop() {}
+void dummyEndLoop() {}
+void dummyStartReflection(int x,int y) {}
+void dummyEndReflection() {}
+void dummyStartBoundary() {}
+void dummyEndBoundary() {}
+
 int [n + 1] push([int n], int [n] environment, int j) {
   int [n + 1] ep = environment;
   ep[n] = j;
@@ -34,6 +41,17 @@ generator int expression([int n], int[n] environment, ref int cost) {
   return ?? * {| environment[0] | environment[1] |} + number();
 }
 
+generator int bound_expression([int n], int[n] environment, ref int cost) {
+  cost = 0;
+  if (??) {
+    int b = ??;
+    assert b > 1;
+    if (b == 2) cost += 1;
+    return b;
+  }
+  return ?? * {| environment[0] | environment[1] |} + ??;
+}
+
 // blocks are sequences of commands; can also introduce local variables.
 generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int cost){
   assert d > 0;
@@ -44,17 +62,6 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
   bit newHit;
   int newCost,newIdentity;
 
-  //  return _c(1,5) || _c(4,3) || _c(4,5) || _c(7,1) || _c(7,5) || _c(7,3);
-  /* for (int j = 0; j < 3; j++) { */
-  /*   for (int k = 0; k < j + 1; k++) { */
-  /*     hit = hit || primitive(SHAPEARGUMENTS, {j,k}, d, newCost, newIdentity); */
-  /*     /\* hit = hit || _c((j-1)*3 + 1, *\/ */
-  /*     /\* 		      5 - (k-1)*2); *\/ */
-  /*     cost = 0; */
-  /*   } */
-  /* } */
-  /* return hit; */
-  
   repeat(??) {
     newHit = primitive(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     assert newIdentity >= identity;
@@ -64,12 +71,13 @@ generator bit block([int n], SHAPEVARIABLES , int[n] environment, int d, ref int
   }
   
   if (??) {
+    dummyStartLoop();
     hit = hit || iterator(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
+    dummyEndLoop();
     cost += newCost;
   }
   
   if (??) {
-    //    @Native("{ ENDOFBLOCK(); }")
     hit = hit || reflection(SHAPEARGUMENTS, environment, d, newCost, newIdentity);
     cost += newCost;
   }
@@ -81,13 +89,19 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
   bit hit = 0;
   identity = LOOP;
     
-  int loop_bound_cost = 1,loop_body_cost;
-  int _;
-  int loop_bound = expression(environment, _);
+  int loop_bound_cost = 0,loop_body_cost,boundary_cost = 0;
+  int loop_bound = bound_expression(environment, loop_bound_cost);
   for (int j = 0; j < loop_bound; j++) {
+    if (j > 0 && ??){
+      dummyStartBoundary();
+      hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, boundary_cost);
+      dummyEndBoundary();
+    }
+    
     hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, loop_body_cost);
   }
-  cost = loop_body_cost + loop_bound_cost;
+  assert loop_body_cost != 0;
+  cost = loop_body_cost + loop_bound_cost + boundary_cost + 1;
   return hit;
 }
 
@@ -137,6 +151,8 @@ generator bit reflection([int n], SHAPEVARIABLES , int[n] environment, int d, re
   assert yr == 0 || xr == 0;
   assert !(yr == 0 && xr == 0);
   int reflection_cost;
+
+  dummyStartReflection(xr,yr);
 	
   // loop wrapper around the generator to make it only be called once
   for (int reflectionIndex = 0; reflectionIndex < 2; reflectionIndex++) {
@@ -178,6 +194,8 @@ generator bit reflection([int n], SHAPEVARIABLES , int[n] environment, int d, re
     }
     hit = hit || block(SHAPEARGUMENTS,environment,d - 1, reflection_cost);
   }
+
+  dummyEndReflection();
 
   cost = reflection_cost + 1;
   return hit;
