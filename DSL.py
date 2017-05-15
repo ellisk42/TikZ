@@ -70,6 +70,13 @@ class circle():
     def reflect(self, x = None,y = None):
         return circle(*reflectPoint(x,y,self.x,self.y))
 
+def addFeatures(fs):
+    composite = {}
+    for f in fs:
+        for k in f:
+            composite[k] = composite.get(k,0) + f[k]
+    return composite
+
 class Reflection():
     def __init__(self, command, body):
         self.command = command
@@ -83,6 +90,11 @@ class Reflection():
             yield Reflection(self.command, b)
     def explode(self):
         return Reflection(self.command, self.body.explode())
+    def features(self):
+        return addFeatures([{'reflections':1,
+                             'reflectionsX':int('x' in self.command),
+                             'reflectionsY':int('y' in self.command)},
+                            self.body.features()])
 class Primitive():
     def __init__(self, k): self.k = k
     def __str__(self): return "Primitive(%s)"%self.k
@@ -90,6 +102,11 @@ class Primitive():
     def extrapolations(self): yield self
     def explode(self):
         return self
+    def features(self):
+        return {'primitives':1,
+                'lines':int('line' in self.k),
+                'rectangle':int('rectangle' in self.k),
+                'circles':int('circle' in self.k)}
 class Loop():
     def __init__(self, v, bound, body, lowerBound = 0):
         self.v = v
@@ -112,6 +129,16 @@ class Loop():
     def explode(self):
         return Block([ Loop(self.v,self.bound,bodyExpression.explode(),lowerBound = self.lowerBound)
                        for bodyExpression in self.body.items ])
+    def features(self):
+        f2 = int(self.bound == '2')
+        f3 = int(self.bound == '3')
+        f4 = int(self.bound == '4')
+        return addFeatures([{'loops':1,
+                             '2': f2,
+                             '3': f3,
+                             '4': f4,
+                             'variableLoopBound': int(f2 == 0 and f3 == 0 and f4 == 0)},
+                            self.body.features()])                             
                 
 class Block():
     def convertToSequence(self):
@@ -128,6 +155,8 @@ class Block():
                     yield Block([e] + s.items)
     def explode(self):
         return Block([ x.explode() for x in self.items ])
+    def features(self):
+        return addFeatures([ x.features() for x in self.items ])
 
 # return something that resembles a syntax tree, built using the above classes
 def sketchToDSL(trace, loopd = 0):
@@ -176,15 +205,6 @@ def sketchToDSL(trace, loopd = 0):
             print l
             assert False
     return Block(accumulator)
-
-def programFeatures(source):
-    return [source.count('range'),
-            source.count('reflect(x'),
-            source.count('reflect(y'),
-            source.count('line'),
-            source.count('rectangle'),
-            source.count('line')]
-
 
 def renderEvaluation(s, exportTo = None):
     parse = evaluate(eval(s))

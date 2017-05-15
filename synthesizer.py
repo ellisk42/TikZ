@@ -1,3 +1,4 @@
+from similarity import analyzeFeatures
 from render import render
 from fastRender import fastRender
 from sketch import synthesizeProgram,parseSketchOutput
@@ -112,6 +113,8 @@ def viewSynthesisResults(arguments):
 
     latex = []
 
+    programFeatures = {}
+
     for expertIndex in range(100):
         f = 'drawings/expert-%d.png'%expertIndex
         parse = getGroundTruthParse(f)
@@ -134,37 +137,46 @@ def viewSynthesisResults(arguments):
             continue
 
         print " [+] %s"%f
-#        print result.source
         print 
         print parseSketchOutput(result.source)
-        syntaxTree = sketchToDSL(parseSketchOutput(result.source)).explode()
+        syntaxTree = sketchToDSL(parseSketchOutput(result.source))
         print syntaxTree
-        trace = syntaxTree.convertToSequence()
-        print trace
-        originalHasCollisions = trace.hasCollisions()
-        print "COLLISIONS",originalHasCollisions
+        print syntaxTree.features()
+        programFeatures[f] = syntaxTree.features()
 
         extrapolations = []
-        framedExtrapolations = []
-        for e in syntaxTree.extrapolations():
-            t = e.convertToSequence()
-            if not originalHasCollisions and t.removeDuplicates().hasCollisions(): continue
-            if t == trace: continue
-            if any([t == o for o in extrapolations ]): continue
-            extrapolations.append(t)
+        if arguments.extrapolate:
+            syntaxTree = syntaxTree.explode()
+            trace = syntaxTree.convertToSequence()
+            print trace
+            originalHasCollisions = trace.hasCollisions()
+            print "COLLISIONS",originalHasCollisions
 
-            framedExtrapolations.append(t.framedRendering())
+            framedExtrapolations = []
+            for e in syntaxTree.extrapolations():
+                t = e.convertToSequence()
+                if not originalHasCollisions and t.removeDuplicates().hasCollisions(): continue
+                if t == trace: continue
+                if any([t == o for o in extrapolations ]): continue
+                extrapolations.append(t)
 
-            if len(extrapolations) > 20: break
+                framedExtrapolations.append(t.framedRendering())
 
-        if framedExtrapolations != []:
-            a = np.zeros((256,256*len(framedExtrapolations)))
-            for j,e in enumerate(framedExtrapolations):
-                a[:,j*256:(1+j)*256] = e
-                a[:,j*256] = 0
-                a[:,(1+j)*256-1] = 0
-            showImage(a)
-            
+                if len(extrapolations) > 20: break
+
+            if framedExtrapolations != []:
+                a = np.zeros((256,256*len(framedExtrapolations)))
+                for j,e in enumerate(framedExtrapolations):
+                    a[:,j*256:(1+j)*256] = e
+                    a[:,j*256] = 0.5
+                    a[:,(1+j)*256-1] = 0.5
+                a[0,:] = 0.5
+                a[:,0] = 0.5
+                a[255,:] = 0.5
+                a[:,256*len(framedExtrapolations)-1] = 0.5
+                a = 255*a
+                saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
+
             
         
         if not arguments.extrapolate:
@@ -196,6 +208,8 @@ def viewSynthesisResults(arguments):
         with open('../TikZpaper/%s'%name,'w') as handle:
             handle.write(latex)
         print "Wrote output to ../TikZpaper/%s"%name
+
+    analyzeFeatures(programFeatures)
 
         
 
