@@ -1,7 +1,8 @@
-from utilities import loadImage
+from utilities import loadImage,removeBorder
 
 import numpy as np
 from sklearn.decomposition import PCA
+from sklearn import preprocessing
 import matplotlib.pyplot as plot
 import matplotlib.image as image
 
@@ -23,7 +24,7 @@ def analyzeFeatures(featureMaps):
         print featureVectors[j]
     
     learner = PCA()
-    transformedFeatures = learner.fit_transform(np.array(featureVectors))
+    transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
     print learner.explained_variance_ratio_
 
 
@@ -31,7 +32,8 @@ def analyzeFeatures(featureMaps):
     f,a = plot.subplots()
     
     for j, imageName in enumerate(imageNames):
-        i = image.imread(imageName)
+        i = 1 - image.imread(imageName)
+        i = 1 - removeBorder(i)
         x = transformedFeatures[j,0]
         y = transformedFeatures[j,1]
         w = 0.2
@@ -44,3 +46,5 @@ def analyzeFeatures(featureMaps):
     a.scatter(transformedFeatures[:,0],
               transformedFeatures[:,1])
     plot.show()
+
+    

@@ -143,3 +143,11 @@ def meanAndStandardError(x):
     deviation = math.sqrt(variance)
     standardError = deviation/math.sqrt(len(x))
     return "%f +/- %f"%(mean,standardError)
+
+
+def removeBorder(x):
+    while np.all(x[0,:] < 0.1): x = x[1:,:]
+    while np.all(x[x.shape[0]-1,:] < 0.1): x = x[:x.shape[0]-2,:]
+    while np.all(x[:,0] < 0.1): x = x[:,1:]
+    while np.all(x[:,x.shape[1]-1] < 0.1): x = x[:,:x.shape[1]-2]
+    return x

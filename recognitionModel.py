@@ -483,7 +483,9 @@ class RecognitionModel():
                     if time() - lastUpdateTime > 120:
                         lastUpdateTime = time()
                         print "\t\tRunning average loss: %f"%(runningAverage/runningAverageCount)
+                        flushEverything()
                 print "Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount)
+                flushEverything()
 
                 testingLosses = [ s.run(self.distanceLoss,
                                         feed_dict = {self.currentPlaceholder: current,
@@ -493,6 +495,7 @@ class RecognitionModel():
                                   for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
                 testingLosses = sum(testingLosses)/len(testingLosses)
                 print "\tTesting loss: %f"%testingLosses
+                flushEverything()
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
         partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples, noisy = self.noisy)
