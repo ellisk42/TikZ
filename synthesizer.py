@@ -1,3 +1,4 @@
+from render import render
 from fastRender import fastRender
 from sketch import synthesizeProgram,parseSketchOutput
 from language import *
@@ -5,7 +6,7 @@ from utilities import showImage,loadImage,saveMatrixAsImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence,getGroundTruthParse
 
-from DSL import extrapolate,sketchToDSL,renderEvaluation
+from DSL import sketchToDSL,renderEvaluation
 
 import traceback
 import re
@@ -131,9 +132,31 @@ def viewSynthesisResults(arguments):
         if result.source == None:
             print "Synthesis failure for %s"%f
             continue
-            
+
+        print " [+] %s"%f
+#        print result.source
+        print 
         print parseSketchOutput(result.source)
-        e = extrapolate(sketchToDSL(parseSketchOutput(result.source)))
+        syntaxTree = sketchToDSL(parseSketchOutput(result.source))
+        print syntaxTree
+        trace = syntaxTree.convertToSequence()
+        print trace
+        originalHasCollisions = trace.hasCollisions()
+        print "COLLISIONS",originalHasCollisions
+
+        extrapolations = []
+        for e in syntaxTree.extrapolations():
+            t = e.convertToSequence()
+            if not originalHasCollisions and t.removeDuplicates().hasCollisions(): continue
+            if t == trace: continue
+            extrapolations.append(e)
+
+            render([t.TikZ()],showImage = True)
+
+            if len(extrapolations) > 10: break
+            
+            
+        
         if not arguments.extrapolate:
             rightEntryOfTable = '''
         \\begin{minipage}{10cm}

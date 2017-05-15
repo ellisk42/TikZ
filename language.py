@@ -286,7 +286,9 @@ class Line(Program):
         return ((p1.x.n - p2.x.n)**2 + (p1.y.n - p2.y.n)**2)**(0.5)
 
     def epsilonShrink(self):
-        e = 0.1/self.length()
+        l = self.length()
+        if l < 0.001: return self
+        e = 0.1/l
         [p1,p2] = self.points
         # points online: t*p1 + (1 - t)*p2
         x1 = (1 - e)*p1.x.n + e*p2.x.n
@@ -524,6 +526,13 @@ class Sequence(Program):
 
     def logPrior(self):
         return sum([l.logPrior() for l in self.lines ]) - (len(self.lines) + 1)*math.log(4)
+
+    def __eq__(self,o):
+        if not isinstance(o,Sequence): return False
+        return set(map(str,self.lines)) == set(map(str,o.lines))
+
+    def removeDuplicates(self):
+        return Sequence([ l for j,l in enumerate(self.lines) if not (str(l) in map(str,self.lines[:j])) ])
 
     def children(self): return self.lines
     def substitute(self, old, new):

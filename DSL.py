@@ -5,6 +5,7 @@ from render import render
 
 import re
 
+
 def reflectPoint(rx,ry,px,py):
     if rx != None: return (rx - px,py)
     if ry != None: return (px,ry - py)
@@ -14,7 +15,6 @@ def reflect(x = None,y = None):
         return stuff + [ o.reflect(x = x,y = y) for o in stuff ]
     return reflector
     
-
 class line():
     def __init__(self, x1, y1, x2, y2, arrow = None, solid = None):
         self.arrow = arrow
@@ -70,12 +70,59 @@ class circle():
     def reflect(self, x = None,y = None):
         return circle(*reflectPoint(x,y,self.x,self.y))
 
-def evaluate(stuff):
-    return Sequence([o.evaluate() for o in stuff ])
+class Reflection():
+    def __init__(self, command, body):
+        self.command = command
+        self.body = body
+    def __str__(self):
+        return "Reflection(%s,%s)"%(self.command,self.body)
+    def convertToPython(self):
+        return "%s(%s)"%(self.command, self.body.convertToPython())
+    def extrapolations(self):
+        for b in self.body.extrapolations():
+            yield Reflection(self.command, b)
+class Primitive():
+    def __init__(self, k): self.k = k
+    def __str__(self): return "Primitive(%s)"%self.k
+    def convertToPython(self): return "[%s]"%self.k
+    def extrapolations(self): yield self
+class Loop():
+    def __init__(self, v, bound, body, lowerBound = 0):
+        self.v = v
+        self.bound = bound
+        self.body = body
+        self.lowerBound = lowerBound
+    def __str__(self):
+        return "Loop(%s, %s, %s, %s)"%(self.v,self.lowerBound, self.bound,self.body)
+    def convertToPython(self):
+        return "[ _%s for %s in range(%s,%s) for _%s in %s ]"%(self.v,
+                                                            self.v,
+                                                            self.lowerBound,
+                                                            self.bound,
+                                                            self.v,
+                                                            self.body.convertToPython())
+    def extrapolations(self):
+        for b in self.body.extrapolations():
+            for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
+                yield Loop(self.v, self.bound + ' + %d'%ub, b, lowerBound = self.lowerBound - lb)
+                
+class Block():
+    def convertToSequence(self):
+        return Sequence([ p.evaluate() for p in eval(self.convertToPython()) ])
+    def __init__(self, items): self.items = items
+    def __str__(self): return "Block([%s])"%(", ".join(map(str,self.items)))
+    def convertToPython(self):
+        return " + ".join([ x.convertToPython() for x in self.items ])
+    def extrapolations(self):
+        if self.items == []: yield self
+        else:
+            for e in self.items[0].extrapolations():
+                for s in Block(self.items[1:]).extrapolations():
+                    yield Block([e] + s.items)
 
-
+# return something that resembles a syntax tree, built using the above classes
 def sketchToDSL(trace, loopd = 0):
-    accumulator = ''
+    accumulator = []
     lines = trace.split('\n')
     def depth(x):
         d = 0
@@ -85,10 +132,8 @@ def sketchToDSL(trace, loopd = 0):
     while j < len(lines):
         l = lines[j]
         if 'rectangle' in l or 'circle' in l or 'line' in l:
-            primitiveCommand = '[%s]'%l
-            if accumulator != '' and accumulator[-1] == ']':
-                primitiveCommand = ' + %s'%primitiveCommand
-            accumulator += primitiveCommand
+            primitiveCommand = l.strip(' ')
+            accumulator += [Primitive(primitiveCommand)]
             j += 1
         elif 'reflect' in l:
             m = re.search('([xy]) = ([0-9]+)',l)
@@ -101,8 +146,7 @@ def sketchToDSL(trace, loopd = 0):
             while body < len(lines) and depth(lines[body]) >= depthThreshold:
                 body += 1
             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd)
-            if accumulator != '': accumulator += ' + '
-            accumulator += "%s(%s)"%(reflectionCommand,body_)
+            accumulator += [Reflection(reflectionCommand, body_)]
             j = body
         elif 'for' in l:
             m = re.search('\((.*)\)',l)
@@ -116,20 +160,13 @@ def sketchToDSL(trace, loopd = 0):
                 body += 1
             
             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd+1)
-            loopCommand = '[ _%s for %s in range(%s) for _%s in %s ]'%(loopVariable,
-                                                                       loopVariable,
-                                                                       m.group(1),
-                                                                       loopVariable,
-                                                                       body_)
             j = body
-            if accumulator != '' and accumulator[-1] == ']':
-                accumulator += ' + '
-            accumulator += loopCommand
+            accumulator += [Loop(loopVariable, m.group(1), body_)]
         elif l == '': j += 1
         else:
             print l
             assert False
-    return accumulator
+    return Block(accumulator)
 
 def programFeatures(source):
     return [source.count('range'),
@@ -138,18 +175,7 @@ def programFeatures(source):
             source.count('line'),
             source.count('rectangle'),
             source.count('line')]
-def extrapolate(source, forward = True, backward = True):
-    p = re.compile(r'range\(([^)]*)\)')
-    if forward and backward:
-        return p.sub(r'range(-1, \1 +1)', source)
-    elif forward:
-        return p.sub(r'range(\1 +1)', source)
-    elif backward:
-        return p.sub(r'range(-1, \1)', source)
-    else:
-        assert False
-def equivalentLinearTransformations(source):
-    yield source
+
 
 def renderEvaluation(s, exportTo = None):
     parse = evaluate(eval(s))

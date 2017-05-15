@@ -759,7 +759,7 @@ class RecognitionModel():
         else:
             os.system('mkdir %s'%(parseDirectory))
         likelihoodCoefficient = 0.058
-        distanceCoefficient = 9.34*0.01
+        distanceCoefficient = -9.34*0.01
         priorCoefficient = 0.38
         finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient*n.distance + priorCoefficient*n.program.logPrior(),
                               reverse = True)
