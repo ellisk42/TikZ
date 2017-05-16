@@ -93,7 +93,7 @@ def expertSynthesisJobs(k):
     return jobs
 
 def synthesizeTopK(k):
-    jobs = expertSynthesisJobs(k)
+    jobs = expertSynthesisJobs(k) if k > 0 else []
     # Also synthesized from the ground truth
     for k in groundTruthSequence:
         sequence = groundTruthSequence[k]
