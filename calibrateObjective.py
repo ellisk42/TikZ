@@ -1,22 +1,36 @@
 from learnedRanking import learnToRank
 from distanceMetrics import *
 from fastRender import fastRender
-from recognitionModel import Particle
+from recognitionModel import Particle,RecognitionModel
 from groundTruthParses import groundTruth
 from utilities import *
 
-
+import tensorflow as tf
 import numpy as np
 import os
 import pickle
 
 MODE = 'ranking' # distance
 
+class DummyArguments():
+    def __init__(self):
+        self.noisy = True
+        self.distance = True
+        self.architecture = "original"
+        self.dropout = False
+        self.learningRate = 1
+        self.showParticles = False
+
+worker = RecognitionModel(DummyArguments())
+worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
+
 def featuresOfParticle(p, target):
-    return [p.logLikelihood, p.program.logPrior(), -0.01*asymmetricBlurredDistance(target,fastRender(p.program),
-                                                                              kernelSize = 7,
-                                                                              factor = 1,
-                                                                              invariance = 3)]
+    return [p.logLikelihood, p.program.logPrior(),
+            p.distance[0],p.distance[1]]
+            # -0.01*asymmetricBlurredDistance(target,fastRender(p.program),
+            #                                                                   kernelSize = 7,
+            #                                                                   factor = 1,
+            #                                                                   invariance = 3)]
 
 distanceTrainingData = []
 trainingData = []
@@ -44,6 +58,8 @@ for k in groundTruth:
 
     if len(positives) > 0:
         if MODE == 'ranking':
+            for p in positives + negatives: p.output = fastRender(p.program)
+            worker.learnedParticleDistances(target,positives + negatives)
             trainingData.append((np.array(map(lambda p: featuresOfParticle(p,target),positives)),
                                  np.array(map(lambda p: featuresOfParticle(p,target),negatives))))
         else:

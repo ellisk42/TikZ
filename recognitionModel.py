@@ -478,7 +478,7 @@ class RecognitionModel():
                 print "Distance vector:",d[j,:]
                 print "Likelihood:",p.logLikelihood
                 showImage(p.output + goal)
-            p.distance = d[j,0] + 5*d[j,1]
+            p.distance = (d[j,0], 5*d[j,1])
 
     def trainDistance(self, numberOfExamples, checkpoint, restore = False):
         assert self.noisy
@@ -699,6 +699,7 @@ class RecognitionModel():
 
             if self.arguments.distance: # use the learned distance metric
                 self.learnedParticleDistances(targetImage, beam)
+                for p in beam: p.distance = p.distance[0]*1 + 5*p.distance[1]
             else:
                 for n in beam:
                     if self.arguments.task == 'evaluate':

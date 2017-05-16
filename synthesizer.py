@@ -112,6 +112,7 @@ def viewSynthesisResults(arguments):
     print " [+] Loaded %d synthesis results."%(len(results))
 
     latex = []
+    extrapolationMatrix = []
 
     programFeatures = {}
 
@@ -169,7 +170,7 @@ def viewSynthesisResults(arguments):
                 if len(extrapolations) > 10: break
 
             if framedExtrapolations != []:
-                framedExtrapolations = [loadImage(f)] + [fastRender(trace),fastRender(result.parse)] + framedExtrapolations
+                framedExtrapolations = [loadImage(f)] + framedExtrapolations
                 a = np.zeros((256,256*len(framedExtrapolations)))
                 for j,e in enumerate(framedExtrapolations):
                     a[:,j*256:(1+j)*256] = 1 - e
@@ -180,6 +181,7 @@ def viewSynthesisResults(arguments):
                 a[255,:] = 0.5
                 a[:,256*len(framedExtrapolations)-1] = 0.5
                 a = 255*a
+                extrapolationMatrix.append(a)
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
 
             
@@ -195,6 +197,12 @@ def viewSynthesisResults(arguments):
         else:
             rightEntryOfTable = ""
         if extrapolations != [] and arguments.extrapolate:
+            #}make the big matrix
+            bigMatrix = np.zeros((256*len(extrapolationMatrix),
+                                  max([m.shape[1] for m in extrapolationMatrix ])))
+            for j,r in enumerate(extrapolationMatrix):
+                bigMatrix[256*j:256*(j+1), 0:r.shape[1]] = r
+            saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrix.png')
             print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
@@ -236,7 +244,14 @@ if __name__ == '__main__':
     elif arguments.synthesizeTopK != None:
         synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.file != None:
-        j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'')
-        print j
-        print j.execute()
+        if "drawings/expert-%s.png"%(arguments.file) in groundTruthSequence:
+            j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'')
+            print j
+            s = j.execute()
+            print s
+            print parseSketchOutput(s)
+        else:
+            j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'')
+            print j
+            print j.execute()
                      
