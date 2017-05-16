@@ -1,13 +1,13 @@
 from similarity import analyzeFeatures
 from render import render
 from fastRender import fastRender
-from sketch import synthesizeProgram,parseSketchOutput
+from sketch import synthesizeProgram
 from language import *
 from utilities import showImage,loadImage,saveMatrixAsImage
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence,getGroundTruthParse
 
-from DSL import sketchToDSL,renderEvaluation
+from DSL import renderEvaluation,parseSketchOutput
 
 import traceback
 import re
@@ -138,8 +138,8 @@ def viewSynthesisResults(arguments):
 
         print " [+] %s"%f
         print 
-        print parseSketchOutput(result.source)
-        syntaxTree = sketchToDSL(parseSketchOutput(result.source))
+                    
+        syntaxTree = parseSketchOutput(result.source)
         print syntaxTree
         print syntaxTree.features()
         programFeatures[f] = syntaxTree.features()

@@ -108,20 +108,31 @@ class Primitive():
                 'rectangle':int('rectangle' in self.k),
                 'circles':int('circle' in self.k)}
 class Loop():
-    def __init__(self, v, bound, body, lowerBound = 0):
+    def __init__(self, v, bound, body, boundary = None, lowerBound = 0):
         self.v = v
         self.bound = bound
         self.body = body
+        self.boundary = boundary
         self.lowerBound = lowerBound
     def __str__(self):
+        if self.boundary != None:
+            return "Loop(%s, %s, %s, %s, boundary = %s)"%(self.v,self.lowerBound, self.bound,self.body,self.boundary)
         return "Loop(%s, %s, %s, %s)"%(self.v,self.lowerBound, self.bound,self.body)
     def convertToPython(self):
+        body = self.body.convertToPython()
+        if self.boundary != None:
+            body += " + ((%s) if %s > %s else %s)"%(self.boundary.convertToPython(),
+                                                    self.v,
+                                                    self.lowerBound,
+                                                    '[]')
+            
         return "[ _%s for %s in range(%s,%s) for _%s in %s ]"%(self.v,
-                                                            self.v,
-                                                            self.lowerBound,
-                                                            self.bound,
-                                                            self.v,
-                                                            self.body.convertToPython())
+                                                               self.v,
+                                                               self.lowerBound,
+                                                               self.bound,
+                                                               self.v,
+                                                               body)
+        
     def extrapolations(self):
         for b in self.body.extrapolations():
             for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
@@ -137,8 +148,10 @@ class Loop():
                              '2': f2,
                              '3': f3,
                              '4': f4,
+                             'boundary': int(self.boundary == None),
                              'variableLoopBound': int(f2 == 0 and f3 == 0 and f4 == 0)},
-                            self.body.features()])                             
+                            self.body.features(),
+                            self.boundary.features() if self.boundary != None else {}])                             
                 
 class Block():
     def convertToSequence(self):
@@ -159,52 +172,203 @@ class Block():
         return addFeatures([ x.features() for x in self.items ])
 
 # return something that resembles a syntax tree, built using the above classes
-def sketchToDSL(trace, loopd = 0):
-    accumulator = []
-    lines = trace.split('\n')
-    def depth(x):
-        d = 0
-        while d < len(x) and x[d] == ' ': d += 1
-        return d
+def parseSketchOutput(output, environment = None, loopDepth = 0):
+    commands = []
+    # variable bindings introduced by the sketch: we have to resolve them
+    environment = {} if environment == None else environment
+    output = output.split('\n')
+
+    def getBlock(name, startingIndex, startingDepth = 0):
+        d = startingDepth
+
+        while d > -1:
+            if 'dummyStart' in output[startingIndex] and name in output[startingIndex]:
+                d += 1
+            elif 'dummyEnd' in output[startingIndex] and name in output[startingIndex]:
+                d -= 1
+            startingIndex += 1
+
+        return startingIndex
+
+    def getBoundary(startingIndex):
+        while True:
+            if 'dummyStartBoundary' in output[startingIndex]:
+                return getBlock('Boundary', startingIndex + 1)
+            if 'dummyStartLoop' in output[startingIndex]:
+                return None
+            if 'dummyEndLoop' in output[startingIndex]:
+                return None
+            startingIndex += 1
+                
+
     j = 0
-    while j < len(lines):
-        l = lines[j]
-        if 'rectangle' in l or 'circle' in l or 'line' in l:
-            primitiveCommand = l.strip(' ')
-            accumulator += [Primitive(primitiveCommand)]
+    while j < len(output):
+        l = output[j]
+        if 'void renderSpecification' in l: break
+
+        m = re.search('validate[X|Y]\((.*), (.*)\);',l)
+        if m:
+            environment[m.group(2)] = m.group(1)
             j += 1
-        elif 'reflect' in l:
-            m = re.search('([xy]) = ([0-9]+)',l)
-            if m == None:
-                print l
-                assert False
-            reflectionCommand = 'reflect(%s = %s)'%(m.group(1),m.group(2))
-            depthThreshold = depth(lines[j])
-            body = j
-            while body < len(lines) and depth(lines[body]) >= depthThreshold:
-                body += 1
-            body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd)
-            accumulator += [Reflection(reflectionCommand, body_)]
-            j = body
-        elif 'for' in l:
-            m = re.search('\((.*)\)',l)
-            if m == None:
-                print l
-                assert False
-            loopVariable = ['i','j'][loopd]
-            depthThreshold = depth(lines[j])
-            body = j+1
-            while body < len(lines) and depth(lines[body]) > depthThreshold:
-                body += 1
+            continue
+
+        # apply the environment
+        for v in sorted(environment.keys(), key = lambda v: -len(v)):
+            # if v in l:
+            #     print "Replacing %s w/ %s in %s gives %s"%(v,environment[v],l,l.replace(v,environment[v]))
+            l = l.replace(v,environment[v])
+
+        
+        pattern = '\(\(\(shapeIdentity == 0\) && \(cx.* == (.+)\)\) && \(cy.* == (.+)\)\)'
+        m = re.search(pattern,l)
+        if m:
+            x = parseExpression(m.group(1))
+            y = parseExpression(m.group(2))
+            commands += [Primitive('circle(%s,%s)'%(x,y))]
+            j += 1
+            continue
+
+        pattern = 'shapeIdentity == 1\) && \((.*) == lx1.*\)\) && \((.*) == ly1.*\)\) && \((.*) == lx2.*\)\) && \((.*) == ly2.*\)\) && \(([01]) == dashed\)\) && \(([01]) == arrow'
+        m = re.search(pattern,l)
+        if m:
+            commands += [Primitive('line(%s,%s,%s,%s,arrow = %s,solid = %s)'%(parseExpression(m.group(1)),
+                                                                              parseExpression(m.group(2)),
+                                                                              parseExpression(m.group(3)),
+                                                                              parseExpression(m.group(4)),
+                                                                              m.group(6) == '1',
+                                                                              m.group(5) == '0'))]
+            j += 1
+            continue
+        
+
+        pattern = '\(\(\(\(\(shapeIdentity == 2\) && \((.+) == rx1.*\)\) && \((.+) == ry1.*\)\) && \((.+) == rx2.*\)\) && \((.+) == ry2.*\)\)'
+        m = re.search(pattern,l)
+        if m:
+            # print m,m.group(1),m.group(2),m.group(3),m.group(4)
+            commands += [Primitive('rectangle(%s,%s,%s,%s)'%(parseExpression(m.group(1)),
+                                                             parseExpression(m.group(2)),
+                                                             parseExpression(m.group(3)),
+                                                             parseExpression(m.group(4))))]
+            j += 1
+            continue
+
+        pattern = 'for\(int (.*) = 0; .* < (.*); .* = .* \+ 1\)'
+        m = re.search(pattern,l)
+        if m and (not ('reflectionIndex' in m.group(1))):
+            boundaryIndex = getBoundary(j + 1)
+            if boundaryIndex != None:
+                boundary = "\n".join(output[(j+1):boundaryIndex])
+                boundary = parseSketchOutput(boundary, environment, loopDepth + 1)
+                j = boundaryIndex
+            else:
+                boundary = None
             
-            body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd+1)
-            j = body
-            accumulator += [Loop(loopVariable, m.group(1), body_)]
-        elif l == '': j += 1
-        else:
-            print l
+            bodyIndex = getBlock('Loop', j+1)
+            body = "\n".join(output[(j+1):bodyIndex])
+            j = bodyIndex
+
+            bound = parseExpression(m.group(2))
+            body = parseSketchOutput(body, environment, loopDepth + 1)
+            v = ['i','j'][loopDepth]
+            commands += [Loop(v, bound, body, boundary)]
+            continue
+
+        pattern = 'dummyStartReflection\(([0-9]+), ([0-9]+)\)'
+        m = re.search(pattern,l)
+        if m:
+            bodyIndex = getBlock('Reflection', j+1)
+            body = "\n".join(output[(j+1):bodyIndex])
+            j = bodyIndex
+            x = int(m.group(1))
+            y = int(m.group(2))
+            k = 'reflect(%s = %d)'%('x' if y == 0 else 'y',
+                                    max([x,y]))
+            commands += [Reflection(k,
+                                    parseSketchOutput(body, environment, loopDepth))]
+
+        j += 1
+            
+        
+    return Block(commands)
+
+def parseExpression(e):
+    try: return int(e)
+    except:
+        factor = re.search('([\-0-9]+) * ',e)
+        if factor != None: factor = int(factor.group(1))
+        offset = re.search(' \+ ([\-0-9]+)',e)
+        if offset != None: offset = int(offset.group(1))
+        variable = re.search('\[(\d)\]',e)
+        if variable != None: variable = ['i','j'][int(variable.group(1))]
+
+        if factor == None: factor = 0
+        if offset == None: offset = 0
+        if variable == None:
+            print e
             assert False
-    return Block(accumulator)
+
+        if factor == 0: return str(offset)
+
+        representation = variable
+        if factor != 1: representation = "%d*%s"%(factor,representation)
+
+        if offset != 0: representation += " + %d"%offset
+
+        return representation
+
+        # return "%s * %s + %s"%(str(factor),
+        #                        str(variable),
+        #                        str(offset))
+
+
+
+
+# def sketchToDSL(trace, loopd = 0):
+#     accumulator = []
+#     lines = trace.split('\n')
+#     def depth(x):
+#         d = 0
+#         while d < len(x) and x[d] == ' ': d += 1
+#         return d
+#     j = 0
+#     while j < len(lines):
+#         l = lines[j]
+#         if 'rectangle' in l or 'circle' in l or 'line' in l:
+#             primitiveCommand = l.strip(' ')
+#             accumulator += [Primitive(primitiveCommand)]
+#             j += 1
+#         elif 'reflect' in l:
+#             m = re.search('([xy]) = ([0-9]+)',l)
+#             if m == None:
+#                 print l
+#                 assert False
+#             reflectionCommand = 'reflect(%s = %s)'%(m.group(1),m.group(2))
+#             depthThreshold = depth(lines[j])
+#             body = j
+#             while body < len(lines) and depth(lines[body]) >= depthThreshold:
+#                 body += 1
+#             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd)
+#             accumulator += [Reflection(reflectionCommand, body_)]
+#             j = body
+#         elif 'for' in l:
+#             m = re.search('\((.*)\)',l)
+#             if m == None:
+#                 print l
+#                 assert False
+#             loopVariable = ['i','j'][loopd]
+#             depthThreshold = depth(lines[j])
+#             body = j+1
+#             while body < len(lines) and depth(lines[body]) > depthThreshold:
+#                 body += 1
+            
+#             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd+1)
+#             j = body
+#             accumulator += [Loop(loopVariable, m.group(1), body_)]
+#         elif l == '': j += 1
+#         else:
+#             print l
+#             assert False
+#     return Block(accumulator)
 
 def renderEvaluation(s, exportTo = None):
     parse = evaluate(eval(s))
