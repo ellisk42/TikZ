@@ -57,10 +57,7 @@ def learnToRank(examples, folds = 0):
     for positives,negatives in examples:
         positiveScores = tf.transpose(tf.matmul(np.array(positives,dtype = np.float32),wp))
         negativeScores = tf.transpose(tf.matmul(np.array(negatives,dtype = np.float32),wp))
-        print positiveScores
-        print negativeScores
         scores = tf.concat([positiveScores,negativeScores],axis = 1)
-        print scores
 
         maximumPositive = tf.reduce_logsumexp(positiveScores)
         maximumOverall = tf.reduce_logsumexp(scores)
@@ -74,7 +71,7 @@ def learnToRank(examples, folds = 0):
 
     with tf.Session() as s:
         s.run(tf.global_variables_initializer())
-        for j in range(100):
+        for j in range(10000):
             l,_,parameters = s.run([loss,Optimizer,w])
             if j%1000 == 0:
                 print j,l,parameters

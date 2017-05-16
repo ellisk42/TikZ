@@ -699,7 +699,7 @@ class RecognitionModel():
 
             if self.arguments.distance: # use the learned distance metric
                 self.learnedParticleDistances(targetImage, beam)
-                for p in beam: p.distance = p.distance[0]*1 + 5*p.distance[1]
+                for p in beam: p.distance = p.distance[0] + self.arguments.mistakePenalty*p.distance[1]
             else:
                 for n in beam:
                     if self.arguments.task == 'evaluate':
@@ -1048,6 +1048,7 @@ if __name__ == '__main__':
     parser.add_argument('--parentCoefficient', action = "store_true", default = False)
     parser.add_argument('--distanceCoefficient', default = 1.0/25.0, type = float)
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
+    parser.add_argument('--mistakePenalty', default = 5.0, type = float)
     parser.add_argument('--beam', action = "store_true", default = False)
     parser.add_argument('--fastRender', action = "store_true", default = True)
     parser.add_argument('--unguided', action = "store_true", default = False)

@@ -25,8 +25,9 @@ worker = RecognitionModel(DummyArguments())
 worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
 
 def featuresOfParticle(p, target):
-    return [p.logLikelihood, p.program.logPrior(),
-            p.distance[0],p.distance[1]]
+    f = map(float,[p.logLikelihood, p.program.logPrior(),
+                   p.distance[0],p.distance[1]])
+    return f
             # -0.01*asymmetricBlurredDistance(target,fastRender(p.program),
             #                                                                   kernelSize = 7,
             #                                                                   factor = 1,
@@ -56,7 +57,7 @@ for k in groundTruth:
             negatives.append(particle)
     print "Got %d positive examples"%(len(positives))
 
-    if len(positives) > 0:
+    if len(positives) > 0 and len(negatives) > 0:
         if MODE == 'ranking':
             for p in positives + negatives: p.output = fastRender(p.program)
             worker.learnedParticleDistances(target,positives + negatives)

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plot
 import matplotlib.image as image
 
 
+
 def analyzeFeatures(featureMaps):
     # collect together a whole of the different names for features
     featureNames = list(set([ k for f in featureMaps.values() for k in f ]))
