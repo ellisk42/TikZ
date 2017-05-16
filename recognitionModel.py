@@ -631,7 +631,6 @@ class RecognitionModel():
 
     def SMC(self, s, targetImage, beamSize = 10, beamLength = 10):
         totalNumberOfRenders = 0
-        #showImage(targetImage)
         targetImage = np.reshape(targetImage,(256,256))
         beam = [Particle(program = [],
                          output = np.zeros(targetImage.shape),
@@ -645,6 +644,7 @@ class RecognitionModel():
         searchStartTime = time()
 
         for iteration in range(beamLength):
+            lastIteration = iteration == beamLength - 1 # are we the last iteration
             children = []
             startTime = time()
             for parent in beam:
@@ -680,6 +680,8 @@ class RecognitionModel():
                                              count = 1,
                                              parent = parent,
                                              time = time() - searchStartTime))
+
+            if lastIteration: children = [p for p in children if p.finished() ]
                 
             if not self.arguments.quiet:
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
