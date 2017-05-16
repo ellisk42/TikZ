@@ -454,6 +454,28 @@ class RecognitionModel():
         self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
         self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
 
+    def loadDistanceCheckpoint(self, checkpoint):
+        saver = tf.train.Saver()
+        self.distanceSession = tf.Session()
+        saver.restore(self.distanceSession, checkpoint)
+    def closeDistanceSession(self): self.distanceSession.close()
+    def learnedDistances(self, currentBatch, goalBatch):
+        return self.distanceSession.run(self.distanceFunction,
+                                        feed_dict = {self.currentPlaceholder: currentBatch,
+                                                     self.goalPlaceholder: goalBatch})
+    def learnedParticleDistances(self, goal, particles):
+        if particles == []: return 
+        # only do it for 50 particles at a time
+        maximumBatchSize = 50
+        if len(particles) > maximumBatchSize:
+            self.learnedParticleDistances(goal, particles[maximumBatchSize:])
+        particles = particles[:maximumBatchSize]
+        d = self.learnedDistances(np.array([ p.output for p in particles ]),
+                                  np.tile(goal, (len(particles), 1, 1)))
+        for j,p in enumerate(particles):
+            # todo: weight these correctly. one of them should be much worse than the other.
+            p.distance = d[j,0] + d[j,1]
+
     def trainDistance(self, numberOfExamples, checkpoint, restore = False):
         assert self.noisy
         targetImages,targetPrograms = loadExamples(numberOfExamples, noisy = self.noisy, distance = True)
@@ -670,14 +692,17 @@ class RecognitionModel():
             if not self.arguments.quiet:
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
-            for n in beam:
-                if self.arguments.task == 'evaluate':
-                    # evaluation is  on noiseless data
-                    assert not self.arguments.noisy
-                    difference = targetImage - n.output
-                    n.distance = np.sum(np.abs(difference[difference > 0])) + 20*np.sum(np.abs(difference[difference < 0]))
-                else:
-                    n.distance = asymmetricBlurredDistance(targetImage, n.output)
+            if self.arguments.distance: # use the learned distance metric
+                self.learnedParticleDistances(targetImage, beam)
+            else:
+                for n in beam:
+                    if self.arguments.task == 'evaluate':
+                        # evaluation is  on noiseless data
+                        assert not self.arguments.noisy
+                        difference = targetImage - n.output
+                        n.distance = np.sum(np.abs(difference[difference > 0])) + 20*np.sum(np.abs(difference[difference < 0]))
+                    else:
+                        n.distance = asymmetricBlurredDistance(targetImage, n.output)
 
             if not self.arguments.quiet: print "Computed distances"
 
@@ -955,6 +980,7 @@ def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
     model = RecognitionModel(arguments)
+    if arguments.distance: model.loadDistanceCheckpoint(arguments.distanceCheckpoint)
     targetImage = loadImage(f)
 
     # l = 0 implies that we should look at the ground truth and use that to abound the length
@@ -969,6 +995,7 @@ def handleTest(a):
                               targetImage,
                               beamSize = arguments.beamWidth,
                               beamLength = l)
+    if arguments.distance: model.closeDistanceSession()
     gotGroundTruth = None
     groundTruth = getGroundTruthParse(f)
     if groundTruth != None:
@@ -995,6 +1022,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
     parser.add_argument('task')
     parser.add_argument('-c','--checkpoint', default = "checkpoints/model.checkpoint", type = str)
+    parser.add_argument('-d','--distanceCheckpoint', default = "checkpoints/distance.checkpoint", type = str)
     parser.add_argument('-n','--numberOfExamples', default = 100000, type = int)
     parser.add_argument('-l','--beamLength', default = 13, type = int)
     parser.add_argument('-b','--beamWidth', default = 10, type = int)
@@ -1044,7 +1072,7 @@ if __name__ == '__main__':
     elif arguments.task == 'train':
         worker = RecognitionModel(arguments)
         if arguments.distance:
-            worker.trainDistance(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+            worker.trainDistance(arguments.numberOfExamples, checkpoint = arguments.distanceCheckpoint, restore = arguments.r)
         else:
             worker.train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
     elif arguments.task == 'evaluate':
