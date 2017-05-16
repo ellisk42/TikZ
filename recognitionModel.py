@@ -476,8 +476,9 @@ class RecognitionModel():
             # todo: weight these correctly. one of them should be much worse than the other.
             if self.arguments.showParticles:
                 print "Distance vector:",d[j,:]
+                print "Likelihood:",p.logLikelihood
                 showImage(p.output + goal)
-            p.distance = 5*d[j,0] + d[j,1]
+            p.distance = d[j,0] + 5*d[j,1]
 
     def trainDistance(self, numberOfExamples, checkpoint, restore = False):
         assert self.noisy
@@ -498,7 +499,8 @@ class RecognitionModel():
                 runningAverageCount = 0
                 lastUpdateTime = time()
                 for images,programs in iterator.epochExamples():
-                    targets, current, distances = makeDistanceExamples(images, programs)
+                    targets, current, distances = makeDistanceExamples(images, programs,
+                                                                       reportTime = runningAverageCount == 0)
                     _,l = s.run([self.distanceOptimizer, self.distanceLoss],
                                 feed_dict = {self.currentPlaceholder: current,
                                              self.goalPlaceholder: targets,

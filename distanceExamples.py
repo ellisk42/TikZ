@@ -6,7 +6,7 @@ from utilities import *
 from random import choice
 from time import time
 
-def makeDistanceExamples(targets,programs):
+def makeDistanceExamples(targets,programs, reportTime = False):
     startTime = time()
     
     # Each example will be a tuple of (image, extraLinesAndTarget, extraLinesInCurrent)
@@ -17,6 +17,11 @@ def makeDistanceExamples(targets,programs):
 
     for target, program in zip(targets, programs):
         program = program.item()
+        if not isinstance(program, Sequence):
+            print "Fatal error: one of the entries of programs was not a sequence"
+            print "programs = ",programs
+            print "program = ",program
+            assert False
         # on policy examples
         for j in range(len(program)+1):
             exampleTargets.append(target)
@@ -47,5 +52,5 @@ def makeDistanceExamples(targets,programs):
             print 
     t = np.stack([np.array(extraTarget), np.array(extraCurrent)],axis = 1)
 
-#    print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
+    if reportTime: print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
     return exampleTargets, np.array(exampleImages), t
