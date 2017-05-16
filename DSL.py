@@ -126,7 +126,7 @@ class Loop():
                                                     self.lowerBound,
                                                     '[]')
             
-        return "[ _%s for %s in range(%s,%s) for _%s in %s ]"%(self.v,
+        return "[ _%s for %s in range(%s,%s) for _%s in (%s) ]"%(self.v,
                                                                self.v,
                                                                self.lowerBound,
                                                                self.bound,
@@ -135,20 +135,20 @@ class Loop():
         
     def extrapolations(self):
         for b in self.body.extrapolations():
-            for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
-                yield Loop(self.v, self.bound + ' + %d'%ub, b, lowerBound = self.lowerBound - lb)
+            for ub,lb in [(1,0),(0,1),(0,0)]:
+                yield Loop(self.v, '%s + %d'%(self.bound,ub), b, lowerBound = self.lowerBound - lb)
     def explode(self):
         return Block([ Loop(self.v,self.bound,bodyExpression.explode(),lowerBound = self.lowerBound)
                        for bodyExpression in self.body.items ])
     def features(self):
-        f2 = int(self.bound == '2')
-        f3 = int(self.bound == '3')
-        f4 = int(self.bound == '4')
+        f2 = int(str(self.bound) == '2')
+        f3 = int(str(self.bound) == '3')
+        f4 = int(str(self.bound) == '4')
         return addFeatures([{'loops':1,
                              '2': f2,
                              '3': f3,
                              '4': f4,
-                             'boundary': int(self.boundary == None),
+                             'boundary': int(self.boundary != None),
                              'variableLoopBound': int(f2 == 0 and f3 == 0 and f4 == 0)},
                             self.body.features(),
                             self.boundary.features() if self.boundary != None else {}])                             
@@ -231,6 +231,10 @@ def parseSketchOutput(output, environment = None, loopDepth = 0):
         pattern = 'shapeIdentity == 1\) && \((.*) == lx1.*\)\) && \((.*) == ly1.*\)\) && \((.*) == lx2.*\)\) && \((.*) == ly2.*\)\) && \(([01]) == dashed\)\) && \(([01]) == arrow'
         m = re.search(pattern,l)
         if m:
+            if False:
+                print "Reading line!"
+                print l
+                for index in range(5): print "index",index,"\t",m.group(index),'\t',parseExpression(m.group(index))
             commands += [Primitive('line(%s,%s,%s,%s,arrow = %s,solid = %s)'%(parseExpression(m.group(1)),
                                                                               parseExpression(m.group(2)),
                                                                               parseExpression(m.group(3)),
@@ -301,7 +305,8 @@ def parseExpression(e):
         variable = re.search('\[(\d)\]',e)
         if variable != None: variable = ['i','j'][int(variable.group(1))]
 
-        if factor == None: factor = 0
+        if factor == None:
+            factor = 1
         if offset == None: offset = 0
         if variable == None:
             print e
@@ -321,55 +326,6 @@ def parseExpression(e):
         #                        str(offset))
 
 
-
-
-# def sketchToDSL(trace, loopd = 0):
-#     accumulator = []
-#     lines = trace.split('\n')
-#     def depth(x):
-#         d = 0
-#         while d < len(x) and x[d] == ' ': d += 1
-#         return d
-#     j = 0
-#     while j < len(lines):
-#         l = lines[j]
-#         if 'rectangle' in l or 'circle' in l or 'line' in l:
-#             primitiveCommand = l.strip(' ')
-#             accumulator += [Primitive(primitiveCommand)]
-#             j += 1
-#         elif 'reflect' in l:
-#             m = re.search('([xy]) = ([0-9]+)',l)
-#             if m == None:
-#                 print l
-#                 assert False
-#             reflectionCommand = 'reflect(%s = %s)'%(m.group(1),m.group(2))
-#             depthThreshold = depth(lines[j])
-#             body = j
-#             while body < len(lines) and depth(lines[body]) >= depthThreshold:
-#                 body += 1
-#             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd)
-#             accumulator += [Reflection(reflectionCommand, body_)]
-#             j = body
-#         elif 'for' in l:
-#             m = re.search('\((.*)\)',l)
-#             if m == None:
-#                 print l
-#                 assert False
-#             loopVariable = ['i','j'][loopd]
-#             depthThreshold = depth(lines[j])
-#             body = j+1
-#             while body < len(lines) and depth(lines[body]) > depthThreshold:
-#                 body += 1
-            
-#             body_ = sketchToDSL("\n".join(lines[(j+1):body]),loopd+1)
-#             j = body
-#             accumulator += [Loop(loopVariable, m.group(1), body_)]
-#         elif l == '': j += 1
-#         else:
-#             print l
-#             assert False
-#     return Block(accumulator)
-
 def renderEvaluation(s, exportTo = None):
     parse = evaluate(eval(s))
     x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
@@ -380,17 +336,51 @@ def renderEvaluation(s, exportTo = None):
     render([parse.TikZ()],showImage = exportTo == None,exportTo = exportTo,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))
 
 if __name__ == '__main__':
-    sequence = evaluate(eval(sketchToDSL('''
-      circle(9,1)
-        for (4)
-            circle(2*i + 3,-3*i + 10)
-            circle(-2*i + 5,3*i + 1)
-            line(2*i + 2,-3*i + 7,2*i + 3,-3*i + 9,arrow = False,solid = True)
-            line(-2*i + 7,3*i + 3,-2*i + 8,3*i + 1,arrow = False,solid = True)
-    ''')))
-
-    #    [  line(0,1,0,4,arrow = False,solid = True)] + [  rectangle(2,0,5,3)] + [ _i for i in range(2)) for _i in [        line(0,3*i + 1,2,3*i,arrow = False,solid = True)] + [        line(-3*i + 3,4,-2*i + 5,3,arrow = False,solid = True)] ]
-    # expression = reflect(y = 5)([circle(1,9),
-    #                              line(1,2,1,4,True,True)])
-    render([sequence.TikZ()],showImage = True)
-
+    print parseSketchOutput('''
+void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpatQqlp.sk:205*/
+{
+  _out = 0;
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpatQqlp.sk:206"; //Assume at tmpatQqlp.sk:206
+  assume (shapeIdentity != 2): "Assume at tmpatQqlp.sk:208"; //Assume at tmpatQqlp.sk:208
+  assume (!(dashed)): "Assume at tmpatQqlp.sk:212"; //Assume at tmpatQqlp.sk:212
+  assume (!(arrow)): "Assume at tmpatQqlp.sk:213"; //Assume at tmpatQqlp.sk:213
+  int[0] environment = {};
+  dummyStartLoop();
+  int loop_body_cost = 0;
+  bit _pac_sc_s7_s9 = 0;
+  for(int j = 0; j < 3; j = j + 1)/*Canonical*/
+  {
+    bit _pac_sc_s23 = _pac_sc_s7_s9;
+    if(!(_pac_sc_s7_s9))/*tmpatQqlp.sk:101*/
+    {
+      int[1] _pac_sc_s23_s25 = {0};
+      push(0, environment, j, _pac_sc_s23_s25);
+      int x_s31 = 0;
+      validateX((3 * (_pac_sc_s23_s25[0])) + 1, x_s31);
+      int y_s35 = 0;
+      validateY(6, y_s35);
+      bit _pac_sc_s23_s27 = 0 || (((shapeIdentity == 0) && (cx == x_s31)) && (cy == y_s35));
+      int x_s31_0 = 0;
+      validateX((3 * (_pac_sc_s23_s25[0])) + 1, x_s31_0);
+      int y_s35_0 = 0;
+      validateY(1, y_s35_0);
+      _pac_sc_s23_s27 = _pac_sc_s23_s27 || (((shapeIdentity == 0) && (cx == x_s31_0)) && (cy == y_s35_0));
+      int x_s31_1 = 0;
+      validateX((3 * (_pac_sc_s23_s25[0])) + 1, x_s31_1);
+      int y_s35_1 = 0;
+      validateY((_pac_sc_s23_s25[0]) + 2, y_s35_1);
+      int x2_s39 = 0;
+      validateX((3 * (_pac_sc_s23_s25[0])) + 1, x2_s39);
+      int y2_s43 = 0;
+      validateY(5, y2_s43);
+      loop_body_cost = 3;
+      _pac_sc_s23_s27 = _pac_sc_s23_s27 || (((((((shapeIdentity == 1) && (x_s31_1 == lx1)) && (y_s35_1 == ly1)) && (x2_s39 == lx2)) && (y2_s43 == ly2)) && (0 == dashed)) && (0 == arrow));
+      _pac_sc_s23 = _pac_sc_s23_s27;
+    }
+    _pac_sc_s7_s9 = _pac_sc_s23;
+  }
+  assert (loop_body_cost != 0); //Assert at tmpatQqlp.sk:103 (6533586931555877886)
+  dummyEndLoop();
+  _out = _pac_sc_s7_s9;
+  minimize(loop_body_cost + 1)
+''')

@@ -140,8 +140,12 @@ def viewSynthesisResults(arguments):
         print 
                     
         syntaxTree = parseSketchOutput(result.source)
+        #        print result.source
         print syntaxTree
         print syntaxTree.features()
+        print syntaxTree.convertToPython()
+        print syntaxTree.convertToSequence()
+        #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
         programFeatures[f] = syntaxTree.features()
 
         extrapolations = []
@@ -162,7 +166,7 @@ def viewSynthesisResults(arguments):
 
                 framedExtrapolations.append(t.framedRendering())
 
-                if len(extrapolations) > 20: break
+                if len(extrapolations) > 10: break
 
             if framedExtrapolations != []:
                 a = np.zeros((256,256*len(framedExtrapolations)))
@@ -191,7 +195,6 @@ def viewSynthesisResults(arguments):
             rightEntryOfTable = ""
         if extrapolations != [] and arguments.extrapolate:
             print e
-            image = renderEvaluation(e, exportTo = "~/projects/TikZ/extrapolations/expert-%d-extrapolation.png"%expertIndex)
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
             latex.append('''
