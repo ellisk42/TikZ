@@ -449,7 +449,7 @@ class RecognitionModel():
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
 
         # Value function learning
-        self.valueTargets = tf.placeholder(tf.float32, [None,2])
+        self.valueTargets = tf.placeholder(tf.float32, [None,2]) # (extra target, extra current)
         self.distanceFunction = tf.layers.dense(f1, 2, activation = tf.nn.relu)
         self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
         self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
@@ -474,7 +474,10 @@ class RecognitionModel():
                                   np.tile(goal, (len(particles), 1, 1)))
         for j,p in enumerate(particles):
             # todo: weight these correctly. one of them should be much worse than the other.
-            p.distance = d[j,0] + d[j,1]
+            if self.arguments.showParticles:
+                print "Distance vector:",d[j,:]
+                showImage(p.output + goal)
+            p.distance = 5*d[j,0] + d[j,1]
 
     def trainDistance(self, numberOfExamples, checkpoint, restore = False):
         assert self.noisy
