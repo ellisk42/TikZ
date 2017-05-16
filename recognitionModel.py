@@ -495,6 +495,7 @@ class RecognitionModel():
                                   for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
                 testingLosses = sum(testingLosses)/len(testingLosses)
                 print "\tTesting loss: %f"%testingLosses
+                print "Saving checkpoint: %s"%(saver.save(s, checkpoint))
                 flushEverything()
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
