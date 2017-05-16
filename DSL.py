@@ -225,7 +225,7 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
             j += 1
             continue
 
-        m = re.search('int\[[0-9]\] coefficients([1|2]) = {([,0-9]+)};',l)
+        m = re.search('int\[[0-9]\] coefficients([1|2]) = {([,0-9\-]+)};',l)
         if m:
             coefficients[int(m.group(1))] = map(int,m.group(2).split(","))
         
@@ -362,61 +362,58 @@ def renderEvaluation(s, exportTo = None):
     render([parse.TikZ()],showImage = exportTo == None,exportTo = exportTo,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))
 
 if __name__ == '__main__':
-    print parseSketchOutput('''
-void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpceZ5MM.sk:206*/
+    e = parseSketchOutput('''
+void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmptaz_4Q.sk:206*/
 {
   _out = 0;
-  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpceZ5MM.sk:207"; //Assume at tmpceZ5MM.sk:207
-  assume (shapeIdentity != 2): "Assume at tmpceZ5MM.sk:209"; //Assume at tmpceZ5MM.sk:209
-  assume (!(dashed)): "Assume at tmpceZ5MM.sk:213"; //Assume at tmpceZ5MM.sk:213
-  assume (arrow): "Assume at tmpceZ5MM.sk:215"; //Assume at tmpceZ5MM.sk:215
-  int[2] coefficients2 = {4,22};
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmptaz_4Q.sk:207"; //Assume at tmptaz_4Q.sk:207
+  assume (shapeIdentity != 0): "Assume at tmptaz_4Q.sk:208"; //Assume at tmptaz_4Q.sk:208
+  assume (shapeIdentity != 2): "Assume at tmptaz_4Q.sk:209"; //Assume at tmptaz_4Q.sk:209
+  assume (!(dashed)): "Assume at tmptaz_4Q.sk:213"; //Assume at tmptaz_4Q.sk:213
+  assume (!(arrow)): "Assume at tmptaz_4Q.sk:214"; //Assume at tmptaz_4Q.sk:214
+  int[2] coefficients1 = {2,1};
+  int[2] coefficients2 = {-2,-1};
   int[0] environment = {};
-  int[1] coefficients2_0 = coefficients2[0::1];
+  int[2] coefficients1_0 = coefficients1[0::2];
+  int[2] coefficients2_0 = coefficients2[0::2];
   dummyStartLoop();
   int loop_body_cost = 0;
-  int boundary_cost = 0;
-  bit _pac_sc_s8_s10 = 0;
+  bit _pac_sc_s12_s14 = 0;
   for(int j = 0; j < 3; j = j + 1)/*Canonical*/
   {
-    if((j > 0) && 1)/*tmpceZ5MM.sk:96*/
+    assert (j < 4); //Assert at tmptaz_4Q.sk:95 (-1783596017435864552)
+    bit _pac_sc_s28 = _pac_sc_s12_s14;
+    if(!(_pac_sc_s12_s14))/*tmptaz_4Q.sk:102*/
     {
-      dummyStartBoundary();
-      bit _pac_sc_s19 = _pac_sc_s8_s10;
-      if(!(_pac_sc_s8_s10))/*tmpceZ5MM.sk:98*/
-      {
-        int[1] _pac_sc_s19_s21 = {0};
-        push(0, environment, j, _pac_sc_s19_s21);
-        int x_s32 = 0;
-        validateX(1, x_s32);
-        int y_s36 = 0;
-        validateY((coefficients2_0[0]) * (_pac_sc_s19_s21[0]), y_s36);
-        int x2_s40 = 0;
-        validateX(1, x2_s40);
-        int y2_s44 = 0;
-        validateY(((coefficients2_0[0]) * (_pac_sc_s19_s21[0])) + -2, y2_s44);
-        boundary_cost = 1;
-        _pac_sc_s19 = 0 || (((((((shapeIdentity == 1) && (x_s32 == lx1)) && (y_s36 == ly1)) && (x2_s40 == lx2)) && (y2_s44 == ly2)) && (0 == dashed)) && (1 == arrow));
-      }
-      _pac_sc_s8_s10 = _pac_sc_s19;
-      dummyEndBoundary();
+      int[1] _pac_sc_s28_s30 = {0};
+      push(0, environment, j, _pac_sc_s28_s30);
+      int x_s36 = 0;
+      validateX(_pac_sc_s28_s30[0], x_s36);
+      int y_s40 = 0;
+      validateY(((coefficients2_0[0]) * (_pac_sc_s28_s30[0])) + 4, y_s40);
+      int x2_s44 = 0;
+      validateX(_pac_sc_s28_s30[0], x2_s44);
+      int y2_s48 = 0;
+      validateY(((coefficients2_0[1]) * (_pac_sc_s28_s30[0])) + 6, y2_s48);
+      bit _pac_sc_s28_s32 = 0 || (((((((shapeIdentity == 1) && (x_s36 == lx1)) && (y_s40 == ly1)) && (x2_s44 == lx2)) && (y2_s48 == ly2)) && (0 == dashed)) && (0 == arrow));
+      int x_s36_0 = 0;
+      validateX(_pac_sc_s28_s30[0], x_s36_0);
+      int y_s40_0 = 0;
+      validateY(((coefficients2_0[1]) * (_pac_sc_s28_s30[0])) + 6, y_s40_0);
+      int x2_s44_0 = 0;
+      validateX(((coefficients1_0[0]) * (_pac_sc_s28_s30[0])) + 2, x2_s44_0);
+      int y2_s48_0 = 0;
+      validateY(((coefficients2_0[1]) * (_pac_sc_s28_s30[0])) + 6, y2_s48_0);
+      loop_body_cost = 2;
+      _pac_sc_s28_s32 = _pac_sc_s28_s32 || (((((((shapeIdentity == 1) && (x_s36_0 == lx1)) && (y_s40_0 == ly1)) && (x2_s44_0 == lx2)) && (y2_s48_0 == ly2)) && (0 == dashed)) && (0 == arrow));
+      _pac_sc_s28 = _pac_sc_s28_s32;
     }
-    bit _pac_sc_s24 = _pac_sc_s8_s10;
-    if(!(_pac_sc_s8_s10))/*tmpceZ5MM.sk:102*/
-    {
-      int[1] _pac_sc_s24_s26 = {0};
-      push(0, environment, j, _pac_sc_s24_s26);
-      int x_s32_0 = 0;
-      validateX(1, x_s32_0);
-      int y_s36_0 = 0;
-      validateY(((coefficients2_0[0]) * (_pac_sc_s24_s26[0])) + 1, y_s36_0);
-      loop_body_cost = 1;
-      _pac_sc_s24 = 0 || (((shapeIdentity == 0) && (cx == x_s32_0)) && (cy == y_s36_0));
-    }
-    _pac_sc_s8_s10 = _pac_sc_s24;
+    _pac_sc_s12_s14 = _pac_sc_s28;
   }
-  assert (loop_body_cost != 0); //Assert at tmpceZ5MM.sk:104 (1155251585833636228)
+  assert (loop_body_cost != 0); //Assert at tmptaz_4Q.sk:104 (1777549926022692487)
   dummyEndLoop();
-  _out = _pac_sc_s8_s10;
-  minimize(((loop_body_cost + boundary_cost) + 1) + 1)
-''')
+  _out = _pac_sc_s12_s14;
+  minimize(((loop_body_cost + 1) + 2) + 2)''')
+    print e
+    for p in e.extrapolations():
+        showImage(fastRender(p.convertToSequence()))
