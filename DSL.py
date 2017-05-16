@@ -135,11 +135,19 @@ class Loop():
         
     def extrapolations(self):
         for b in self.body.extrapolations():
-            for ub,lb in [(1,0),(0,1),(0,0)]:
-                yield Loop(self.v, '%s + %d'%(self.bound,ub), b, lowerBound = self.lowerBound - lb)
+            for boundary in ([None] if self.boundary == None else self.boundary.extrapolations()):
+                for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
+                    yield Loop(self.v, '%s + %d'%(self.bound,ub), b,
+                               lowerBound = self.lowerBound - lb,
+                               boundary = boundary)
     def explode(self):
-        return Block([ Loop(self.v,self.bound,bodyExpression.explode(),lowerBound = self.lowerBound)
-                       for bodyExpression in self.body.items ])
+        shrapnel = [ Loop(self.v,self.bound,bodyExpression.explode(),lowerBound = self.lowerBound)
+                       for bodyExpression in self.body.items ]
+        if self.boundary != None:
+            shrapnel += [ Loop(self.v,self.bound,Block([]),lowerBound = self.lowerBound,
+                               boundary = bodyExpression.explode())
+                       for bodyExpression in self.boundary.items ]
+        return Block(shrapnel)
     def features(self):
         f2 = int(str(self.bound) == '2')
         f3 = int(str(self.bound) == '3')
@@ -159,6 +167,7 @@ class Block():
     def __init__(self, items): self.items = items
     def __str__(self): return "Block([%s])"%(", ".join(map(str,self.items)))
     def convertToPython(self):
+        if self.items == []: return "[]"
         return " + ".join([ x.convertToPython() for x in self.items ])
     def extrapolations(self):
         if self.items == []: yield self

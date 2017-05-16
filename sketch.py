@@ -49,8 +49,9 @@ def synthesizeProgram(parse):
                                                   1 if p.arrow else 0))
     
     source = '''
-pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
+pragma options "--bnd-unroll-amnt 8 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
     
+#define MAXIMUMLOOPITERATIONS 4
 #define MAXIMUMXCOORDINATE %d
 #define MAXIMUMYCOORDINATE %d
 #define HASCIRCLES %d

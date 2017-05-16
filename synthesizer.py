@@ -169,9 +169,10 @@ def viewSynthesisResults(arguments):
                 if len(extrapolations) > 10: break
 
             if framedExtrapolations != []:
+                framedExtrapolations = [loadImage(f)] + [fastRender(trace),fastRender(result.parse)] + framedExtrapolations
                 a = np.zeros((256,256*len(framedExtrapolations)))
                 for j,e in enumerate(framedExtrapolations):
-                    a[:,j*256:(1+j)*256] = e
+                    a[:,j*256:(1+j)*256] = 1 - e
                     a[:,j*256] = 0.5
                     a[:,(1+j)*256-1] = 0.5
                 a[0,:] = 0.5
@@ -212,7 +213,8 @@ def viewSynthesisResults(arguments):
             handle.write(latex)
         print "Wrote output to ../TikZpaper/%s"%name
 
-    analyzeFeatures(programFeatures)
+    if arguments.similarity:
+        analyzeFeatures(programFeatures)
 
         
 
@@ -225,6 +227,7 @@ if __name__ == '__main__':
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
     parser.add_argument('--extrapolate', default = False, action = 'store_true')
+    parser.add_argument('--similarity', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
 

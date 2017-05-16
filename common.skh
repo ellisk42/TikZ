@@ -92,6 +92,7 @@ generator bit iterator([int n], SHAPEVARIABLES , int[n] environment, int d, ref 
   int loop_bound_cost = 0,loop_body_cost,boundary_cost = 0;
   int loop_bound = bound_expression(environment, loop_bound_cost);
   for (int j = 0; j < loop_bound; j++) {
+    assert j < MAXIMUMLOOPITERATIONS;
     if (j > 0 && ??){
       dummyStartBoundary();
       hit = hit || block(SHAPEARGUMENTS,push(environment,j),d - 1, boundary_cost);

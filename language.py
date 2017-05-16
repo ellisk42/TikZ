@@ -615,12 +615,16 @@ class Sequence(Program):
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
     def framedRendering(self):
         parse = self
-        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
-        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
-        x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ])
-        y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ])
+        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ]) - 1
+        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ]) - 1
+        x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ]) + 1
+        y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ]) + 1
 
-        return render([self.TikZ()],yieldsPixels = True,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))[0]
+        x0 = min([x0,0])
+        y0 = min([y0,0])
+        x1 = max([x1,16])
+        y1 = max([y1,16])
+        return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
 
 
 def randomLineOfCode():
