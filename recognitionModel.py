@@ -473,12 +473,11 @@ class RecognitionModel():
         d = self.learnedDistances(np.array([ p.output for p in particles ]),
                                   np.tile(goal, (len(particles), 1, 1)))
         for j,p in enumerate(particles):
-            # todo: weight these correctly. one of them should be much worse than the other.
             if self.arguments.showParticles:
                 print "Distance vector:",d[j,:]
                 print "Likelihood:",p.logLikelihood
                 showImage(p.output + goal)
-            p.distance = (d[j,0], 5*d[j,1])
+            p.distance = (d[j,0], d[j,1])
 
     def trainDistance(self, numberOfExamples, checkpoint, restore = False):
         assert self.noisy
@@ -847,10 +846,11 @@ class RecognitionModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
-        likelihoodCoefficient = 0.058
-        distanceCoefficient = -9.34*0.01
-        priorCoefficient = 0.38
-        finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient*n.distance + priorCoefficient*n.program.logPrior(),
+        self.learnedParticleDistances(targetImage, finishedPrograms)
+        likelihoodCoefficient = 0.3
+        distanceCoefficient = (-7,-7)
+        priorCoefficient = 0.05
+        finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient[0]*n.distance[0] + distanceCoefficient[1]*n.distance[1] + priorCoefficient*n.program.logPrior(),
                               reverse = True)
         for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
