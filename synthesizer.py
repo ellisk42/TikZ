@@ -144,6 +144,7 @@ def viewSynthesisResults(arguments):
             print result.source
                     
         syntaxTree = parseSketchOutput(result.source)
+        syntaxTree = syntaxTree.fixReflections(result.parse.canonicalTranslation())
         #        print result.source
         print syntaxTree
         print syntaxTree.features()

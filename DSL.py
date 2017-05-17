@@ -81,6 +81,14 @@ class Reflection():
     def __init__(self, command, body):
         self.command = command
         self.body = body
+    def hoistReflection(self):
+        for j,p in enumerate(self.body.items):
+            if isinstance(p,Primitive):
+                newBlock = list(self.body.items)
+                del newBlock[j]
+                newBlock = Block(newBlock)
+                yield Block([p,Reflection(self.command,newBlock)])
+                
     def __str__(self):
         return "Reflection(%s,%s)"%(self.command,self.body)
     def convertToPython(self):
@@ -98,6 +106,9 @@ class Reflection():
 class Primitive():
     def __init__(self, k): self.k = k
     def __str__(self): return "Primitive(%s)"%self.k
+    def hoistReflection(self):
+        return
+        yield
     def convertToPython(self): return "[%s]"%self.k
     def extrapolations(self): yield self
     def explode(self):
@@ -114,6 +125,13 @@ class Loop():
         self.body = body
         self.boundary = boundary
         self.lowerBound = lowerBound
+    def hoistReflection(self):
+        for h in self.body.hoistReflection():
+            yield Loop(self.v,self.bound,h,boundary = self.boundary,lowerBound = self.lowerBound)
+        if self.boundary != None:
+            for h in self.boundary.hoistReflection():
+                yield Loop(self.v,self.bound,self.body,boundary = h,lowerBound = self.lowerBound)
+                
     def __str__(self):
         if self.boundary != None:
             return "Loop(%s, %s, %s, %s, boundary = %s)"%(self.v,self.lowerBound, self.bound,self.body,self.boundary)
@@ -179,6 +197,26 @@ class Block():
         return Block([ x.explode() for x in self.items ])
     def features(self):
         return addFeatures([ x.features() for x in self.items ])
+    def hoistReflection(self):
+        for j,x in enumerate(self.items):
+            for y in x.hoistReflection():
+                copy = list(self.items)
+                copy[j] = y
+                yield Block(copy)
+
+    def fixReflections(self,target):
+        distance = self.convertToSequence() - target
+        if distance == 0: return self
+
+        print "Fixing reflections"
+
+        candidates = [self] + list(self.hoistReflection())
+        sequences = [k.convertToSequence() for k in candidates ]
+        distances = [target - s for s in sequences ]
+        best = min(range(len(distances)),key = lambda k: distances[k])
+        if distances[best] == distance: return self
+        return candidates[best].fixReflections(target)
+            
 
 # return something that resembles a syntax tree, built using the above classes
 def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = None):
@@ -478,6 +516,9 @@ void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int l
 ''')
 #    e = [circle(4,10)] + [ _i for i in range(0,3) for _i in ([line(3*i + 1,4,3*i + 1,2,arrow = True,solid = True)] + reflect(y = 6)([circle(3*i + 1,1)] + [line(4,9,3*i + 1,6,arrow = True,solid = True)])) ]
     print e
+    for h in e.hoistReflection():
+        print h
+        showImage(fastRender(h.convertToSequence()))
 #    print len(e)
     # print e
     # for p in e.extrapolations():

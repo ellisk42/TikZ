@@ -98,6 +98,10 @@ class AbsolutePoint(Expression):
         self.x = x
         self.y = y
 
+    def translate(self,x,y):
+        return AbsolutePoint(Number(self.x.n + x),
+                             Number(self.y.n + y))
+
     def children(self): return [self.x,self.y]
     def substitute(self, old, new):
         return AbsolutePoint(self.x.substitute(old, new),
@@ -175,6 +179,8 @@ class Line(Program):
 #            raise Exception('Attempt to create line with zero length')
             pass
 
+    def translate(self,x,y):
+        return Line([p.translate(x,y) for p in self.points ],self.arrow, self.solid)
     def logPrior(self): return -math.log(14*14*14*14*2*2)
 
     def isDiagonal(self):
@@ -311,6 +317,9 @@ class Rectangle(Program):
         self.p1 = p1
         self.p2 = p2
     def logPrior(self): return -math.log(14*14*14*14)
+    def translate(self,x,y):
+        return Rectangle(self.p1.translate(x,y),
+                         self.p2.translate(x,y))
     @staticmethod
     def absolute(x1,y1,x2,y2):
         return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
@@ -433,6 +442,10 @@ class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius
+
+    def translate(self,x,y):
+        return Circle(self.center.translate(x,y),
+                      self.radius)
 
     @staticmethod
     def absolute(x,y): return Circle(AbsolutePoint(Number(x),Number(y)),Number(1))
@@ -625,6 +638,18 @@ class Sequence(Program):
         x1 = max([x1,16])
         y1 = max([y1,16])
         return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
+
+    def __sub__(self,o):
+        return len(set(map(str,o.lines))^set(map(str,self.lines)))
+
+    def translate(self,x,y):
+        return Sequence([z.translate(x,y) for z in self.lines ])
+
+    def canonicalTranslation(self):
+        parse = self
+        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
+        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
+        return self.translate(-x0,-y0)
 
 
 def randomLineOfCode():
