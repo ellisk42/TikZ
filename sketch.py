@@ -13,6 +13,7 @@ def synthesizeProgram(parse):
     hasCircles = False
     hasRectangles = False
     hasLines = False
+    noDiagonals = True
     arrows = [] #}settings of the arrow parameters that are observed in the data
     solid = [] # settings of the solid parameters are so served in the data
     
@@ -39,6 +40,7 @@ def synthesizeProgram(parse):
                                             p.p2.y.n - y0))
         elif isinstance(p,Line):
             hasLines = True
+            if p.isDiagonal(): noDiagonals = False
             arrows.append(p.arrow)
             solid.append(p.solid)
             parts.append("_l(%d,%d,%d,%d,%d,%d)"%(p.points[0].x.n - x0,
@@ -61,6 +63,7 @@ pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-in
 #define HASDASHED %d
 #define HASARROW %d
 #define HASNOARROW %d
+#define NODIAGONALS %d
 
 #include "common.skh"
 bit renderSpecification(SHAPEVARIABLES) {
@@ -81,6 +84,7 @@ bit renderSpecification(SHAPEVARIABLES) {
      hasCircles,hasRectangles,hasLines,
      (True in solid),(False in solid),
      (True in arrows),(False in arrows),
+     int(noDiagonals),
      " || ".join(parts))
 
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')

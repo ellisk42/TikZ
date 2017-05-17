@@ -132,6 +132,8 @@ generator bit primitive([int n,int m1,int m2], SHAPEVARIABLES , int[n] environme
       if (!HASARROW) ar = 0;
       if (!HASNOARROW) ar = 1;
       hit = _l(x,y,x2,y2,da,ar);
+
+      if (NODIAGONALS) assert x == x2 || y == y2;
       identity = LINE;
     } else {
       assert HASRECTANGLES;
