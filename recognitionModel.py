@@ -1005,7 +1005,6 @@ def handleTest(a):
                               targetImage,
                               beamSize = arguments.beamWidth,
                               beamLength = l)
-    if arguments.distance: model.closeDistanceSession()
     gotGroundTruth = None
     groundTruth = getGroundTruthParse(f)
     if groundTruth != None:
@@ -1021,6 +1020,7 @@ def handleTest(a):
     # place where we will save the parses
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
+    if arguments.distance: model.closeDistanceSession()
     return gotGroundTruth
     
 def picturesInDirectory(d):
