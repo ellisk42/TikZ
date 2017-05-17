@@ -138,7 +138,10 @@ def viewSynthesisResults(arguments):
             continue
 
         print " [+] %s"%f
-        print 
+        print
+
+        if arguments.debug:
+            print result.source
                     
         syntaxTree = parseSketchOutput(result.source)
         #        print result.source
@@ -151,10 +154,10 @@ def viewSynthesisResults(arguments):
 
         extrapolations = []
         if arguments.extrapolate:
-            syntaxTree = syntaxTree.explode()
+#            syntaxTree = syntaxTree.explode()
             trace = syntaxTree.convertToSequence()
             print trace
-            originalHasCollisions = trace.hasCollisions()
+            originalHasCollisions = result.parse.hasCollisions()
             print "COLLISIONS",originalHasCollisions
 
             framedExtrapolations = []
@@ -170,7 +173,10 @@ def viewSynthesisResults(arguments):
                 if len(extrapolations) > 10: break
 
             if framedExtrapolations != []:
-                framedExtrapolations = [loadImage(f)] + framedExtrapolations
+                if arguments.debug:
+                    framedExtrapolations = [loadImage(f), fastRender(syntaxTree.convertToSequence())] + framedExtrapolations
+                else:
+                    framedExtrapolations = [loadImage(f)] + framedExtrapolations
                 a = np.zeros((256,256*len(framedExtrapolations)))
                 for j,e in enumerate(framedExtrapolations):
                     a[:,j*256:(1+j)*256] = 1 - e
@@ -235,6 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
     parser.add_argument('--extrapolate', default = False, action = 'store_true')
+    parser.add_argument('--debug', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
