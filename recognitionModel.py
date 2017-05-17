@@ -715,7 +715,9 @@ class RecognitionModel():
 
             # record/remove all of the finished programs
             finishedPrograms += [ n for n in beam if n.finished() ]
-            beam = [ n for n in beam if not n.finished() ]                
+            beam = [ n for n in beam if not n.finished() ]
+
+            if beam == []: break            
 
             # Resample
             for n in beam:
