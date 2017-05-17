@@ -640,7 +640,7 @@ class RecognitionModel():
                          logLikelihood = 0.0,
                          count = beamSize,
                          time = 0.0,
-                         distance = asymmetricBlurredDistance(targetImage, np.zeros(targetImage.shape)))]
+                         distance = 999999999)]
 
         finishedPrograms = []
         
@@ -684,7 +684,7 @@ class RecognitionModel():
                                              parent = parent,
                                              time = time() - searchStartTime))
 
-            if lastIteration: children = [p for p in children if p.finished() ]
+            if lastIteration and self.arguments.task != 'evaluate': children = [p for p in children if p.finished() ]
                 
             if not self.arguments.quiet:
                 print "Ran neural network beam in %f seconds"%(time() - startTime)
@@ -773,11 +773,7 @@ class RecognitionModel():
             #     showImage(p.output)
         # Remove these pointers so that they can be garbage collected. Replaced distance with something more meaningful.
         for p in finishedPrograms:
-            p.distance = asymmetricBlurredDistance(targetImage,
-                                                   p.output,
-                                                   kernelSize = 7,
-                                                   factor = 1,
-                                                   invariance = 3)
+#            p.distance = None
             p.output = None
             p.parent = None
         return finishedPrograms
@@ -824,27 +820,20 @@ class RecognitionModel():
     
     def renderParticles(self,particles):
         startTime = time()
-        if not self.arguments.fastRender:
-            outputs = render([ (n.program if n.finished() else Sequence(n.program)).TikZ()
-                               for n in particles ],
-                             yieldsPixels = True,
-                             canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))
-        else:
-            # optimization: add the rendering of last command to the parent
-            outputs = []
-            for n in particles:
-                program = n.sequence().lines
-                o = n.parent.output
-                if len(program) > 0:
-                    o = fastRender(program[-1]) + o
-                    o[o > 1] = 1
-                outputs.append(o)
+        assert self.arguments.fastRender
+        # optimization: add the rendering of last command to the parent
+        outputs = []
+        for n in particles:
+            program = n.sequence().lines
+            o = n.parent.output
+            if len(program) > 0:
+                o = fastRender(program[-1]) + o
+                o[o > 1] = 1
+            outputs.append(o)
             
         if not self.arguments.quiet: print "Rendered in %f seconds"%(time() - startTime)
         for n,o in zip(particles,outputs):
             n.output = o
-            if not self.arguments.fastRender:
-                n.output = 1.0 - n.output
 
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
@@ -900,12 +889,12 @@ class RecognitionModel():
             os.system("feh /tmp/filters.png")
 
     def evaluateAccuracy(self):
-        # map from the number of objects in the scene to the best pixel distance of the model
-        pixelDistance = {}
         # similar map but for the rank of the correct program
         programRank = {}
         # distance from correct program to suggested program
         programDistance = {}
+        # intersection of reunion
+        intersectionDistance = {}
         # how long the search took
         searchTime = {}
 
@@ -922,8 +911,8 @@ class RecognitionModel():
         for targetProgram in targetPrograms:
             targetImage = fastRender(targetProgram)
             k = len(targetProgram.lines)
-            if not k in pixelDistance:
-                pixelDistance[k] = []
+            if not k in intersectionDistance:
+                intersectionDistance[k] = []
                 programRank[k] = []
                 programDistance[k] = []
                 searchTime[k] = []
@@ -936,7 +925,7 @@ class RecognitionModel():
             searchTime[k].append(time() - startTime)
             if particles == []:
                 print "No solutions."
-                pixelDistance[k].append(None)
+                intersectionDistance[k].append(None)
                 programRank[k].append(None)
                 programDistance[k].append(None)
                 continue
@@ -950,14 +939,13 @@ class RecognitionModel():
                 preference = lambda p: p.logLikelihood - p.distance*0.04
             particles.sort(key = preference,reverse = True)
             
-            # find the pixel distance of the preferred particle
+            # find the intersection distance of the preferred particle
             preferred = particles[0]
-            d = np.sum(np.abs(targetImage - fastRender(preferred.program)))
-            pixelDistance[k].append(d)
-
-            # find the program distance of the preferred particle
             targetSet = set(map(str,targetProgram.lines))
             preferredSet = set(map(str,preferred.program.lines))
+            intersectionDistance[k].append(len(targetSet&preferredSet)/float(len(targetSet|preferredSet)))
+
+            # find the program distance of the preferred particle
             programDistance[k].append(len(targetSet^preferredSet))
             
             # see if any of the programs match exactly
@@ -974,17 +962,17 @@ class RecognitionModel():
             # showImage(preferred.output)
 
         print programRank
-        print pixelDistance
+        print intersectionDistance
         print programDistance
         print searchTime
 
         n = len([ r for rs in programRank.values() for r in rs ])
         ranks = [ r for rs in programRank.values() for r in rs if r != None]
         programDistances = [ r for rs in programDistance.values() for r in rs if r != None]
-        pixelDistances = [ r for rs in pixelDistance.values() for r in rs if r != None]
+        intersectionDistances = [ r for rs in intersectionDistance.values() for r in rs if r != None]
         print "Got the correct program %d/%d times"%(len(ranks),n)
         print "Average program distance: %f"%(sum(programDistances)/float(len(programDistances)))
-        print "Average pixel distance: %f"%(sum(pixelDistances)/float(len(pixelDistances)))
+        print "Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances)))
         
         session.close()
                     
