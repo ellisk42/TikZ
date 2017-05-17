@@ -151,10 +151,10 @@ def viewSynthesisResults(arguments):
 
         extrapolations = []
         if arguments.extrapolate:
-            syntaxTree = syntaxTree.explode()
+#            syntaxTree = syntaxTree.explode()
             trace = syntaxTree.convertToSequence()
             print trace
-            originalHasCollisions = trace.hasCollisions()
+            originalHasCollisions = result.parse.hasCollisions()
             print "COLLISIONS",originalHasCollisions
 
             framedExtrapolations = []

@@ -371,6 +371,10 @@ class Particle():
     def sequence(self):
         if self.finished(): return self.program
         return Sequence(self.program)
+    def render(self):
+        if self.output is None:
+            self.output = fastRender(self.sequence())
+        return self.output
 
 class RecognitionModel():
     def __init__(self, arguments):
@@ -470,7 +474,7 @@ class RecognitionModel():
         if len(particles) > maximumBatchSize:
             self.learnedParticleDistances(goal, particles[maximumBatchSize:])
         particles = particles[:maximumBatchSize]
-        d = self.learnedDistances(np.array([ p.output for p in particles ]),
+        d = self.learnedDistances(np.array([ p.render() for p in particles ]),
                                   np.tile(goal, (len(particles), 1, 1)))
         for j,p in enumerate(particles):
             if self.arguments.showParticles:
@@ -860,7 +864,7 @@ class RecognitionModel():
             if j < 10:
                 print "Finished program: log likelihood %f"%(n.logLikelihood)
                 print n.program
-                print "Distance: %f"%(n.distance)
+                print "Distance: %s"%(str(n.distance))
                 print ""
 
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))

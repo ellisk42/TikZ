@@ -43,6 +43,9 @@ def learnedDistanceMatrix(images):
     for (x,y),d in zip(indexes, distances):
         matrix[x,y] += d
 
+    matrix = matrix + matrix.T
+    print "MATRIX:"
+    print matrix.tolist()
     return matrix
 
 
