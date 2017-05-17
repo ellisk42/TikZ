@@ -49,7 +49,7 @@ def synthesizeProgram(parse):
                                                   1 if p.arrow else 0))
     
     source = '''
-pragma options "--bnd-unroll-amnt 3 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
+pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
     
 #define MAXIMUMLOOPITERATIONS 4
 #define MAXIMUMXCOORDINATE %d
@@ -93,7 +93,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     od.close()
     outputFile = od.name
 
-    os.system('sketch --fe-timeout 60 -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
+    os.system('sketch --fe-timeout 180 -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
     os.remove(fd.name)
