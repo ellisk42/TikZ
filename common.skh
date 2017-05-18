@@ -93,7 +93,7 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
   int loop_bound = bound_expression(environment, loop_bound_cost);
   for (int j = 0; j < loop_bound; j++) {
     assert j < MAXIMUMLOOPITERATIONS;
-    if (j > 0 && ??){
+    if (j > 0 && ({| environment[0] | 1 |} > 0) && ??){
       dummyStartBoundary();
       hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, boundary_cost);
       dummyEndBoundary();
@@ -219,11 +219,13 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   int cost;
   int [2] coefficients1 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
   int [2] coefficients2 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
-  int numberOfCoefficients1 = {| 0 | 1 | 2|};
+  int numberOfCoefficients1 = {| 0 | 1 | 2 |};
   int numberOfCoefficients2 = {| 0 | 1 | 2 |};
   bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost);
+#ifdef USEPRIOR
   minimize(3*cost +
 	   (numberOfCoefficients1 == 2 ? 1 : 0) +
 	   (numberOfCoefficients2 == 2 ? 1 : 0));
+#endif
   return inScene;
 }

@@ -18,7 +18,8 @@ import time
 from multiprocessing import Pool
 
 class SynthesisResult():
-    def __init__(self, parse, time = None, source = None, cost = None, originalDrawing = None):
+    def __init__(self, parse, time = None, source = None, cost = None, originalDrawing = None, usePrior = True):
+        self.usePrior = usePrior
         self.originalDrawing = originalDrawing
         self.parse = parse
         self.time = time
@@ -28,21 +29,23 @@ class SynthesisResult():
         return self.source
 
 class SynthesisJob():
-    def __init__(self, parse, originalDrawing):
+    def __init__(self, parse, originalDrawing, usePrior = True):
         self.parse = parse
         self.originalDrawing = originalDrawing
+        self.usePrior = usePrior
     def __str__(self):
-        return "%s:\n%s"%(self.originalDrawing,str(self.parse))
+        return "SynthesisJob(%s) using the prior? %s:\n%s"%(self.originalDrawing,self.usePrior,str(self.parse))
     def execute(self):
         startTime = time.time()
-        result = synthesizeProgram(self.parse)
+        result = synthesizeProgram(self.parse,self.usePrior)
         elapsedTime = time.time() - startTime
         
         return SynthesisResult(parse = self.parse,
                                time = elapsedTime,
                                originalDrawing = self.originalDrawing,
                                source = result[1] if result != None else None,
-                               cost = result[0] if result != None else None)
+                               cost = result[0] if result != None else None,
+                               usePrior = self.usePrior)
 def invokeExecuteMethod(k):
     try:
         return k.execute()
@@ -82,7 +85,7 @@ def expertSynthesisJobs(k):
             continue
         
         for p in loadTopParticles(particleDirectory, k):
-            jobs.append(SynthesisJob(p.sequence(), originalDrawing))
+            jobs.append(SynthesisJob(p.sequence(), originalDrawing, usePrior = not arguments.noPrior))
 
     return jobs
 
@@ -93,7 +96,9 @@ def synthesizeTopK(k):
         sequence = groundTruthSequence[k]
         if all([ set(map(str,sequence.lines)) != set(map(str,j.parse.lines))
                 for j in jobs ]):
-            jobs.append(SynthesisJob(sequence,k))
+            jobs.append(SynthesisJob(sequence,k,usePrior = True))
+            if arguments.noPrior:
+                jobs.append(SynthesisJob(sequence,k,usePrior = False))
             
     results = parallelExecute(jobs)
     with open('topSynthesisResults.p','wb') as handle:
@@ -120,7 +125,7 @@ def viewSynthesisResults(arguments):
         result = None
         for r in results:
             if isinstance(r,SynthesisResult) and r.originalDrawing == f:
-                if set(map(str,r.parse.lines)) == parts:
+                if set(map(str,r.parse.lines)) == parts and r.usePrior == (not arguments.noPrior):
                     result = r
                     break
         if result == None:
@@ -163,7 +168,7 @@ def viewSynthesisResults(arguments):
                 if any([t == o for o in extrapolations ]): continue
                 extrapolations.append(t)
 
-                framedExtrapolations.append(t.framedRendering())
+                framedExtrapolations.append(t.framedRendering(result.parse))
 
                 if len(extrapolations) > 10: break
 
@@ -236,6 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
     parser.add_argument('--extrapolate', default = False, action = 'store_true')
+    parser.add_argument('--noPrior', default = False, action = 'store_true')
     parser.add_argument('--debug', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
 
@@ -247,13 +253,15 @@ if __name__ == '__main__':
         synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.file != None:
         if "drawings/expert-%s.png"%(arguments.file) in groundTruthSequence:
-            j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'')
+            j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'',
+                             usePrior = not arguments.noPrior)
             print j
             s = j.execute()
             print s
-            print parseSketchOutput(s)
+            print parseSketchOutput(s.source)
         else:
-            j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'')
+            j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'',
+                             usePrior = not arguments.noPrior)
             print j
             print j.execute()
                      

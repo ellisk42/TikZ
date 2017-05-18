@@ -8,7 +8,7 @@ import tempfile
 
 from language import *
 
-def synthesizeProgram(parse):
+def synthesizeProgram(parse,usePrior = True):
     parts = []
     hasCircles = False
     hasRectangles = False
@@ -52,7 +52,8 @@ def synthesizeProgram(parse):
     
     source = '''
 pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
-    
+
+%s    
 #define MAXIMUMLOOPITERATIONS 4
 #define MAXIMUMXCOORDINATE %d
 #define MAXIMUMYCOORDINATE %d
@@ -80,6 +81,7 @@ bit renderSpecification(SHAPEVARIABLES) {
   return %s;
 }
 '''%(biggestNumber,
+     ('#define USEPRIOR' if usePrior else ''),
      x1,y1,
      hasCircles,hasRectangles,hasLines,
      (True in solid),(False in solid),
@@ -104,15 +106,18 @@ bit renderSpecification(SHAPEVARIABLES) {
     os.remove(outputFile)
 
     # Recover the program length from the sketch output
-    programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
-    if programSize == []:
-        print "Synthesis failure!"
-        print output
-        return None
-    programSize = programSize[-1]
-    m = re.match('.*=([0-9]+),',programSize)
-    cost = int(m.group(1))
-
+    if usePrior:
+        programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
+        if programSize == []:
+            print "Synthesis failure!"
+            print output
+            return None
+        programSize = programSize[-1]
+        m = re.match('.*=([0-9]+),',programSize)
+        cost = int(m.group(1))
+    else:
+        cost = -1
+    
     # find the body of the synthesized code
     body = None
     for l in output.split('\n'):

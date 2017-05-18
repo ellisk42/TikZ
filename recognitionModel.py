@@ -936,7 +936,7 @@ class RecognitionModel():
             elif self.arguments.unguided:
                 preference = lambda p: p.program.logPrior() - p.distance
             else: # guided Monte Carlo
-                preference = lambda p: p.logLikelihood - p.distance*0.04
+                preference = lambda p: p.logLikelihood - p.distance*0.1
             particles.sort(key = preference,reverse = True)
             
             # find the intersection distance of the preferred particle

@@ -643,7 +643,7 @@ class Sequence(Program):
         else:
             r = choice(self.lines)
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
-    def framedRendering(self):
+    def extent(self):
         parse = self
         x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ]) - 1
         y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ]) - 1
@@ -654,6 +654,10 @@ class Sequence(Program):
         y0 = min([y0,0])
         x1 = max([x1,16])
         y1 = max([y1,16])
+
+        return (x0,y0,x1,y1)
+    def framedRendering(self, reference = None):
+        (x0,y0,x1,y1) = self.extent()
         return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
 
     def __sub__(self,o):
