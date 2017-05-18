@@ -233,11 +233,23 @@ class Line(Program):
     def mutate(self):
         a = self.arrow
         s = self.solid
-        if random() < 0.2: a = not a
-        if random() < 0.2: s = not s
+        ps = self.points
         
-        r = choice(self.points)
-        ps = [ (p.mutate() if p == r else p) for p in self.points ]
+        mutateArrow = random() < 0.2
+        mutateSolid = random() < 0.2
+
+        if mutateSolid: s = not s
+        if mutateArrow:
+            if not a: # it didn't have an arrow and now it does
+                # we need to randomly choose which side gets the arrow
+                if random() < 0.5:
+                    ps = list(reversed(ps))
+            a = not a
+        
+        if random() < 0.4 or ((not mutateArrow) and (not mutateSolid)):
+            r = choice(ps)
+            ps = [ (p.mutate() if p == r else p) for p in ps ]
+            
         if not a: ps = sorted(ps,key = lambda p: (p.x.n,p.y.n))
         return Line(ps, arrow = a, solid = s)
     @staticmethod
@@ -414,6 +426,8 @@ class Rectangle(Program):
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
     def mutate(self):
+        if self.p2.y.n - self.p1.y.n == 2 and self.p2.x.n - self.p1.x.n == 2 and random() < 0.5:
+            return Circle.absolute(p1.x.n + 1,p1.y.n + 1)
         while True:
             p1 = self.p1
             p2 = self.p2
@@ -486,6 +500,9 @@ class Circle(Program):
     def labeled(self,label):
         return "\\node(%s)[draw,circle,inner sep=0pt,minimum size = %dcm,line width = 0.1cm] at %s {};"%(label, self.radius*2, self.center)
     def mutate(self):
+        if random() < 0.15:
+            return Rectangle.absolute(self.center.x.n - 1, self.center.y.n - 1,
+                                      self.center.x.n + 1, self.center.y.n + 1)
         while True:
             c = Circle(self.center.mutate(), self.radius)
             if c.inbounds():

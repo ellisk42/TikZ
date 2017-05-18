@@ -3,7 +3,8 @@ from fastRender import fastRender
 from utilities import *
 
 
-from random import choice
+from random import choice,random
+import numpy as np
 from time import time
 
 def makeDistanceExamples(targets,programs, reportTime = False):
@@ -34,7 +35,9 @@ def makeDistanceExamples(targets,programs, reportTime = False):
         for _ in range(10):
             exampleTargets.append(target)
             prefixSize = choice(range(len(program) + 1))
-            mutant = Sequence(program.lines[:prefixSize])
+            stuff = program.lines
+            if random() < 0.4: stuff = np.random.permutation(stuff).tolist()
+            mutant = Sequence(stuff[:prefixSize])
             for _ in range(choice(range(max(prefixSize,1)))):
                 mutant = mutant.mutate()
             exampleImages.append(fastRender(mutant))
