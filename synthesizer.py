@@ -111,13 +111,12 @@ def synthesizeTopK(k):
                     jobs.append(SynthesisJob(sequence,k,usePrior = False))
     else:
         print "top jobs",len(jobs)
-        assert False
                     
     results = parallelExecute(jobs)
     if k == 0:
         name = 'groundTruthSynthesisResults.p'
     else:
-        name = 'topSynthesisResults.p'
+        name = 'top%dSynthesisResults.p'%k
     with open(name,'wb') as handle:
         pickle.dump(results, handle)
     print "Dumped %d results to %s"%(len(results),name)
