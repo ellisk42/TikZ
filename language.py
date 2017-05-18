@@ -98,6 +98,10 @@ class AbsolutePoint(Expression):
         self.x = x
         self.y = y
 
+    def translate(self,x,y):
+        return AbsolutePoint(Number(self.x.n + x),
+                             Number(self.y.n + y))
+
     def children(self): return [self.x,self.y]
     def substitute(self, old, new):
         return AbsolutePoint(self.x.substitute(old, new),
@@ -175,6 +179,8 @@ class Line(Program):
 #            raise Exception('Attempt to create line with zero length')
             pass
 
+    def translate(self,x,y):
+        return Line([p.translate(x,y) for p in self.points ],self.arrow, self.solid)
     def logPrior(self): return -math.log(14*14*14*14*2*2)
 
     def isDiagonal(self):
@@ -227,11 +233,23 @@ class Line(Program):
     def mutate(self):
         a = self.arrow
         s = self.solid
-        if random() < 0.2: a = not a
-        if random() < 0.2: s = not s
+        ps = self.points
         
-        r = choice(self.points)
-        ps = [ (p.mutate() if p == r else p) for p in self.points ]
+        mutateArrow = random() < 0.2
+        mutateSolid = random() < 0.2
+
+        if mutateSolid: s = not s
+        if mutateArrow:
+            if not a: # it didn't have an arrow and now it does
+                # we need to randomly choose which side gets the arrow
+                if random() < 0.5:
+                    ps = list(reversed(ps))
+            a = not a
+        
+        if random() < 0.4 or ((not mutateArrow) and (not mutateSolid)):
+            r = choice(ps)
+            ps = [ (p.mutate() if p == r else p) for p in ps ]
+            
         if not a: ps = sorted(ps,key = lambda p: (p.x.n,p.y.n))
         return Line(ps, arrow = a, solid = s)
     @staticmethod
@@ -311,6 +329,9 @@ class Rectangle(Program):
         self.p1 = p1
         self.p2 = p2
     def logPrior(self): return -math.log(14*14*14*14)
+    def translate(self,x,y):
+        return Rectangle(self.p1.translate(x,y),
+                         self.p2.translate(x,y))
     @staticmethod
     def absolute(x1,y1,x2,y2):
         return Rectangle(AbsolutePoint(Number(x1),Number(y1)),
@@ -405,6 +426,8 @@ class Rectangle(Program):
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
     def mutate(self):
+        if self.p2.y.n - self.p1.y.n == 2 and self.p2.x.n - self.p1.x.n == 2 and random() < 0.5:
+            return Circle.absolute(p1.x.n + 1,p1.y.n + 1)
         while True:
             p1 = self.p1
             p2 = self.p2
@@ -433,6 +456,10 @@ class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius
+
+    def translate(self,x,y):
+        return Circle(self.center.translate(x,y),
+                      self.radius)
 
     @staticmethod
     def absolute(x,y): return Circle(AbsolutePoint(Number(x),Number(y)),Number(1))
@@ -473,6 +500,9 @@ class Circle(Program):
     def labeled(self,label):
         return "\\node(%s)[draw,circle,inner sep=0pt,minimum size = %dcm,line width = 0.1cm] at %s {};"%(label, self.radius*2, self.center)
     def mutate(self):
+        if random() < 0.15:
+            return Rectangle.absolute(self.center.x.n - 1, self.center.y.n - 1,
+                                      self.center.x.n + 1, self.center.y.n + 1)
         while True:
             c = Circle(self.center.mutate(), self.radius)
             if c.inbounds():
@@ -625,6 +655,18 @@ class Sequence(Program):
         x1 = max([x1,16])
         y1 = max([y1,16])
         return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
+
+    def __sub__(self,o):
+        return len(set(map(str,o.lines))^set(map(str,self.lines)))
+
+    def translate(self,x,y):
+        return Sequence([z.translate(x,y) for z in self.lines ])
+
+    def canonicalTranslation(self):
+        parse = self
+        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
+        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
+        return self.translate(-x0,-y0)
 
 
 def randomLineOfCode():

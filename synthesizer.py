@@ -69,12 +69,6 @@ def loadTopParticles(directory, k):
         particles.append(pickle.load(open(f,'rb')))
         print " [+] Loaded %s"%(f)
 
-    distanceWeight = 0.1
-    priorWeight = 0.0
-
-    particles.sort(key = lambda p: p.logLikelihood - distanceWeight*p.distance + p.program.logPrior()*priorWeight,
-                   reverse = True)
-
     return particles[:k]
 
 # Synthesize based on the top k particles in drawings/expert*
@@ -144,6 +138,7 @@ def viewSynthesisResults(arguments):
             print result.source
                     
         syntaxTree = parseSketchOutput(result.source)
+        syntaxTree = syntaxTree.fixReflections(result.parse.canonicalTranslation())
         #        print result.source
         print syntaxTree
         print syntaxTree.features()

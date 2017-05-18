@@ -132,6 +132,8 @@ generator bit primitive([int n,int m1,int m2], SHAPEVARIABLES , int[n] environme
       if (!HASARROW) ar = 0;
       if (!HASNOARROW) ar = 1;
       hit = _l(x,y,x2,y2,da,ar);
+
+      if (NODIAGONALS) assert x == x2 || y == y2;
       identity = LINE;
     } else {
       assert HASRECTANGLES;
@@ -217,9 +219,11 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   int cost;
   int [2] coefficients1 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
   int [2] coefficients2 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
-  int numberOfCoefficients1 = ??;
-  int numberOfCoefficients2 = ??;
+  int numberOfCoefficients1 = {| 0 | 1 | 2|};
+  int numberOfCoefficients2 = {| 0 | 1 | 2 |};
   bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost);
-  minimize(cost + numberOfCoefficients1 + numberOfCoefficients2);
+  minimize(3*cost +
+	   (numberOfCoefficients1 == 2 ? 1 : 0) +
+	   (numberOfCoefficients2 == 2 ? 1 : 0));
   return inScene;
 }
