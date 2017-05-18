@@ -1,9 +1,10 @@
+from learnedRanking import learnToRank
 from similarity import analyzeFeatures
 from render import render
 from fastRender import fastRender
 from sketch import synthesizeProgram
 from language import *
-from utilities import showImage,loadImage,saveMatrixAsImage
+from utilities import showImage,loadImage,saveMatrixAsImage,mergeDictionaries,frameImageNicely
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence,getGroundTruthParse
 
@@ -27,6 +28,9 @@ class SynthesisResult():
         self.cost = cost
     def __str__(self):
         return self.source
+    def usedPrior(self):
+        if hasattr(self,'usePrior'): return self.usePrior
+        return True
 
 class SynthesisJob():
     def __init__(self, parse, originalDrawing, usePrior = True):
@@ -66,7 +70,7 @@ def parallelExecute(jobs):
 def loadTopParticles(directory, k):
     particles = []
     if directory.endswith('/'): directory = directory[:-1]
-    for j in range(200):
+    for j in range(k):
         f = directory + '/particle' + str(j) + '.p'
         if not os.path.isfile(f): break
         particles.append(pickle.load(open(f,'rb')))
@@ -110,12 +114,34 @@ def viewSynthesisResults(arguments):
     results = pickle.load(open('topSynthesisResults.p','rb'))
     print " [+] Loaded %d synthesis results."%(len(results))
 
+    interestingExtrapolations = [7,
+                                 #14,
+                                 17,
+                                 29,
+                                 #35,
+                                 52,
+                                 57,
+                                 63,
+                                 70,
+                                 72,
+                                 88,
+                                 #99]
+                                 ]
+                                 
+
     latex = []
     extrapolationMatrix = []
 
     programFeatures = {}
 
     for expertIndex in range(100):
+
+        if arguments.extrapolate:
+            if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
+                         for e in interestingExtrapolations ]):
+                continue
+            
+        
         f = 'drawings/expert-%d.png'%expertIndex
         parse = getGroundTruthParse(f)
         if parse == None:
@@ -125,7 +151,7 @@ def viewSynthesisResults(arguments):
         result = None
         for r in results:
             if isinstance(r,SynthesisResult) and r.originalDrawing == f:
-                if set(map(str,r.parse.lines)) == parts and r.usePrior == (not arguments.noPrior):
+                if set(map(str,r.parse.lines)) == parts and r.usedPrior() == (not arguments.noPrior):
                     result = r
                     break
         if result == None:
@@ -168,25 +194,27 @@ def viewSynthesisResults(arguments):
                 if any([t == o for o in extrapolations ]): continue
                 extrapolations.append(t)
 
-                framedExtrapolations.append(t.framedRendering(result.parse))
+                framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.parse)))
 
-                if len(extrapolations) > 10: break
+                if len(extrapolations) > 1: break
 
             if framedExtrapolations != []:
                 if arguments.debug:
                     framedExtrapolations = [loadImage(f), fastRender(syntaxTree.convertToSequence())] + framedExtrapolations
                 else:
-                    framedExtrapolations = [loadImage(f)] + framedExtrapolations
-                a = np.zeros((256,256*len(framedExtrapolations)))
+                    framedExtrapolations = [frameImageNicely(loadImage(f))] + framedExtrapolations
+                a = np.zeros((256*len(framedExtrapolations),256))
                 for j,e in enumerate(framedExtrapolations):
-                    a[:,j*256:(1+j)*256] = 1 - e
-                    a[:,j*256] = 0.5
-                    a[:,(1+j)*256-1] = 0.5
+                    a[j*256:(1+j)*256,:] = 1 - e
+                    a[j*256,:] = 0.5
+                    a[(1+j)*256-1,:] = 0.5
                 a[0,:] = 0.5
                 a[:,0] = 0.5
-                a[255,:] = 0.5
-                a[:,256*len(framedExtrapolations)-1] = 0.5
+                a[:,255] = 0.5
+                a[256*len(framedExtrapolations)-1,:] = 0.5
                 a = 255*a
+                # to show the first one
+                a = a[:(256*2),:]
                 extrapolationMatrix.append(a)
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
 
@@ -199,25 +227,25 @@ def viewSynthesisResults(arguments):
 %s
         \\end{verbatim}
 \\end{minipage}
-'''%(parseSketchOutput(result.source))
+'''%(parseSketchOutput(result.source).pretty())
         else:
             rightEntryOfTable = ""
         if extrapolations != [] and arguments.extrapolate:
             #}make the big matrix
-            bigMatrix = np.zeros((256*len(extrapolationMatrix),
-                                  max([m.shape[1] for m in extrapolationMatrix ])))
+            bigMatrix = np.zeros((max([m.shape[0] for m in extrapolationMatrix ]),256*len(extrapolationMatrix)))
             for j,r in enumerate(extrapolationMatrix):
-                bigMatrix[256*j:256*(j+1), 0:r.shape[1]] = r
+                bigMatrix[0:r.shape[0],256*j:256*(j+1)] = r
             saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrix.png')
             print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
             latex.append('''
-            \\begin{tabular}{ll}
+            \\begin{tabular}{lll}
     \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
+            \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d-parses/0.png}&
     %s
     \\end{tabular}        
-            '''%(expertIndex, rightEntryOfTable))
+            '''%(expertIndex, expertIndex, rightEntryOfTable))
             print
 
     if arguments.latex:
@@ -231,7 +259,58 @@ def viewSynthesisResults(arguments):
         analyzeFeatures(programFeatures)
 
         
+def rankUsingPrograms():
+    results = pickle.load(open('topSynthesisResults.p','rb'))
+    print " [+] Loaded %d synthesis results."%(len(results))
 
+    def getProgramForParse(sequence):
+        for r in results:
+            if sequence == r.parse and r.usedPrior():
+                return r
+        return None
+
+    def featuresOfParticle(p):
+        r = getProgramForParse(p.sequence())
+        if r != None and r.cost != None and r.source != None:
+            programFeatures = mergeDictionaries({'failure': 0.0},
+                                                parseSketchOutput(r.source).features())
+        else:
+            programFeatures = {'failure': 1.0}
+        parseFeatures = {'distance': p.distance[0] + p.distance[1],
+                'logPrior': p.sequence().logPrior(),
+                'logLikelihood': p.logLikelihood}
+        return mergeDictionaries(parseFeatures,programFeatures)
+    
+    k = arguments.learnToRank
+    topParticles = [loadTopParticles('drawings/expert-%d-parses'%j,k)
+                    for j in range(100) ]
+    learningProblems = []
+    for j,ps in enumerate(topParticles):
+        gt = getGroundTruthParse('drawings/expert-%d.png'%j)
+        positives = []
+        negatives = []
+        for p in ps:
+            if p.sequence() == gt: positives.append(p)
+            else: negatives.append(p)
+        if positives != [] and negatives != []:
+            learningProblems.append((map(featuresOfParticle,positives),
+                                     map(featuresOfParticle,negatives)))
+
+    featureIndices = list(set([ f
+                                for pn in learningProblems
+                                for exs in pn
+                                for ex in exs 
+                                for f in ex.keys() ]))
+    def dictionaryToVector(featureMap):
+        return [ featureMap.get(f,0.0) for f in featureIndices ]
+
+    learningProblems = [ (map(dictionaryToVector,positives), map(dictionaryToVector,negatives))
+                         for positives,negatives in learningProblems ]
+    parameters = learnToRank(learningProblems)
+    for f,p in zip(featureIndices,parameters):
+        print f,p
+        
+                                    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
@@ -244,11 +323,14 @@ if __name__ == '__main__':
     parser.add_argument('--noPrior', default = False, action = 'store_true')
     parser.add_argument('--debug', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
+    parser.add_argument('--learnToRank', default = None, type = int)
 
     arguments = parser.parse_args()
 
     if arguments.view:
         viewSynthesisResults(arguments)
+    elif arguments.learnToRank != None:
+        rankUsingPrograms()
     elif arguments.synthesizeTopK != None:
         synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.file != None:

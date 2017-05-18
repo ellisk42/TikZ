@@ -78,6 +78,8 @@ def addFeatures(fs):
     return composite
 
 class Reflection():
+    def pretty(self):
+        return "reflect(%s){\n%s\n}"%(self.command,self.body.pretty())
     def __init__(self, command, body):
         self.command = command
         self.body = body
@@ -104,6 +106,7 @@ class Reflection():
                              'reflectionsY':int('y' in self.command)},
                             self.body.features()])
 class Primitive():
+    def pretty(self): return self.k
     def __init__(self, k): self.k = k
     def __str__(self): return "Primitive(%s)"%self.k
     def hoistReflection(self):
@@ -119,6 +122,12 @@ class Primitive():
                 'rectangle':int('rectangle' in self.k),
                 'circles':int('circle' in self.k)}
 class Loop():
+    def pretty(self):
+        p = "for (%s < %s){\n"%(self.v,self.bound)
+        if self.boundary != None:
+            p += "if (%s > 0){\n%s\n}"%(self.v,self.boundary.pretty())
+        p += "%s\n}"%(self.body.pretty())
+        return p
     def __init__(self, v, bound, body, boundary = None, lowerBound = 0):
         self.v = v
         self.bound = bound
@@ -180,6 +189,7 @@ class Loop():
                             self.boundary.features() if self.boundary != None else {}])                             
                 
 class Block():
+    def pretty(self): return ";\n".join([x.pretty() for x in self.items ])
     def convertToSequence(self):
         return Sequence([ p.evaluate() for p in eval(self.convertToPython()) ])
     def __init__(self, items): self.items = items
