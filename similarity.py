@@ -1,6 +1,8 @@
 from recognitionModel import RecognitionModel
 from utilities import loadImage,removeBorder
 
+
+import random
 import numpy as np
 from sklearn.decomposition import PCA,NMF
 from sklearn import preprocessing
@@ -84,7 +86,8 @@ def analyzeFeatures(featureMaps):
         maximumExtent = max([transformedFeatures[:,0].max() - transformedFeatures[:,0].min(),
                              transformedFeatures[:,1].max() - transformedFeatures[:,1].min()])
         print maximumExtent
-
+        w = 0.09*maximumExtent
+        
         if algorithm < 2:
             print learner.components_
             for dimension in range(2):
@@ -95,22 +98,44 @@ def analyzeFeatures(featureMaps):
                 print 
 
         
-        f,a = plot.subplots()
+        
 
-        for j, imageName in enumerate(imageNames):
-            i = 1 - image.imread(imageName)
-            i = 1 - removeBorder(i)
-            x = transformedFeatures[j,0]
-            y = transformedFeatures[j,1]
-            w = 0.05*maximumExtent
-            a.imshow(i, aspect = 'auto',
-                     extent = (x - w,x + w,
-                               y - w,y + w),
-                     zorder = -1,
-                     cmap = plot.get_cmap('Greys'))
+        showProbability = []
+        for j in range(len(imageNames)):
+            overlapping = 0
+            for k in range(len(imageNames)):
+                if j == k: continue
+                d = transformedFeatures[j,:] - transformedFeatures[k,:]
+                d = d[0]*d[0] + d[1]*d[1]
+                if d < w*w:
+                    overlapping += 1
+            
+            showProbability.append(1.5/(1 + overlapping))
 
-        a.scatter(transformedFeatures[:,0],
-                  transformedFeatures[:,1])
-        plot.show()
+        for index in range(50):
+            f,a = plot.subplots()
+            for j, imageName in enumerate(imageNames):
+                if random.random() > showProbability[j]: continue
+
+                i = 1 - image.imread(imageName)
+                i = 1 - removeBorder(i)
+                x = transformedFeatures[j,0]
+                y = transformedFeatures[j,1]
+
+                a.imshow(i, aspect = 'auto',
+                         extent = (x - w,x + w,
+                                   y - w,y + w),
+                         zorder = -1,
+                         cmap = plot.get_cmap('Greys'))
+
+            a.scatter(transformedFeatures[:,0],
+                      transformedFeatures[:,1])
+            a.get_yaxis().set_visible(False)
+            a.get_xaxis().set_visible(False)
+
+            n = ['PCA','NMF','MDS'][algorithm]
+            plot.savefig('%s/%s%d.png'%(n,n,index),bbox_inches = 'tight')
+#            plot.show()
+
 
 
