@@ -1,6 +1,6 @@
 from recognitionModel import RecognitionModel
 from utilities import loadImage,removeBorder
-from calculate_distances import distanceMatrix
+
 
 import random
 import numpy as np
@@ -20,7 +20,8 @@ class DummyArguments():
         self.showParticles = False
         
 def learnedDistanceMatrix(images):
-    return np.array(distanceMatrix)
+    # from calculate_distances import distanceMatrix
+    # return np.array(distanceMatrix)
     worker = RecognitionModel(DummyArguments())
     worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
 
