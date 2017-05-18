@@ -50,6 +50,41 @@ def learnedDistanceMatrix(images):
     print matrix.tolist()
     return matrix
 
+if __name__ == '__main__':
+    worker = RecognitionModel(DummyArguments())
+    worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
+
+    imageNames = ['drawings/expert-%d.png'%j
+                  for j in range(100) ]
+    images = [ loadImage('/om/user/ellisk/%s'%n)
+               for n in imageNames ]
+    jobs = [(x,y) for j,x in enumerate(images)
+            for k,y in enumerate(images)
+            if j != k ]
+    distances = []
+    while jobs != []:
+        batch = jobs[:100]
+        jobs = jobs[100:]
+
+        print "%d jobs remaining"%len(jobs)
+
+        result = worker.learnedDistances(np.array([x for x,_ in batch ]),
+                                         np.array([x for _,x in batch ]))
+        for j in range(len(batch)):
+            distances.append(result[j,1] + result[j,0])
+
+    matrix = np.zeros((len(images),len(images)))
+    indexes = [(x,y) for x in range(len(images))
+               for y in range(len(images))
+               if x != y]
+    for (x,y),d in zip(indexes, distances):
+        matrix[x,y] += d
+
+    matrix = matrix + matrix.T
+    print "MATRIX:"
+    print matrix.tolist()
+    
+
 
 def analyzeFeatures(featureMaps):
     # collect together a whole of the different names for features
@@ -67,7 +102,7 @@ def analyzeFeatures(featureMaps):
         print featureMaps[n]
         print featureVectors[j]
 
-    for algorithm in range(3):
+    for algorithm in [1,2]:
         if algorithm == 0:
             learner = PCA()
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
