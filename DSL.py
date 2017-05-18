@@ -125,7 +125,7 @@ class Loop():
     def pretty(self):
         p = "for (%s < %s){\n"%(self.v,self.bound)
         if self.boundary != None:
-            p += "if (%s > 0){\n%s\n}"%(self.v,self.boundary.pretty())
+            p += "if (%s > 0){\n%s\n}\n"%(self.v,self.boundary.pretty())
         p += "%s\n}"%(self.body.pretty())
         return p
     def __init__(self, v, bound, body, boundary = None, lowerBound = 0):

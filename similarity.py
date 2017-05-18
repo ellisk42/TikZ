@@ -1,6 +1,6 @@
 from recognitionModel import RecognitionModel
 from utilities import loadImage,removeBorder
-
+from calculate_distances import distanceMatrix
 
 import random
 import numpy as np
@@ -20,6 +20,7 @@ class DummyArguments():
         self.showParticles = False
         
 def learnedDistanceMatrix(images):
+    return np.array(distanceMatrix)
     worker = RecognitionModel(DummyArguments())
     worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
 
@@ -102,7 +103,7 @@ def analyzeFeatures(featureMaps):
         print featureMaps[n]
         print featureVectors[j]
 
-    for algorithm in [1,2]:
+    for algorithm in [2]:
         if algorithm == 0:
             learner = PCA()
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
@@ -112,6 +113,7 @@ def analyzeFeatures(featureMaps):
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors),
                                                                             with_mean = False))
         if algorithm == 2:
+            imageNames = ["drawings/expert-%d.png"%j for j in range(100) ]
             distances = learnedDistanceMatrix(map(loadImage,imageNames))
             learner = MDS(dissimilarity = 'precomputed')
             transformedFeatures = learner.fit_transform(distances)

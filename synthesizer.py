@@ -82,32 +82,45 @@ def loadTopParticles(directory, k):
 # Just returns the jobs to synthesize these things
 def expertSynthesisJobs(k):
     jobs = []
-    for j in range(200):
+    for j in range(100):
         originalDrawing = 'drawings/expert-%d.png'%j
         particleDirectory = 'drawings/expert-%d-parses'%j
         if not os.path.exists(originalDrawing) or not os.path.exists(particleDirectory):
             continue
-        
+        newJobs = []
         for p in loadTopParticles(particleDirectory, k):
-            jobs.append(SynthesisJob(p.sequence(), originalDrawing, usePrior = not arguments.noPrior))
+            newJobs.append(SynthesisJob(p.sequence(), originalDrawing, usePrior = not arguments.noPrior))
+        # but we don't care about synthesizing if there wasn't a ground truth in them
+        if any([ newJob.parse == getGroundTruthParse(originalDrawing) for newJob in newJobs ]):
+            jobs += newJobs
+
+
 
     return jobs
 
 def synthesizeTopK(k):
     jobs = expertSynthesisJobs(k) if k > 0 else []
-    # Also synthesized from the ground truth
-    for k in groundTruthSequence:
-        sequence = groundTruthSequence[k]
-        if all([ set(map(str,sequence.lines)) != set(map(str,j.parse.lines))
-                for j in jobs ]):
-            jobs.append(SynthesisJob(sequence,k,usePrior = True))
-            if arguments.noPrior:
-                jobs.append(SynthesisJob(sequence,k,usePrior = False))
-            
+    # synthesized from the ground truth?
+    if k == 0:
+        for k in groundTruthSequence:
+            sequence = groundTruthSequence[k]
+            if all([ set(map(str,sequence.lines)) != set(map(str,j.parse.lines))
+                    for j in jobs ]):
+                jobs.append(SynthesisJob(sequence,k,usePrior = True))
+                if arguments.noPrior:
+                    jobs.append(SynthesisJob(sequence,k,usePrior = False))
+    else:
+        print "top jobs",len(jobs)
+        assert False
+                    
     results = parallelExecute(jobs)
-    with open('topSynthesisResults.p','wb') as handle:
+    if k == 0:
+        name = 'groundTruthSynthesisResults.p'
+    else:
+        name = 'topSynthesisResults.p'
+    with open(name,'wb') as handle:
         pickle.dump(results, handle)
-    print "Dumped %d results to topSynthesisResults.p"%(len(results))
+    print "Dumped %d results to %s"%(len(results),name)
         
 
 def viewSynthesisResults(arguments):
@@ -156,27 +169,27 @@ def viewSynthesisResults(arguments):
                     break
         if result == None:
             print "No synthesis result for %s"%f
-            continue
+            if arguments.extrapolate: continue
 
         if result.source == None:
             print "Synthesis failure for %s"%f
-            continue
+            if arguments.extrapolate: continue
 
         print " [+] %s"%f
         print
 
         if arguments.debug:
             print result.source
-                    
-        syntaxTree = parseSketchOutput(result.source)
-        syntaxTree = syntaxTree.fixReflections(result.parse.canonicalTranslation())
-        #        print result.source
-        print syntaxTree
-        print syntaxTree.features()
-        print syntaxTree.convertToPython()
-        print syntaxTree.convertToSequence()
-        #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
-        programFeatures[f] = syntaxTree.features()
+
+        if result != None and result.source != None:
+            syntaxTree = parseSketchOutput(result.source)
+            syntaxTree = syntaxTree.fixReflections(result.parse.canonicalTranslation())
+            print syntaxTree
+            print syntaxTree.features()
+            print syntaxTree.convertToPython()
+            print syntaxTree.convertToSequence()
+            #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
+            programFeatures[f] = syntaxTree.features()
 
         extrapolations = []
         if arguments.extrapolate:
@@ -227,7 +240,7 @@ def viewSynthesisResults(arguments):
 %s
         \\end{verbatim}
 \\end{minipage}
-'''%(parseSketchOutput(result.source).pretty())
+'''%(parseSketchOutput(result.source).pretty() if result != None and result.source != None else "Solver timeout")
         else:
             rightEntryOfTable = ""
         if extrapolations != [] and arguments.extrapolate:
@@ -239,13 +252,16 @@ def viewSynthesisResults(arguments):
             print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
+            parseImage = '\\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d-parses/0.png}'%expertIndex
+            if not os.path.exists('drawings/expert-%d-parses/0.png'%expertIndex):
+                parseImage = "Sampled no finished traces."
             latex.append('''
             \\begin{tabular}{lll}
     \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
-            \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d-parses/0.png}&
+            %s&
     %s
     \\end{tabular}        
-            '''%(expertIndex, expertIndex, rightEntryOfTable))
+            '''%(expertIndex, parseImage, rightEntryOfTable))
             print
 
     if arguments.latex:

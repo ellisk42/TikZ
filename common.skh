@@ -53,7 +53,7 @@ generator int bound_expression([int n], int[n] environment, ref int cost) {
 }
 
 // blocks are sequences of commands; can also introduce local variables.
-generator bit block([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment,int [m1] coefficients1, int [m2] coefficients2,  int d, ref int cost){
+generator bit block([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment,int [m1] coefficients1, int [m2] coefficients2,  int d, ref int cost, bit can_loop){
   assert d > 0;
   
   cost = 0;
@@ -72,19 +72,20 @@ generator bit block([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment,i
   
   if (??) {
     dummyStartLoop();
-    hit = hit || iterator(SHAPEARGUMENTS, environment, coefficients1, coefficients2, d, newCost, newIdentity);
+    hit = hit || iterator(SHAPEARGUMENTS, environment, coefficients1, coefficients2, d, newCost, newIdentity, can_loop);
     dummyEndLoop();
     cost += newCost;
   }
   
   if (??) {
-    hit = hit || reflection(SHAPEARGUMENTS, environment, coefficients1, coefficients2,  d, newCost, newIdentity);
+    hit = hit || reflection(SHAPEARGUMENTS, environment, coefficients1, coefficients2,  d, newCost, newIdentity, can_loop);
     cost += newCost;
   }
   return hit;
 }
 
-generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment, int [m1] coefficients1, int [m2] coefficients2, int d, ref int cost, ref int identity) {
+generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment, int [m1] coefficients1, int [m2] coefficients2, int d, ref int cost, ref int identity, bit can_loop) {
+  assert can_loop;
   assert d > 0;
   bit hit = 0;
   identity = LOOP;
@@ -95,11 +96,11 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
     assert j < MAXIMUMLOOPITERATIONS;
     if (j > 0 && ({| environment[0] | 1 |} > 0) && ??){
       dummyStartBoundary();
-      hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, boundary_cost);
+      hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, boundary_cost, 0);
       dummyEndBoundary();
     }
     
-    hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, loop_body_cost);
+    hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, loop_body_cost, 1);
   }
   assert loop_body_cost != 0;
   cost = loop_body_cost + loop_bound_cost + boundary_cost + 1;
@@ -144,7 +145,7 @@ generator bit primitive([int n,int m1,int m2], SHAPEVARIABLES , int[n] environme
   return hit;
 }
 
-generator bit reflection([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment, int [m1] coefficients1, int [m2] coefficients2, int d, ref int cost, ref int identity) {
+generator bit reflection([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment, int [m1] coefficients1, int [m2] coefficients2, int d, ref int cost, ref int identity, bit can_loop) {
   assert d > 0;
   bit hit = 0;
   
@@ -195,7 +196,7 @@ generator bit reflection([int n,int m1,int m2], SHAPEVARIABLES , int[n] environm
 	lx2 = xr == 0 ? lx2 : xr - (_lx1 - 0);
       }
     }
-    hit = hit || block(SHAPEARGUMENTS,environment,coefficients1,coefficients2,d - 1, reflection_cost);
+    hit = hit || block(SHAPEARGUMENTS,environment,coefficients1,coefficients2,d - 1, reflection_cost, can_loop);
   }
 
   dummyEndReflection();
@@ -221,7 +222,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   int [2] coefficients2 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
   int numberOfCoefficients1 = {| 0 | 1 | 2 |};
   int numberOfCoefficients2 = {| 0 | 1 | 2 |};
-  bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost);
+  bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost,1);
 #ifdef USEPRIOR
   minimize(3*cost +
 	   (numberOfCoefficients1 == 2 ? 1 : 0) +
