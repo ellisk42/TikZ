@@ -348,6 +348,10 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
             bound = parseExpression(m.group(2))
             body = parseSketchOutput(body, environment, loopDepth + 1, coefficients)
             v = ['i','j'][loopDepth]
+            if v == 'j' and boundary != None and False:
+                print "INNERLOOP"
+                print '\n'.join(output)
+                print "ENDOFINNERLOOP"
             commands += [Loop(v, bound, body, boundary)]
             continue
 
@@ -408,6 +412,104 @@ def renderEvaluation(s, exportTo = None):
     y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ])
 
     render([parse.TikZ()],showImage = exportTo == None,exportTo = exportTo,canvas = (x1+1,y1+1), x0y0 = (x0 - 1,y0 - 1))
+
+
+
+
+
+
+
+
+
+icingModelOutput = '''void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpzqJj8W.sk:209*/
+{
+  _out = 0;
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpzqJj8W.sk:210"; //Assume at tmpzqJj8W.sk:210
+  assume (shapeIdentity != 2): "Assume at tmpzqJj8W.sk:212"; //Assume at tmpzqJj8W.sk:212
+  assume (!(dashed)): "Assume at tmpzqJj8W.sk:216"; //Assume at tmpzqJj8W.sk:216
+  assume (!(arrow)): "Assume at tmpzqJj8W.sk:217"; //Assume at tmpzqJj8W.sk:217
+  int[2] coefficients1 = {-3,28};
+  int[2] coefficients2 = {-3,24};
+  int[0] environment = {};
+  int[1] coefficients1_0 = coefficients1[0::1];
+  int[1] coefficients2_0 = coefficients2[0::1];
+  dummyStartLoop();
+  int loop_body_cost = 0;
+  bit _pac_sc_s15_s17 = 0;
+  for(int j = 0; j < 3; j = j + 1)/*Canonical*/
+  {
+    assert (j < 4); //Assert at tmpzqJj8W.sk:96 (1334757887901394789)
+    bit _pac_sc_s31 = _pac_sc_s15_s17;
+    if(!(_pac_sc_s15_s17))/*tmpzqJj8W.sk:103*/
+    {
+      int[1] _pac_sc_s31_s33 = {0};
+      push(0, environment, j, _pac_sc_s31_s33);
+      dummyStartLoop();
+      int loop_body_cost_0 = 0;
+      int boundary_cost = 0;
+      bit _pac_sc_s15_s17_0 = 0;
+      for(int j_0 = 0; j_0 < 3; j_0 = j_0 + 1)/*Canonical*/
+      {
+        assert (j_0 < 4); //Assert at tmpzqJj8W.sk:96 (-4325113148049933570)
+        if(((j_0 > 0) && 1) && 1)/*tmpzqJj8W.sk:97*/
+        {
+          dummyStartBoundary();
+          bit _pac_sc_s26 = _pac_sc_s15_s17_0;
+          if(!(_pac_sc_s15_s17_0))/*tmpzqJj8W.sk:99*/
+          {
+            int[2] _pac_sc_s26_s28 = {0,0};
+            push(1, _pac_sc_s31_s33, j_0, _pac_sc_s26_s28);
+            int x_s39 = 0;
+            validateX(((coefficients1_0[0]) * (_pac_sc_s26_s28[1])) + 8, x_s39);
+            int y_s43 = 0;
+            validateY(((coefficients2_0[0]) * (_pac_sc_s26_s28[0])) + 7, y_s43);
+            int x2_s47 = 0;
+            validateX(((coefficients1_0[0]) * (_pac_sc_s26_s28[1])) + 9, x2_s47);
+            int y2_s51 = 0;
+            validateY(((coefficients2_0[0]) * (_pac_sc_s26_s28[0])) + 7, y2_s51);
+            assert ((x_s39 == x2_s47) || (y_s43 == y2_s51)); //Assert at tmpzqJj8W.sk:137 (2109344902378156491)
+            bit _pac_sc_s26_s30 = 0 || (((((((shapeIdentity == 1) && (x_s39 == lx1)) && (y_s43 == ly1)) && (x2_s47 == lx2)) && (y2_s51 == ly2)) && (0 == dashed)) && (0 == arrow));
+            int x_s39_0 = 0;
+            validateX(((coefficients1_0[0]) * (_pac_sc_s26_s28[0])) + 7, x_s39_0);
+            int y_s43_0 = 0;
+            validateY(((coefficients2_0[0]) * (_pac_sc_s26_s28[1])) + 8, y_s43_0);
+            int x2_s47_0 = 0;
+            validateX(((coefficients1_0[0]) * (_pac_sc_s26_s28[0])) + 7, x2_s47_0);
+            int y2_s51_0 = 0;
+            validateY(((coefficients2_0[0]) * (_pac_sc_s26_s28[1])) + 9, y2_s51_0);
+            assert ((x_s39_0 == x2_s47_0) || (y_s43_0 == y2_s51_0)); //Assert at tmpzqJj8W.sk:137 (8471357942716875626)
+            boundary_cost = 2;
+            _pac_sc_s26_s30 = _pac_sc_s26_s30 || (((((((shapeIdentity == 1) && (x_s39_0 == lx1)) && (y_s43_0 == ly1)) && (x2_s47_0 == lx2)) && (y2_s51_0 == ly2)) && (0 == dashed)) && (0 == arrow));
+            _pac_sc_s26 = _pac_sc_s26_s30;
+          }
+          _pac_sc_s15_s17_0 = _pac_sc_s26;
+          dummyEndBoundary();
+        }
+        bit _pac_sc_s31_0 = _pac_sc_s15_s17_0;
+        if(!(_pac_sc_s15_s17_0))/*tmpzqJj8W.sk:103*/
+        {
+          int[2] _pac_sc_s31_s33_0 = {0,0};
+          push(1, _pac_sc_s31_s33, j_0, _pac_sc_s31_s33_0);
+          int x_s39_1 = 0;
+          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[1])) + 7, x_s39_1);
+          int y_s43_1 = 0;
+          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[0])) + 7, y_s43_1);
+          loop_body_cost_0 = 1;
+          _pac_sc_s31_0 = 0 || (((shapeIdentity == 0) && (cx == x_s39_1)) && (cy == y_s43_1));
+        }
+        _pac_sc_s15_s17_0 = _pac_sc_s31_0;
+      }
+      assert (loop_body_cost_0 != 0); //Assert at tmpzqJj8W.sk:105 (710966093749967188)
+      dummyEndLoop();
+      loop_body_cost = (loop_body_cost_0 + boundary_cost) + 1;
+      _pac_sc_s31 = _pac_sc_s15_s17_0;
+    }
+    _pac_sc_s15_s17 = _pac_sc_s31;
+  }
+  assert (loop_body_cost != 0); //Assert at tmpzqJj8W.sk:105 (-6090248756724217227)
+  dummyEndLoop();
+  _out = _pac_sc_s15_s17;
+  minimize(3 * (loop_body_cost + 1))'''
 
 if __name__ == '__main__':
     e = parseSketchOutput('''

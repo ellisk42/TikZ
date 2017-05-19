@@ -20,8 +20,8 @@ class DummyArguments():
         self.showParticles = False
         
 def learnedDistanceMatrix(images):
-    # from calculate_distances import distanceMatrix
-    # return np.array(distanceMatrix)
+    from calculate_distances import distanceMatrix
+    return np.array(distanceMatrix)
     worker = RecognitionModel(DummyArguments())
     worker.loadDistanceCheckpoint("checkpoints/distance.checkpoint")
 
@@ -124,7 +124,7 @@ def analyzeFeatures(featureMaps):
         maximumExtent = max([transformedFeatures[:,0].max() - transformedFeatures[:,0].min(),
                              transformedFeatures[:,1].max() - transformedFeatures[:,1].min()])
         print maximumExtent
-        w = 0.09*maximumExtent
+        w = 0.2*maximumExtent
         
         if algorithm < 2:
             print learner.components_
@@ -148,7 +148,7 @@ def analyzeFeatures(featureMaps):
                 if d < w*w:
                     overlapping += 1
             
-            showProbability.append(1.5/(1 + overlapping))
+            showProbability.append(1.0/(1 + overlapping))
 
         for index in range(50):
             f,a = plot.subplots()

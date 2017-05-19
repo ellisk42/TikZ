@@ -1058,8 +1058,10 @@ if __name__ == '__main__':
     
     if arguments.fastRender:
         loadPrecomputedRenderings()
-    
-    if arguments.task == 'test':
+
+    if arguments.task == 'showSynthetic':
+        print "not implemented"
+    elif arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)
         if arguments.cores == 1:
             gt = map(handleTest, [ (f,arguments) for f in fs ])

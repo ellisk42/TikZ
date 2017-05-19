@@ -8,7 +8,7 @@ from utilities import showImage,loadImage,saveMatrixAsImage,mergeDictionaries,fr
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence,getGroundTruthParse
 
-from DSL import renderEvaluation,parseSketchOutput
+from DSL import *
 
 import traceback
 import re
@@ -31,6 +31,11 @@ class SynthesisResult():
     def usedPrior(self):
         if hasattr(self,'usePrior'): return self.usePrior
         return True
+
+icingResult = SynthesisResult(getGroundTruthParse('drawings/expert-38.png'),
+                              source = icingModelOutput,
+                              cost = 0,
+                              originalDrawing = 'drawings/expert-38.png')
 
 class SynthesisJob():
     def __init__(self, parse, originalDrawing, usePrior = True):
@@ -99,31 +104,37 @@ def expertSynthesisJobs(k):
     return jobs
 
 def synthesizeTopK(k):
+    if k == 0:
+        name = 'groundTruthSynthesisResults.p'
+    else:
+        name = 'top%dSynthesisResults.p'%k
+    if arguments.resume:
+        with open(name,'rb') as handle:
+            results = [ r for r in pickle.load(handle) if r.source != None ]
+        print "Resuming with",len(results),"old results."
+    else: results = []
+    
     jobs = expertSynthesisJobs(k) if k > 0 else []
     # synthesized from the ground truth?
     if k == 0:
         for k in groundTruthSequence:
             sequence = groundTruthSequence[k]
-            if all([ set(map(str,sequence.lines)) != set(map(str,j.parse.lines))
-                    for j in jobs ]):
+            if all([ not (r.parse == sequence)
+                    for r in results ]):
                 jobs.append(SynthesisJob(sequence,k,usePrior = True))
                 if arguments.noPrior:
                     jobs.append(SynthesisJob(sequence,k,usePrior = False))
     else:
         print "top jobs",len(jobs)
                     
-    results = parallelExecute(jobs)
-    if k == 0:
-        name = 'groundTruthSynthesisResults.p'
-    else:
-        name = 'top%dSynthesisResults.p'%k
+    results = parallelExecute(jobs) + results
     with open(name,'wb') as handle:
         pickle.dump(results, handle)
     print "Dumped %d results to %s"%(len(results),name)
         
 
 def viewSynthesisResults(arguments):
-    results = pickle.load(open('topSynthesisResults.p','rb'))
+    results = pickle.load(open(arguments.name,'rb'))
     print " [+] Loaded %d synthesis results."%(len(results))
 
     interestingExtrapolations = [7,
@@ -139,6 +150,7 @@ def viewSynthesisResults(arguments):
                                  88,
                                  #99]
                                  ]
+    interestingExtrapolations = list(range(100))
                                  
 
     latex = []
@@ -166,6 +178,7 @@ def viewSynthesisResults(arguments):
                 if set(map(str,r.parse.lines)) == parts and r.usedPrior() == (not arguments.noPrior):
                     result = r
                     break
+        if j == 38: result = icingResult
         if result == None:
             print "No synthesis result for %s"%f
             if arguments.extrapolate: continue
@@ -208,8 +221,9 @@ def viewSynthesisResults(arguments):
 
                 framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.parse)))
 
-                if len(extrapolations) > 1: break
-
+                if len(interestingExtrapolations) != 100:
+                    break
+                
             if framedExtrapolations != []:
                 if arguments.debug:
                     framedExtrapolations = [loadImage(f), fastRender(syntaxTree.convertToSequence())] + framedExtrapolations
@@ -247,7 +261,10 @@ def viewSynthesisResults(arguments):
             bigMatrix = np.zeros((max([m.shape[0] for m in extrapolationMatrix ]),256*len(extrapolationMatrix)))
             for j,r in enumerate(extrapolationMatrix):
                 bigMatrix[0:r.shape[0],256*j:256*(j+1)] = r
-            saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrix.png')
+            if len(extrapolations) < 10 and False:
+                saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrix.png')
+            else:
+                saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrixSupplement.png')
             print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
@@ -275,8 +292,8 @@ def viewSynthesisResults(arguments):
 
         
 def rankUsingPrograms():
-    results = pickle.load(open('topSynthesisResults.p','rb'))
-    print " [+] Loaded %d synthesis results."%(len(results))
+    results = pickle.load(open(arguments.name,'rb'))
+    print " [+] Loaded %d synthesis results from %s."%(len(results),arguments.name)
 
     def getProgramForParse(sequence):
         for r in results:
@@ -377,14 +394,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
     parser.add_argument('-f', '--file', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
+    parser.add_argument('-n', '--name', default = "groundTruthSynthesisResults.p", type = str)
     parser.add_argument('--view', default = False, action = 'store_true')
     parser.add_argument('--latex', default = False, action = 'store_true')
     parser.add_argument('--synthesizeTopK', default = None,type = int)
     parser.add_argument('--extrapolate', default = False, action = 'store_true')
     parser.add_argument('--noPrior', default = False, action = 'store_true')
     parser.add_argument('--debug', default = False, action = 'store_true')
+    parser.add_argument('--resume', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
     parser.add_argument('--learnToRank', default = None, type = int)
+    
 
     arguments = parser.parse_args()
 
