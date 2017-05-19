@@ -324,6 +324,52 @@ def rankUsingPrograms():
     parameters = learnToRank(learningProblems)
     for f,p in zip(featureIndices,parameters):
         print f,p
+
+    # showcases where it succeeds
+    programAccuracy = 0
+    oldAccuracy = 0
+    for j,tp in enumerate(topParticles):
+        if tp == []: continue
+        
+        gt = getGroundTruthParse('drawings/expert-%d.png'%j)
+        # the_top_particles_according_to_the_learned_weights
+        featureVectors = np.array([ dictionaryToVector(featuresOfParticle(p))
+                                    for p in tp ])
+        particleScores = featureVectors.dot(parameters)
+        bestParticleUsingPrograms = max(zip(particleScores.tolist(),tp))[1]
+        programPredictionCorrect = False
+        if bestParticleUsingPrograms.sequence() == gt:
+            print "Prediction using the program is correct."
+            programPredictionCorrect = True
+            programAccuracy += 1
+        else:
+            print "Prediction using the program is incorrect."
+        oldPredictionCorrect = tp[0].sequence() == gt
+        print "Was the old prediction correct?",oldPredictionCorrect
+        oldAccuracy += int(oldPredictionCorrect)
+
+        visualization = np.zeros((256,256*3))
+        visualization[:,:256] = 1 - frameImageNicely(loadImage('drawings/expert-%d.png'%j))
+        visualization[:,256:(256*2)] = frameImageNicely(fastRender(tp[0].sequence()))
+        visualization[:,(256*2):(256*3)] = frameImageNicely(fastRender(bestParticleUsingPrograms.sequence()))
+        visualization[:,256] = 0.5
+        visualization[:,256*2] = 0.5
+        visualization = 255*visualization
+        
+        if not oldPredictionCorrect and programPredictionCorrect:
+            print "Great success!"
+            saveMatrixAsImage(visualization,"../TikZpaper/figures/programSuccess%d.png"%j)
+
+            
+        if oldPredictionCorrect and not programPredictionCorrect:
+            print "Minor setback!"
+            print particleScores
+            
+
+            
+            
+    print programAccuracy,"vs",oldAccuracy
+            
         
                                     
 

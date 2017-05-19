@@ -106,7 +106,7 @@ class Reflection():
                              'reflectionsY':int('y' in self.command)},
                             self.body.features()])
 class Primitive():
-    def pretty(self): return self.k
+    def pretty(self): return self.k.replace(',arrow',',\narrow')
     def __init__(self, k): self.k = k
     def __str__(self): return "Primitive(%s)"%self.k
     def hoistReflection(self):
