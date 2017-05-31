@@ -1005,9 +1005,6 @@ if __name__ == '__main__':
     if arguments.task == 'evaluate':
         assert 'clean' in arguments.checkpoint
     
-    if arguments.fastRender:
-        loadPrecomputedRenderings()
-
     if arguments.task == 'showSynthetic':
         print "not implemented"
     elif arguments.task == 'test':
