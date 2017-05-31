@@ -126,6 +126,9 @@ def synthesizeTopK(k):
                     jobs.append(SynthesisJob(sequence,k,usePrior = False))
     else:
         print "top jobs",len(jobs)
+        
+    print "# jobs",len(jobs)
+    flushEverything()
                     
     results = parallelExecute(jobs) + results
     with open(name,'wb') as handle:
