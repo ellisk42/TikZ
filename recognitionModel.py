@@ -115,7 +115,9 @@ def loadExamples(numberOfExamples, dummyImages = True, noisy = False, distance =
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
         # A placeholder for each target
-        self.targetPlaceholder = [ tf.placeholder(tf.int32, [None]) for _ in self.outputDimensions ]
+        self.targetPlaceholder = [ (tf.placeholder(tf.int32, [None]) if d >= 0
+                                    else tf.placeholder(tf.floatd32, [None]))
+                                   for d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
 
@@ -131,6 +133,7 @@ class StandardPrimitiveDecoder():
                                                              self.hiddenSizes[j],
                                                              activation = tf.nn.sigmoid)
                 self.prediction.append(tf.layers.dense(intermediateRepresentation, d, activation = None))
+#            if :
             predictionInputs = tf.concat([predictionInputs,
                                           tf.one_hot(self.targetPlaceholder[j], d)],
                                          axis = 1)

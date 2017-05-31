@@ -1,3 +1,6 @@
+from utilities import lseList
+
+import math
 import numpy as np
 import matplotlib.pyplot as plot
 import tensorflow as tf
@@ -27,6 +30,13 @@ def sampleMixture(u,v,p):
     components = len(u)
     j = np.random.choice(range(components),p = p)
     return np.random.normal()*(v[j]**0.5) + u[j]
+
+def beamMixture(u,v,p,interval,k):
+    def score(x):
+        return lseList([ math.log(p[j]) - 0.5*math.log(v[j]) - 0.5*(x - u[j])**2/v[j]
+                         for j in range(len(u)) ])
+    scores = [(i,score(i)) for i in interval ]
+    return sorted(scores,key = lambda z: z[1],reverse = True)[:k]
 
 if __name__ == '__main__':
     NSAMPLE = 1000
@@ -72,6 +82,9 @@ if __name__ == '__main__':
     print predictMeans[0]
     y_predicted = [sampleMixture(predictMeans[j],predictVariance[j],predictMixture[j])
                    for j in range(NSAMPLE) ]
+    xs = np.arange(-10,10,0.1)
+    y_predicted = [beamMixture(predictMeans[j],predictVariance[j],predictMixture[j], xs, 1)[0][0]
+    for j in range(NSAMPLE) ]
 
     
     plot.figure(figsize=(8, 8))

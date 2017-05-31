@@ -104,7 +104,7 @@ def analyzeFeatures(featureMaps):
         print featureMaps[n]
         print featureVectors[j]
 
-    for algorithm in [2]:
+    for algorithm in [0,1]:
         if algorithm == 0:
             learner = PCA()
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
@@ -124,7 +124,7 @@ def analyzeFeatures(featureMaps):
         maximumExtent = max([transformedFeatures[:,0].max() - transformedFeatures[:,0].min(),
                              transformedFeatures[:,1].max() - transformedFeatures[:,1].min()])
         print maximumExtent
-        w = 0.2*maximumExtent
+        w = 0.05*maximumExtent
         
         if algorithm < 2:
             print learner.components_

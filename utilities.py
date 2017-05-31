@@ -154,19 +154,14 @@ def removeBorder(x):
 
 def frameImageNicely(x):
     x = removeBorder(x)
-    print x
-    print x.shape
     l = max([x.shape[0],x.shape[1]])
     b = 15
     z = np.zeros((l + 2*b,l + 2*b))
     z[b:x.shape[0]+b,b:x.shape[1]+b] = x
 
 
-    import cv2
     import scipy.ndimage
     return scipy.ndimage.zoom(z,256.0/(2*b+l))
-    return cv2.resize(z,(256,256),
-                      cv2.INTER_LINEAR)[0,:,:]
 
         
 
