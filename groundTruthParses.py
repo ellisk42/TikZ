@@ -111,13 +111,13 @@ groundTruth['drawings/expert-98.png'] = set(['Circle(center = (5,9), radius = 1)
 groundTruth['drawings/expert-99.png'] = set(['Circle(center = (2,8), radius = 1)', 'Rectangle((4,7), (6,9))', 'Rectangle((1,10), (3,12))', 'Rectangle((1,4), (3,6))', 'Circle(center = (2,14), radius = 1)', 'Circle(center = (5,11), radius = 1)', 'Rectangle((4,13), (6,15))', 'Circle(center = (5,5), radius = 1)'])
 
 def parseLineOfCode(l):
-    points = [ AbsolutePoint(Number(int(x)),Number(int(y))) for x,y in re.findall('\(([0-9]+),([0-9]+)\)',l) ]
+    points = [ AbsolutePoint((int(x)),(int(y))) for x,y in re.findall('\(([0-9]+),([0-9]+)\)',l) ]
     if l.startswith('Line'):
         arrow = 'arrow = True' in l
         solid = 'solid = True' in l
         return Line(points,arrow, solid)
     if l.startswith('Circle'):
-        return Circle(points[0],Number(1))
+        return Circle(points[0],(1))
     if l.startswith('Rectangle'):
         return Rectangle(points[0],points[1])
     assert False

@@ -154,14 +154,29 @@ def loadPrecomputedRenderings():
 
 if __name__ == '__main__':
     loadPrecomputedRenderings()
-    for _ in range(20):
-        p = [Rectangle.sample(), Circle.sample(), Line.sample()] #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
-    #    p.solid = True
-    #    p.arrow = False
-        print p
-        correct = (1 - render([Sequence(p).TikZ()],yieldsPixels = True)[0])
-        fast = (fastRender(Sequence(p)))
-        showImage(correct)
-        showImage(fast)
-            # showImage(correct - fast)
-            # print np.sum(np.abs(correct - fast))
+        
+    s = Sequence.sample(10)
+    print s
+    x = render([s.TikZ()],yieldsPixels = True)[0]*256
+    y = (s.draw())
+
+    showImage(np.concatenate([x,y]))
+
+    # rendering benchmarking
+    startTime = time()
+    N = 10000
+    for _ in range(N):
+        fastRender(s)
+    print "%f fps"%(N/(time() - startTime))
+
+    # for _ in range(20):
+    #     p = [Rectangle.sample(), Circle.sample(), Line.sample()] #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
+    # #    p.solid = True
+    # #    p.arrow = False
+    #     print p
+    #     correct = (1 - render([Sequence(p).TikZ()],yieldsPixels = True)[0])
+    #     fast = (fastRender(Sequence(p)))
+    #     showImage(correct)
+    #     showImage(fast)
+    #         # showImage(correct - fast)
+    #         # print np.sum(np.abs(correct - fast))

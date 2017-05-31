@@ -8,9 +8,9 @@ from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsy
 from fastRender import fastRender,loadPrecomputedRenderings
 from makeSyntheticData import randomScene
 from groundTruthParses import getGroundTruthParse
+from loadTrainingExamples import *
 
 import argparse
-import tarfile
 import sys
 import tensorflow as tf
 import os
@@ -31,92 +31,12 @@ TESTINGFRACTION = 0.1
 
 [STOP,CIRCLE,LINE,RECTANGLE] = range(4)
 
-def loadTar(f = 'syntheticTrainingData.tar'):
-    if os.path.isfile('/om/user/ellisk/%s'%f):
-        handle = '/om/user/ellisk/%s'%f
-    else:
-        handle = f
-    print "Loading data from",handle
-    handle = tarfile.open(handle)
-    
-    # just load everything into RAM - faster that way. screw you tar
-    members = {}
-    for member in handle:
-        if member.name == '.': continue
-        stuff = handle.extractfile(member)
-        members[member.name] = stuff.read()
-        stuff.close()
-    handle.close()
-
-    print "Loaded tar file into RAM: %d entries."%len(members)
-    return members
-
-def loadExamples(numberOfExamples, dummyImages = True, noisy = False, distance = False):
-    noisyTrainingData = noisy
-    
-    members = loadTar()
-    programNames = [ "./randomScene-%d.p"%(j)
-                     for j in range(numberOfExamples) ]
-    programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
-
-    print "Loaded pickles."
-
-    if distance:
-        noisyTarget = [ "./randomScene-%d-noisy.png"%(j) for j in range(numberOfExamples) ]
-        for t in noisyTarget:
-            cacheImage(t,members[t])
-        return np.array(noisyTarget),np.array(programs)
-
-    startingExamples = []
-    endingExamples = []
-    target = {}
-
-    # for debugging purposes / analysis, keep track of the target line
-    targetLine = []
-
-    startTime = time()
-    # get one example from each line of each program
-    for j,program in enumerate(programs):
-        if j%10000 == 1:
-            print "Loaded %d/%d programs"%(j - 1,len(programs))
-        trace = [ "./randomScene-%d-%d.png"%(j, k) for k in range(len(program)) ]
-        noisyTarget = "./randomScene-%d-noisy.png"%(j) if noisyTrainingData else trace[-1]
-        # cache the images
-        for imageFilename in [noisyTarget] + trace:
-            cacheImage(imageFilename, members[imageFilename])
-        if not dummyImages:
-            trace = loadImages(trace)
-            noisyTarget = loadImage(noisyTarget)
-        
-        targetImage = trace[-1]
-        currentImage = "blankImage" if dummyImages else np.zeros(targetImage.shape)
-        for k,l in enumerate(program.lines):
-            startingExamples.append(currentImage)
-            endingExamples.append(noisyTarget)
-            targetLine.append(l)
-            currentImage = trace[k]
-            for j,t in enumerate(PrimitiveDecoder.extractTargets(l)):
-                if not j in target: target[j] = []
-                target[j].append(t)
-        # end of program
-        startingExamples.append(targetImage)
-        endingExamples.append(noisyTarget)
-        targetLine.append(None)
-        for j in target:
-            target[j] += [STOP] # should be zero and therefore valid for everyone
-            
-    targetVectors = [np.array(target[j]) for j in sorted(target.keys()) ]
-
-    print "loaded images in",(time() - startTime),"s"
-    print "target dimensionality:",len(targetVectors)
-
-    return np.array(startingExamples), np.array(endingExamples), targetVectors, np.array(targetLine)
 
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
         # A placeholder for each target
         self.targetPlaceholder = [ (tf.placeholder(tf.int32, [None]) if d >= 0
-                                    else tf.placeholder(tf.floatd32, [None]))
+                                    else tf.placeholder(tf.float32, [None]))
                                    for d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
@@ -191,9 +111,9 @@ class CircleDecoder(StandardPrimitiveDecoder):
 
     @staticmethod
     def extractTargets(l):
-        if isinstance(l,Circle):
-            return [coordinate2grid(l.center.x.n),
-                    coordinate2grid(l.center.y.n)]
+        if l != None and isinstance(l,Circle):
+            return [coordinate2grid(l.center.x),
+                    coordinate2grid(l.center.y)]
         return [0,0]
 
 class RectangleDecoder(StandardPrimitiveDecoder):
@@ -219,11 +139,11 @@ class RectangleDecoder(StandardPrimitiveDecoder):
 
     @staticmethod
     def extractTargets(l):
-        if isinstance(l,Rectangle):
-            return [coordinate2grid(l.p1.x.n),
-                    coordinate2grid(l.p1.y.n),
-                    coordinate2grid(l.p2.x.n),
-                    coordinate2grid(l.p2.y.n)]
+        if l != None and isinstance(l,Rectangle):
+            return [coordinate2grid(l.p1.x),
+                    coordinate2grid(l.p1.y),
+                    coordinate2grid(l.p2.x),
+                    coordinate2grid(l.p2.y)]
         return [0]*4
 
 class LineDecoder(StandardPrimitiveDecoder):
@@ -251,11 +171,11 @@ class LineDecoder(StandardPrimitiveDecoder):
 
     @staticmethod
     def extractTargets(l):
-        if isinstance(l,Line):
-            return [coordinate2grid(l.points[0].x.n),
-                    coordinate2grid(l.points[0].y.n),
-                    coordinate2grid(l.points[1].x.n),
-                    coordinate2grid(l.points[1].y.n),
+        if l != None and isinstance(l,Line):
+            return [coordinate2grid(l.points[0].x),
+                    coordinate2grid(l.points[0].y),
+                    coordinate2grid(l.points[1].x),
+                    coordinate2grid(l.points[1].y),
                     int(l.arrow),
                     int(l.solid)]
         return [0]*6
@@ -319,7 +239,7 @@ class PrimitiveDecoder():
         '''Given a line of code l, what is the array of targets (int's) we expect the decoder to produce?'''
         t = [STOP]
         for d in PrimitiveDecoder.decoderClasses:
-            if isinstance(l,d.languagePrimitive):
+            if l != None and isinstance(l,d.languagePrimitive):
                 t = [d.token]
                 break
         for d in PrimitiveDecoder.decoderClasses:
@@ -420,7 +340,6 @@ class RecognitionModel():
                                      pool_size = architecture.poolSizes[0],
                                      strides = architecture.poolStrides[0],
                                      padding = "same")
-        print c1
 
         numberOfFilters = architecture.numberOfFilters
         kernelSizes = architecture.kernelSizes
@@ -532,13 +451,11 @@ class RecognitionModel():
                 flushEverything()
 
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
-        partialImages,targetImages,targetVectors,_ = loadExamples(numberOfExamples, noisy = self.noisy)
+        noisyTarget,programs = loadExamples(numberOfExamples)
         
         initializer = tf.global_variables_initializer()
-        iterator = BatchIterator(50,tuple([partialImages,targetImages] + targetVectors),
+        iterator = BatchIterator(10,(np.array(noisyTarget),np.array(programs)),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
-        iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
-                                      self.decoder.placeholders())
         saver = tf.train.Saver()
 
         flushEverything()
@@ -548,10 +465,12 @@ class RecognitionModel():
                 s.run(initializer)
             else:
                 saver.restore(s, checkpoint)
+            
             for e in range(20):
                 epicLoss = []
                 epicAccuracy = []
-                for feed in iterator.epochFeeds():
+                for ts,ps in iterator.epochExamples():
+                    feed = self.makeTrainingFeed(ts,ps)
                     if self.arguments.noisy:
                         feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
                     feed[self.trainingPredicatePlaceholder] = True
@@ -561,14 +480,41 @@ class RecognitionModel():
                     epicAccuracy.append(accuracy)
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
                 testingAccuracy = []
-                for feed in iterator.testingFeeds():
-                    if self.arguments.noisy:
-                        feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
+                for ts,ps in iterator.testingExamples():
+                    feed = self.makeTrainingFeed(ts,ps)
                     feed[self.trainingPredicatePlaceholder] = False
                     testingAccuracy.append(s.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
                 print "Saving checkpoint: %s" % saver.save(s, checkpoint)
                 flushEverything()
+
+    def makeTrainingFeed(self, targets, programs):
+        # goal, current, predictions
+        gs = []
+        cs = []
+        ps = []
+        for target, program in zip(targets, programs):
+            if not self.arguments.noisy:
+                target = program.draw()
+            for j in range(len(program) + 1):
+                gs.append(target)
+                cs.append(Sequence(program.lines[:j]).draw())
+                l = None
+                if j < len(program): l = program.lines[j]
+                ps.append(self.decoder.extractTargets(l))
+
+        gs = np.array(gs)
+        cs = np.array(cs)
+        ps = np.array(ps)
+        
+        if self.arguments.noisy: gs = augmentData(gs)
+        
+        f = {self.goalPlaceholder: gs,
+             self.currentPlaceholder: cs}
+        for j,p in enumerate(self.decoder.placeholders()):
+            f[p] = ps[:,j]
+        return f
+        
 
     def analyzeFailures(self, numberOfExamples, checkpoint):
         partialImages,targetImages,targetVectors,targetLines = loadExamples(numberOfExamples,noisy = self.noisy)

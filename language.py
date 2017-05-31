@@ -7,16 +7,7 @@ from utilities import linesIntersect,truncatedNormal,showImage
 import math
 
 import cairo
-
-# data = np.zeros((256, 256), dtype=np.uint8)
-# surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_A8,256,256)
-# context = cairo.Context(surface)
-# context.set_line_width(5)
-# context.set_source_rgb(256,256,256)
-# context.rectangle(0.2,0.2,50,50)
-# context.stroke()
-# showImage(data)
-
+from time import time
 
 '''
 Programs: evaluator maps to trace
@@ -380,17 +371,16 @@ class Rectangle(Program):
         h = y2 - y1
         cx = (x2 + x1)/2.0 + centerNoise()
         cy = (y2 + y1)/2.0 + centerNoise()
-        x1 = cx - w/2.0 + vertexNoise() + NOISYXOFFSET
-        x2 = cx + w/2.0 + vertexNoise() + NOISYXOFFSET
-        y1 = cy - h/2.0 + vertexNoise() + NOISYYOFFSET
-        y2 = cy + h/2.0 + vertexNoise() + NOISYYOFFSET
+        x1 = cx - w/2.0 + vertexNoise()
+        x2 = cx + w/2.0 + vertexNoise()
+        y1 = cy - h/2.0 + vertexNoise()
+        y2 = cy + h/2.0 + vertexNoise()
         
         p1 = "(%.2f,%.2f)"%(x1,y1)
         p2 = "(%.2f,%.2f)"%(x2,y1)
         p3 = "(%.2f,%.2f)"%(x2,y2)
         p4 = "(%.2f,%.2f)"%(x1,y2)
-        return ([Rectangle.noisyLineCommand(p1,p2,p3,p4)],
-                environment)
+        return [Rectangle.noisyLineCommand(p1,p2,p3,p4)]
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
     def mutate(self):
@@ -628,7 +618,7 @@ class Sequence(Program):
             surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_A8,256,256)
             context = cairo.Context(surface)
         for l in self.lines: l.draw(context)
-        return np.flip(data, 0)
+        return np.flip(data, 0)/255.0
 
 
 def randomLineOfCode():
@@ -641,10 +631,16 @@ def randomLineOfCode():
     
 if __name__ == '__main__':
     
-    s = Sequence.sample(5)
+    s = Sequence.sample(10)
     print s
     x = render([s.TikZ()],yieldsPixels = True)[0]*256
     y = (s.draw())
 
     showImage(np.concatenate([x,y]))
 
+    # rendering benchmarking
+    startTime = time()
+    N = 10000
+    for _ in range(N):
+        s.draw()
+    print "%f fps"%(N/(time() - startTime))
