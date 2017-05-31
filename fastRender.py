@@ -14,14 +14,14 @@ def thresholdPrecomputed(a):
 
 def precomputedRenderings():
     # exactly one rendering of a circle
-    c = Sequence([Circle(AbsolutePoint(Number(2),Number(2)),Number(1))]).TikZ()
+    c = Sequence([Circle(AbsolutePoint((2),(2)),(1))]).TikZ()
     c = thresholdPrecomputed(render([c],yieldsPixels = True)[0])
 
     rectangles = {}
     for dx in range(1,15):
         for dy in range(1,15):
-            rectangles[(dx,dy)] = Rectangle(AbsolutePoint(Number(1),Number(1)),
-                                            AbsolutePoint(Number(1 + dx),Number(1 + dy))).TikZ()
+            rectangles[(dx,dy)] = Rectangle(AbsolutePoint((1),(1)),
+                                            AbsolutePoint((1 + dx),(1 + dy))).TikZ()
     rectangleKeys = rectangles.keys()
     print "About to render %d rectangles"%(len(rectangleKeys))
     rectangleRenders = render([rectangles[k] for k in rectangleKeys ], yieldsPixels = True)
@@ -41,13 +41,13 @@ def precomputedRenderings():
             else:
                 y1 = 15
                 y2 = y1 + dy            
-            lines[(dx,dy,True,None)] = Line.absolute(Number(1), Number(y1),
-                                                      Number(1 + dx), Number(y2)).TikZ()
-            lines[(dx,dy,False,None)] = Line.absolute(Number(1), Number(y1),
-                                                       Number(1 + dx), Number(y2),
+            lines[(dx,dy,True,None)] = Line.absolute((1), (y1),
+                                                      (1 + dx), (y2)).TikZ()
+            lines[(dx,dy,False,None)] = Line.absolute((1), (y1),
+                                                       (1 + dx), (y2),
                                                        solid = False).TikZ()
-            p1 = AbsolutePoint(Number(1), Number(y1))
-            p2 = AbsolutePoint(Number(1 + dx), Number(y2))
+            p1 = AbsolutePoint((1), (y1))
+            p2 = AbsolutePoint((1 + dx), (y2))
             # p1 > p2
             lines[(dx,dy,True,False)] = Line([p1,p2],arrow = True).TikZ()
             lines[(dx,dy,False,False)] = Line([p1,p2],arrow = True,solid = False).TikZ()
@@ -79,10 +79,10 @@ def fastRender(program, keepBinary = False):
     if isinstance(program,Line):
         if program.length() < 0.1: return blankCanvas
         
-        _x1 = program.points[0].x.n
-        _y1 = program.points[0].y.n
-        _x2 = program.points[1].x.n
-        _y2 = program.points[1].y.n
+        _x1 = program.points[0].x
+        _y1 = program.points[0].y
+        _x2 = program.points[1].x
+        _y2 = program.points[1].y
 
         # canonical coordinates
         [(x1,y1),(x2,y2)] = sorted([(_x1,_y1),(_x2,_y2)])
@@ -112,8 +112,8 @@ def fastRender(program, keepBinary = False):
             return np.roll(o, (15 - y1)*256/16,axis = 0)
 
     if isinstance(program,Circle):
-        x = program.center.x.n
-        y = program.center.y.n
+        x = program.center.x
+        y = program.center.y
         dx = (x - 2)*256/16
         dy = 256 - (y - 2)*256/16
         o = np.roll(globalFastRenderTable['c'],dx,axis = 1)
@@ -121,10 +121,10 @@ def fastRender(program, keepBinary = False):
         return o
 
     if isinstance(program,Rectangle):
-        y1 = min([program.p1.y.n,program.p2.y.n])
-        y2 = max([program.p1.y.n,program.p2.y.n])
-        x1 = min([program.p1.x.n,program.p2.x.n])
-        x2 = max([program.p1.x.n,program.p2.x.n])
+        y1 = min([program.p1.y,program.p2.y])
+        y2 = max([program.p1.y,program.p2.y])
+        x1 = min([program.p1.x,program.p2.x])
+        x2 = max([program.p1.x,program.p2.x])
 
         dx = x2 - x1
         dy = y2 - y1
@@ -154,14 +154,29 @@ def loadPrecomputedRenderings():
 
 if __name__ == '__main__':
     loadPrecomputedRenderings()
-    for _ in range(20):
-        p = [Rectangle.sample(), Circle.sample(), Line.sample()] #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
-    #    p.solid = True
-    #    p.arrow = False
-        print p
-        correct = (1 - render([Sequence(p).TikZ()],yieldsPixels = True)[0])
-        fast = (fastRender(Sequence(p)))
-        showImage(correct)
-        showImage(fast)
-            # showImage(correct - fast)
-            # print np.sum(np.abs(correct - fast))
+        
+    s = Sequence.sample(10)
+    print s
+    x = render([s.TikZ()],yieldsPixels = True)[0]*256
+    y = (s.draw())
+
+    showImage(np.concatenate([x,y]))
+
+    # rendering benchmarking
+    startTime = time()
+    N = 10000
+    for _ in range(N):
+        fastRender(s)
+    print "%f fps"%(N/(time() - startTime))
+
+    # for _ in range(20):
+    #     p = [Rectangle.sample(), Circle.sample(), Line.sample()] #Circle(AbsolutePoint(Number(2),Number(3)),Number(1))
+    # #    p.solid = True
+    # #    p.arrow = False
+    #     print p
+    #     correct = (1 - render([Sequence(p).TikZ()],yieldsPixels = True)[0])
+    #     fast = (fastRender(Sequence(p)))
+    #     showImage(correct)
+    #     showImage(fast)
+    #         # showImage(correct - fast)
+    #         # print np.sum(np.abs(correct - fast))

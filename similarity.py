@@ -4,11 +4,6 @@ from utilities import loadImage,removeBorder
 
 import random
 import numpy as np
-from sklearn.decomposition import PCA,NMF
-from sklearn import preprocessing
-from sklearn.manifold import MDS
-import matplotlib.pyplot as plot
-import matplotlib.image as image
 
 class DummyArguments():
     def __init__(self):
@@ -89,6 +84,12 @@ if __name__ == '__main__':
 
 
 def analyzeFeatures(featureMaps):
+    from sklearn.decomposition import PCA,NMF
+    from sklearn import preprocessing
+    from sklearn.manifold import MDS
+    import matplotlib.pyplot as plot
+    import matplotlib.image as image
+
     # collect together a whole of the different names for features
     featureNames = list(set([ k for f in featureMaps.values() for k in f ]))
 
@@ -104,7 +105,7 @@ def analyzeFeatures(featureMaps):
         print featureMaps[n]
         print featureVectors[j]
 
-    for algorithm in [2]:
+    for algorithm in [0,1]:
         if algorithm == 0:
             learner = PCA()
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
@@ -124,7 +125,7 @@ def analyzeFeatures(featureMaps):
         maximumExtent = max([transformedFeatures[:,0].max() - transformedFeatures[:,0].min(),
                              transformedFeatures[:,1].max() - transformedFeatures[:,1].min()])
         print maximumExtent
-        w = 0.2*maximumExtent
+        w = 0.05*maximumExtent
         
         if algorithm < 2:
             print learner.components_

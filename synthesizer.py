@@ -153,6 +153,16 @@ def viewSynthesisResults(arguments):
                                  88,
                                  #99]
                                  ]
+    interestingExtrapolations = [(14,0),
+                                 (23,0),
+                                 (31,12),
+                                 (35,0),
+                                 (38,0),
+                                 (39,10),
+                                 (58,11),
+                                 (75,0),
+                                 (93,0),
+                                  (99,0)]
     interestingExtrapolations = list(range(100))
                                  
 
@@ -181,7 +191,7 @@ def viewSynthesisResults(arguments):
                 if set(map(str,r.parse.lines)) == parts and r.usedPrior() == (not arguments.noPrior):
                     result = r
                     break
-        if j == 38: result = icingResult
+        if expertIndex == 38: result = icingResult
         if result == None:
             print "No synthesis result for %s"%f
             if arguments.extrapolate: continue
@@ -208,7 +218,7 @@ def viewSynthesisResults(arguments):
 
         extrapolations = []
         if arguments.extrapolate:
-#            syntaxTree = syntaxTree.explode()
+            syntaxTree = syntaxTree.explode()
             trace = syntaxTree.convertToSequence()
             print trace
             originalHasCollisions = result.parse.hasCollisions()
@@ -224,10 +234,16 @@ def viewSynthesisResults(arguments):
 
                 framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.parse)))
 
-                if len(interestingExtrapolations) != 100:
+                if len(framedExtrapolations) > 20:
                     break
                 
             if framedExtrapolations != []:
+                for crap in interestingExtrapolations:
+                    if isinstance(crap,tuple) and crap[0] == expertIndex:
+                        framedExtrapolations = [framedExtrapolations[crap[1]]]
+                        break
+                
+                        
                 if arguments.debug:
                     framedExtrapolations = [loadImage(f), fastRender(syntaxTree.convertToSequence())] + framedExtrapolations
                 else:
@@ -243,7 +259,7 @@ def viewSynthesisResults(arguments):
                 a[256*len(framedExtrapolations)-1,:] = 0.5
                 a = 255*a
                 # to show the first one
-                a = a[:(256*2),:]
+                #a = a[:(256*2),:]
                 extrapolationMatrix.append(a)
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
 
@@ -398,10 +414,10 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--file', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
     parser.add_argument('-n', '--name', default = "groundTruthSynthesisResults.p", type = str)
-    parser.add_argument('--view', default = False, action = 'store_true')
+    parser.add_argument('-v', '--view', default = False, action = 'store_true')
     parser.add_argument('--latex', default = False, action = 'store_true')
-    parser.add_argument('--synthesizeTopK', default = None,type = int)
-    parser.add_argument('--extrapolate', default = False, action = 'store_true')
+    parser.add_argument('-k','--synthesizeTopK', default = None,type = int)
+    parser.add_argument('-e','--extrapolate', default = False, action = 'store_true')
     parser.add_argument('--noPrior', default = False, action = 'store_true')
     parser.add_argument('--debug', default = False, action = 'store_true')
     parser.add_argument('--resume', default = False, action = 'store_true')
