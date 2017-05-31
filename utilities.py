@@ -151,3 +151,20 @@ def removeBorder(x):
     while np.all(x[:,0] < 0.1): x = x[:,1:]
     while np.all(x[:,x.shape[1]-1] < 0.1): x = x[:,:x.shape[1]-2]
     return x
+
+def frameImageNicely(x):
+    x = removeBorder(x)
+    l = max([x.shape[0],x.shape[1]])
+    b = 15
+    z = np.zeros((l + 2*b,l + 2*b))
+    z[b:x.shape[0]+b,b:x.shape[1]+b] = x
+
+
+    import scipy.ndimage
+    return scipy.ndimage.zoom(z,256.0/(2*b+l))
+
+        
+
+def mergeDictionaries(a,b):
+    return dict([ (k,a.get(k,0) + b.get(k,0))
+                  for k in set(a.keys() + b.keys()) ])

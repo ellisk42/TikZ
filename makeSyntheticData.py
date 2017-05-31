@@ -15,37 +15,27 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
     print "Sampled %d programs."%k
-    programPrefixes = [ [ Sequence(p.lines[:j]) for j in range(len(p)+1) ] for p in programs ]
     noisyTargets = [ p.noisyTikZ() for p in programs ]
     distinctPrograms = list(set(noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
     print "Rendered %d images for %s."%(len(distinctPrograms),filePrefix)
 
-    # for program,image in zip(distinctPrograms,pixels):
-    #     print program
-    #     showImage(image)
-    #     print 
-    
     pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
     pixels = dict(zip(distinctPrograms,pixels))
     
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
         pixels[noisyTargets[j]].save("%s-%d-noisy.png"%(filePrefix,j + offset))
-        for k in range(len(programs[j])):
-            endingPoint = Image.fromarray(255*(1.0 - fastRender(programPrefixes[j][k+1]))).convert('L')
-            endingPoint.save("%s-%d-%d.png"%(filePrefix,j + offset,k))
-
             
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     cs = [c for c in things if isinstance(c,Circle) ]
-    cs = sorted(cs, key = lambda c: (c.center.x.n, c.center.y.n))
+    cs = sorted(cs, key = lambda c: (c.center.x, c.center.y))
     rs = [c for c in things if isinstance(c,Rectangle) ]
-    rs = sorted(rs, key = lambda r: (r.p1.x.n,
-                                         r.p1.y.n))
+    rs = sorted(rs, key = lambda r: (r.p1.x,
+                                     r.p1.y))
     ls = [c for c in things if isinstance(c,Line) ]
-    ls = sorted(ls, key = lambda l: (l.points[0].x.n,l.points[0].y.n))
+    ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y))
     return cs + rs + ls
 
 
@@ -73,10 +63,10 @@ def proposeAttachmentLines(objects):
                         isAligned = False
                         
                     if candidate != None:
-                        l = Line.absolute(Number(candidate[0]),
-                                          Number(candidate[1]),
-                                          Number(candidate[2]),
-                                          Number(candidate[3]))
+                        l = Line.absolute((candidate[0]),
+                                          (candidate[1]),
+                                          (candidate[2]),
+                                          (candidate[3]))
                         if l.length() > 0 and all([not o.intersects(l) for o in objects ]):
                             if isAligned:
                                 alignedAttachments.append(candidate)
@@ -95,15 +85,15 @@ def samplePoint(objects):
     if ls != [] and random() < 0.1: return choice(ls)
     option = choice(range(3))
     if option == 0 and len(xs) > 0:
-        return AbsolutePoint(Number(choice(xs)),Number(randomCoordinate()))
+        return AbsolutePoint((choice(xs)),(randomCoordinate()))
     if option == 1 and len(ys) > 0:
-        return AbsolutePoint(Number(randomCoordinate()), Number(choice(ys)))
+        return AbsolutePoint((randomCoordinate()), (choice(ys)))
     return AbsolutePoint.sample()
 
 def sampleCircle(objects):
     while True:
         p = samplePoint(objects)
-        r = Number(1)
+        r = 1
         c = Circle(p,r)
         if c.inbounds(): return c
 
@@ -112,10 +102,10 @@ def sampleRectangle(objects):
         p1 = samplePoint(objects)
         p2 = samplePoint(objects)
         if p1.x != p2.x and p1.y != p2.y:
-            x1 = Number(min([p1.x.n,p2.x.n]))
-            x2 = Number(max([p1.x.n,p2.x.n]))
-            y1 = Number(min([p1.y.n,p2.y.n]))
-            y2 = Number(max([p1.y.n,p2.y.n]))
+            x1 = (min([p1.x,p2.x]))
+            x2 = (max([p1.x,p2.x]))
+            y1 = (min([p1.y,p2.y]))
+            y2 = (max([p1.y,p2.y]))
             p1 = AbsolutePoint(x1,y1)
             p2 = AbsolutePoint(x2,y2)
             return Rectangle(p1, p2)
@@ -125,21 +115,21 @@ def sampleLine(objects, attachedLines = []):
     concentration = 2.0
     if attachedLines != [] and random() < float(len(attachedLines))/(concentration + len(attachedLines)):
         (x1,y1,x2,y2) = choice(attachedLines)
-        points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y2))]
+        points = [AbsolutePoint((x1),(y1)),AbsolutePoint((x2),(y2))]
     elif random() < 1.0: # horizontal or vertical line: diagonals only allowed as attachments
         p1 = samplePoint(objects)
-        x1 = p1.x.n
-        y1 = p1.y.n
+        x1 = p1.x
+        y1 = p1.y
         if choice([True,False]):
             # x1 == x2; y1 != y2
             y2 = y1
             while y2 == y1: y2 = randomCoordinate()
-            points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x1),Number(y2))]
+            points = [AbsolutePoint((x1),(y1)),AbsolutePoint((x1),(y2))]
         else:
             # x1 != x2; y1 == y2
             x2 = x1
             while x2 == x1: x2 = randomCoordinate()
-            points = [AbsolutePoint(Number(x1),Number(y1)),AbsolutePoint(Number(x2),Number(y1))]
+            points = [AbsolutePoint((x1),(y1)),AbsolutePoint((x2),(y1))]
     else: # arbitrary line between two points. Don't allow these.
         while True:
             p1 = AbsolutePoint.sample()
@@ -149,7 +139,7 @@ def sampleLine(objects, attachedLines = []):
                 break
     arrow = random() > 0.5
     if not arrow: # without an arrow there is no canonical orientation
-        points = list(sorted(points, key = lambda p: (p.x.n,p.y.n)))
+        points = list(sorted(points, key = lambda p: (p.x,p.y)))
     return Line(points,
                 solid = random() > 0.1,
                 arrow = arrow)
@@ -194,22 +184,22 @@ def randomScene(maximumNumberOfObjects):
 def hiddenMarkovModel():
     spacing = 4
     offset = 2
-    primitives = [ Circle(AbsolutePoint(Number((spacing + 2)*x + offset),
-                                        Number((spacing + 2)*y + offset)), Number(1))
+    primitives = [ Circle(AbsolutePoint(((spacing + 2)*x + offset),
+                                        ((spacing + 2)*y + offset)), (1))
       for x in range(3)
       for y in range(2) ]
     # horizontal lines connecting hidden nodes
-    primitives += [ Line.absolute(Number((spacing + 2)*x + offset + 1),
-                                  Number(offset + y*(spacing + 2)),
-                                  Number((spacing + 2)*x + offset + spacing + 1),
-                                  Number(offset + y*(spacing + 2)),
+    primitives += [ Line.absolute(((spacing + 2)*x + offset + 1),
+                                  (offset + y*(spacing + 2)),
+                                  ((spacing + 2)*x + offset + spacing + 1),
+                                  (offset + y*(spacing + 2)),
                                   arrow = False)
                     for x in range(2)
                     for y in [1] ]
-    primitives += [ Line.absolute(Number(offset + x*(spacing + 2)),
-                                  Number((spacing + 2)*y + offset + spacing + 1),
-                                  Number(offset + x*(spacing + 2)),
-                                  Number((spacing + 2)*y + offset + 1),
+    primitives += [ Line.absolute((offset + x*(spacing + 2)),
+                                  ((spacing + 2)*y + offset + spacing + 1),
+                                  (offset + x*(spacing + 2)),
+                                  ((spacing + 2)*y + offset + 1),
                                   arrow = False)
                     for x in range(3)
                     for y in [0] ]
@@ -221,21 +211,21 @@ def hiddenMarkovModel():
 def icingModel():
     spacing = 3
     offset = 3
-    primitives = [ Circle(AbsolutePoint(Number((spacing + 2)*x + offset),
-                                        Number((spacing + 2)*y + offset)), Number(1))
+    primitives = [ Circle(AbsolutePoint(((spacing + 2)*x + offset),
+                                        ((spacing + 2)*y + offset)), (1))
       for x in range(3)
       for y in range(3) ]
-    primitives += [ Line.absolute(Number(offset + x*(spacing + 2)),
-                                  Number((spacing + 2)*y + offset + 1),
-                                  Number(offset + x*(spacing + 2)),
-                                  Number((spacing + 2)*y + offset + spacing + 1)
+    primitives += [ Line.absolute((offset + x*(spacing + 2)),
+                                  ((spacing + 2)*y + offset + 1),
+                                  (offset + x*(spacing + 2)),
+                                  ((spacing + 2)*y + offset + spacing + 1)
                                   )
                     for x in range(3)
                     for y in range(2) ]
-    primitives += [ Line.absolute(Number((spacing + 2)*x + offset + 1),
-                                  Number(offset + y*(spacing + 2)),
-                                  Number((spacing + 2)*x + offset + spacing + 1),
-                                  Number(offset + y*(spacing + 2)))
+    primitives += [ Line.absolute(((spacing + 2)*x + offset + 1),
+                                  (offset + y*(spacing + 2)),
+                                  ((spacing + 2)*x + offset + spacing + 1),
+                                  (offset + y*(spacing + 2)))
                     for x in range(2)
                     for y in range(3) ]
     return Sequence(primitives)

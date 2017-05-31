@@ -5,10 +5,9 @@ class BatchIterator():
         for t in tensors: assert t.shape[0] == tensors[0].shape[0]
 
         np.random.seed(seed)
+        self.tensors = tensors
+        self.shuffle()
         
-        # side-by-side shuffle of the data
-        permutation = np.random.permutation(range(tensors[0].shape[0]))
-        self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in tensors ]
         self.batchSize = batchSize
 
         if testingFraction > 0.0:
@@ -22,6 +21,11 @@ class BatchIterator():
         self.trainingSetSize = self.tensors[0].shape[0]
 
         self.process = stringProcessor
+
+    def shuffle(self):
+        # side-by-side shuffle of the data
+        permutation = np.random.permutation(range(self.tensors[0].shape[0]))
+        self.tensors = [ t[permutation] for t in self.tensors ]
 
     def registerPlaceholders(self,placeholders):
         self.placeholders = placeholders
@@ -47,16 +51,14 @@ class BatchIterator():
             yield self.nextFeed()
             if self.startingIndex == 0:
                 # rerandomize
-                permutation = np.random.permutation(range(self.tensors[0].shape[0]))
-                self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in self.tensors ]
+                self.shuffle()
                 break
     def epochExamples(self):
         while True:
             yield self.next()
             if self.startingIndex == 0:
                 # rerandomize
-                permutation = np.random.permutation(range(self.tensors[0].shape[0]))
-                self.tensors = [ np.array([ t[p,...] for p in permutation ]) for t in self.tensors ]
+                self.shuffle()
                 break
             
 
