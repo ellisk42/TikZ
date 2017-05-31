@@ -4,11 +4,6 @@ from utilities import loadImage,removeBorder
 
 import random
 import numpy as np
-from sklearn.decomposition import PCA,NMF
-from sklearn import preprocessing
-from sklearn.manifold import MDS
-import matplotlib.pyplot as plot
-import matplotlib.image as image
 
 class DummyArguments():
     def __init__(self):
@@ -87,6 +82,12 @@ if __name__ == '__main__':
 
 
 def analyzeFeatures(featureMaps):
+    from sklearn.decomposition import PCA,NMF
+    from sklearn import preprocessing
+    from sklearn.manifold import MDS
+    import matplotlib.pyplot as plot
+    import matplotlib.image as image
+
     # collect together a whole of the different names for features
     featureNames = list(set([ k for f in featureMaps.values() for k in f ]))
 
