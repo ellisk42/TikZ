@@ -108,6 +108,46 @@ class AbsolutePoint(Expression):
             if inbounds(dp):
                 return AbsolutePoint((dp[0]),(dp[1]))
 
+
+class Label():
+    def __init__(self, p, c):
+        self.p = p
+        self.c = c
+
+    def draw(self,context):
+        context.set_source_rgb(256,256,256)
+        context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, 
+                                 cairo.FONT_WEIGHT_BOLD)
+        context.set_font_size(12)
+        (x, y, width, height, dx, dy) = context.text_extents(self.c)
+        context.move_to(self.p.x*16 - width/2, self.p.y*16 - height/2)
+        context.scale(1,-1)
+        context.show_text(self.c)
+        context.scale(1,-1)
+        context.stroke()
+
+    def translate(self,x,y):
+        return Label(self.p.translate(x,y),self.c)
+    def logPrior(self): return -math.log(26*2*14*14)
+    def intersects(self,o):
+        return Circle(self.p,1).intersects(o)
+    def usedXCoordinates(self): return [self.p.x]
+    def usedYCoordinates(self): return [self.p.y]
+    def __str__(self): return "Label(%s, \"%s\")"%(self.p,self.c)
+    def mutate(self): return Label(self.p.mutate(),self.c)
+
+    @staticmethod
+    def sample(): return Label(AbsolutePoint.sample(),
+                               chr(ord(choice(['a','A'])) + choice(range(26))))
+    def evaluate(self):
+        return ["\\node at %s {\\Huge %s};"%(self.p.evaluate(), self.c)]
+    def noisyEvaluate(self):
+        return ["\\node at %s {%s};"%(self.p.noisyEvaluate(), self.c)]
+    
+        
+
+
+        
 class Line(Program):
     def __init__(self, points, arrow = False, solid = True):
         self.points = points
@@ -187,7 +227,10 @@ class Line(Program):
         if arrow:
             scale = 1.5
             if noisy: scale = 1.0 + random()
-            attributes += ["-{>[scale = %f]}"%(round(scale,1))]
+            scale = round(scale,1)
+            attributes.append(choice(["-{>[scale = %f]}",
+                                      "-{Stealth[scale = %f]}",
+                                      "-{Latex[scale = %f]}"])%(scale))
         if not solid: attributes += ["dashed"]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
@@ -224,9 +267,6 @@ class Line(Program):
             l = Line(ps, solid = random() > 0.5, arrow = a)
             if l.length() > 0: return l
         
-    def isValid(self, parents):
-        return all([p.isValid(parents) for p in self.points ])
-
     def evaluate(self):
         return [Line.lineCommand([ p.evaluate() for p in self.points ],
                                  self.arrow,
@@ -434,9 +474,6 @@ class Circle(Program):
     def logPrior(self): return -math.log(14*14)
 
     def children(self): return [self.center,self.radius]
-    def substitute(self, old, new):
-        return Circle(self.center.substitute(old, new),
-                      self.radius)
     def attachmentPoints(self):
         r = self.radius
         x = self.center.x
@@ -467,8 +504,8 @@ class Circle(Program):
     
     def mutate(self):
         if random() < 0.15:
-            return Rectangle.absolute(self.center.x - 1, self.center.y - 1,
-                                      self.center.x + 1, self.center.y + 1)
+            return Rectangle.absolute(self.center.x - self.radius, self.center.y - self.radius,
+                                      self.center.x + self.radius, self.center.y + self.radius)
         while True:
             c = Circle(self.center.mutate(), self.radius)
             if c.inbounds():
@@ -506,14 +543,14 @@ class Circle(Program):
     def sample():
         while True:
             p = AbsolutePoint.sample()
-            r = (1)
+            r = choice(range(5)) + 1
             c = Circle(p,r)
             if c.inbounds():
                 return c
 
     def evaluate(self):
         return [Circle.command(self.center.evaluate(),
-                                self.radius)]
+                               self.radius)]
     def noisyEvaluate(self):
         r = self.radius + truncatedNormal(-1,1)*RADIUSNOISE
         return [Circle.command(self.center.noisyEvaluate(),
@@ -618,29 +655,31 @@ class Sequence(Program):
             surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_A8,256,256)
             context = cairo.Context(surface)
         for l in self.lines: l.draw(context)
-        return np.flip(data, 0)/255.0
+        data = np.flip(data, 0)
+        return data/255.0
 
 
 def randomLineOfCode():
-    k = choice(range(4))
+    k = choice(range(5))
     if k == 0: return None
     if k == 1: return Circle.sample()
     if k == 2: return Line.sample()
     if k == 3: return Rectangle.sample()
+    if k == 4: return Label.sample()
     assert False
     
 if __name__ == '__main__':
     
     s = Sequence.sample(10)
     print s
-    x = render([s.TikZ()],yieldsPixels = True)[0]*256
+    x = render([s.TikZ()],yieldsPixels = True)[0]
     y = (s.draw())
 
     showImage(np.concatenate([x,y]))
 
     # rendering benchmarking
     startTime = time()
-    N = 10000
+    N = 100
     for _ in range(N):
         s.draw()
     print "%f fps"%(N/(time() - startTime))

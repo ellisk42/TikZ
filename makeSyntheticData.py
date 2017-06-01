@@ -90,10 +90,17 @@ def samplePoint(objects):
         return AbsolutePoint((randomCoordinate()), (choice(ys)))
     return AbsolutePoint.sample()
 
+
 def sampleCircle(objects):
+    existingRadii = [ c.radius for c in objects if isinstance(c,Circle) ]
+    concentrationParameter = 1.5
+    reuseProbability = len(existingRadii)/(len(existingRadii) + concentrationParameter)
     while True:
         p = samplePoint(objects)
-        r = 1
+        if random() < reuseProbability:
+            r = choice(existingRadii)
+        else:
+            r = choice(range(4)) + 1
         c = Circle(p,r)
         if c.inbounds(): return c
 
