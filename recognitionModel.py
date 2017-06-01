@@ -471,8 +471,6 @@ class RecognitionModel():
                 epicAccuracy = []
                 for ts,ps in iterator.epochExamples():
                     feed = self.makeTrainingFeed(ts,ps)
-                    if self.arguments.noisy:
-                        feed[self.goalPlaceholder] = augmentData(feed[self.goalPlaceholder])
                     feed[self.trainingPredicatePlaceholder] = True
                     _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
