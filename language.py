@@ -110,6 +110,7 @@ class AbsolutePoint(Expression):
 
 
 class Label():
+    allowedLabels = ['A','B','C','X','Y','Z']
     def __init__(self, p, c):
         self.p = p
         self.c = c
@@ -131,6 +132,8 @@ class Label():
     def logPrior(self): return -math.log(26*2*14*14)
     def intersects(self,o):
         return Circle(self.p,1).intersects(o)
+    def attachmentPoints(self):
+        return []
     def usedXCoordinates(self): return [self.p.x]
     def usedYCoordinates(self): return [self.p.y]
     def __str__(self): return "Label(%s, \"%s\")"%(self.p,self.c)
@@ -138,11 +141,12 @@ class Label():
 
     @staticmethod
     def sample(): return Label(AbsolutePoint.sample(),
-                               chr(ord(choice(['a','A'])) + choice(range(26))))
+                               choice(Label.allowedLabels))
+                               #chr(ord(choice(['a','A'])) + choice(range(26))))
     def evaluate(self):
-        return ["\\node at %s {\\Huge %s};"%(self.p.evaluate(), self.c)]
+        return ["\\node at %s {\\Huge \\textbf{%s}};"%(self.p.evaluate(), self.c)]
     def noisyEvaluate(self):
-        return ["\\node at %s {\\Huge %s};"%(self.p.noisyEvaluate(), self.c)]
+        return ["\\node at %s {\\Huge \\textbf{%s}};"%(self.p.noisyEvaluate(), self.c)]
     
         
 
@@ -199,8 +203,8 @@ class Line(Program):
     def children(self): return self.points
     
     def intersects(self,o):
-        if isinstance(o,Circle): return o.intersects(self)
-        if isinstance(o,Rectangle): return o.intersects(self)
+        if isinstance(o,Circle) or isinstance(o,Label) or isinstance(o,Rectangle):
+            return o.intersects(self)
         if isinstance(o,Line):
             s = self
             # if they have different orientations and then do a small shrink
@@ -226,11 +230,14 @@ class Line(Program):
             attributes = ["line width = 0.1cm"]
         if arrow:
             scale = 1.5
-            if noisy: scale = 1.0 + random()
+            if noisy: scale = 1.2 + random()*(1.5 - 1.2)*2
             scale = round(scale,1)
-            attributes.append(choice(["-{>[scale = %f]}",
-                                      "-{Stealth[scale = %f]}",
-                                      "-{Latex[scale = %f]}"])%(scale))
+            differentStyles = ["-{>[scale = %f]}",
+                               "-{Stealth[scale = %f]}",
+                               "-{Latex[scale = %f]}"]
+            if noisy: style = choice(differentStyles)
+            else: style = differentStyles[0]
+            attributes.append(style%(scale))
         if not solid:
             if not noisy: attributes += ["dashed"]
             else: attributes += ["dash pattern = on %dpt off %dpt"%(choice(range(5)) + 2,
@@ -360,7 +367,7 @@ class Rectangle(Program):
         return [self.p1.y,self.p2.y]
     
     def intersects(self,o):
-        if isinstance(o,Circle): return o.intersects(self)
+        if isinstance(o,Circle) or isinstance(o,Label): return o.intersects(self)
         if isinstance(o,Line):
             o = o.epsilonShrink() # lines are allowed to border rectangles
             for l in self.constituentLines():
@@ -514,6 +521,7 @@ class Circle(Program):
             if c.inbounds():
                 return c
     def intersects(self,o):
+        if isinstance(o,Label): return o.intersects(self)
         if isinstance(o,Circle):
             x1,y1,r1 = self.center.x,self.center.y,self.radius
             x2,y2,r2 = o.center.x,o.center.y,o.radius

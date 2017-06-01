@@ -38,7 +38,9 @@ def canonicalOrdering(things):
     ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y,
                                      l.points[1].x,l.points[1].y,
                                      l.solid,l.arrow))
-    return cs + rs + ls
+    ts = [t for t in things if isinstance(t,Label) ]
+    ts = sorted(ts, key = lambda t: (t.p.x,t.p.y))
+    return cs + rs + ls + ts
 
 
 def proposeAttachmentLines(objects):
@@ -118,6 +120,11 @@ def sampleRectangle(objects):
             p1 = AbsolutePoint(x1,y1)
             p2 = AbsolutePoint(x2,y2)
             return Rectangle(p1, p2)
+
+def sampleLabel(objects):
+    l = Label.sample()
+    l.p = samplePoint(objects)
+    return l
                                 
 
 def sampleLine(objects, attachedLines = []):
@@ -167,11 +174,12 @@ def sampleWithoutIntersection(n, existingObjects, f):
             existingObjects += [newObject]
     return existingObjects
 
-def multipleObjects(rectangles = 0,lines = 0,circles = 0):
+def multipleObjects(rectangles = 0,lines = 0,circles = 0,labels = 0):
     def sampler():
         objects = []
         objects = sampleWithoutIntersection(circles, objects, lambda: sampleCircle(objects))
         objects = sampleWithoutIntersection(rectangles, objects, lambda: sampleRectangle(objects))
+        objects = sampleWithoutIntersection(labels, objects, lambda: sampleLabel(objects))
         attachedLines = proposeAttachmentLines(objects)
         objects = sampleWithoutIntersection(lines, objects, lambda: sampleLine(objects,attachedLines))
         return Sequence(canonicalOrdering(objects))
@@ -179,15 +187,13 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0):
 
 def randomScene(maximumNumberOfObjects):
     def sampler():
-        if 'extrapolate' in sys.argv:
-            n = choice(range(maximumNumberOfObjects + 1, 20))
-        else:
-            n = choice(range(maximumNumberOfObjects)) + 1
+        n = choice(range(maximumNumberOfObjects)) + 1
 
-        shapeIdentities = [choice(range(3)) for _ in range(n) ]
+        shapeIdentities = [choice(range(4)) for _ in range(n) ]
         return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
                                lines = len([x for x in shapeIdentities if x == 1 ]),
-                               circles = len([x for x in shapeIdentities if x == 2 ]))()
+                               circles = len([x for x in shapeIdentities if x == 2 ]),
+                               labels = len([x for x in shapeIdentities if x == 3 ]))()
     return sampler
 
 def hiddenMarkovModel():
