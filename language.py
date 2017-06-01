@@ -142,7 +142,7 @@ class Label():
     def evaluate(self):
         return ["\\node at %s {\\Huge %s};"%(self.p.evaluate(), self.c)]
     def noisyEvaluate(self):
-        return ["\\node at %s {%s};"%(self.p.noisyEvaluate(), self.c)]
+        return ["\\node at %s {\\Huge %s};"%(self.p.noisyEvaluate(), self.c)]
     
         
 
@@ -155,7 +155,7 @@ class Line(Program):
         self.solid = solid
 
         if self.length() == 0.0:
-#            raise Exception('Attempt to create line with zero length')
+            # craise Exception('Attempt to create line with zero length')
             pass
 
     def draw(self,context):
@@ -231,7 +231,10 @@ class Line(Program):
             attributes.append(choice(["-{>[scale = %f]}",
                                       "-{Stealth[scale = %f]}",
                                       "-{Latex[scale = %f]}"])%(scale))
-        if not solid: attributes += ["dashed"]
+        if not solid:
+            if not noisy: attributes += ["dashed"]
+            else: attributes += ["dash pattern = on %dpt off %dpt"%(choice(range(5)) + 2,
+                                                                    choice(range(5)) + 2)]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
         return "\\draw [%s] %s;" % (a," -- ".join(map(str,points)))
@@ -672,7 +675,7 @@ if __name__ == '__main__':
     
     s = Sequence.sample(10)
     print s
-    x = render([s.TikZ()],yieldsPixels = True)[0]
+    x = render([s.noisyTikZ()],yieldsPixels = True)[0]
     y = (s.draw())
 
     showImage(np.concatenate([x,y]))

@@ -490,7 +490,7 @@ class RecognitionModel():
         # goal, current, predictions
         gs = []
         cs = []
-        ps = []
+d        ps = []
         for target, program in zip(targets, programs):
             if not self.arguments.noisy:
                 target = program.draw()

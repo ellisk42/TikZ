@@ -30,12 +30,14 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     cs = [c for c in things if isinstance(c,Circle) ]
-    cs = sorted(cs, key = lambda c: (c.center.x, c.center.y))
+    cs = sorted(cs, key = lambda c: (c.center.x, c.center.y, -c.radius))
     rs = [c for c in things if isinstance(c,Rectangle) ]
     rs = sorted(rs, key = lambda r: (r.p1.x,
                                      r.p1.y))
     ls = [c for c in things if isinstance(c,Line) ]
-    ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y))
+    ls = sorted(ls, key = lambda l: (l.points[0].x,l.points[0].y,
+                                     l.points[1].x,l.points[1].y,
+                                     l.solid,l.arrow))
     return cs + rs + ls
 
 
