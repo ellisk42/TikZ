@@ -3,7 +3,7 @@ import sys
 import os
 from language import *
 from render import render
-from fastRender import fastRender
+from character import *
 from PIL import Image
 import pickle
 from random import choice,shuffle
@@ -15,17 +15,32 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
     print "Sampled %d programs."%k
-    noisyTargets = [ p.noisyTikZ() for p in programs ]
+    # remove all of the labels - we will render them separately
+    noLabels = [ Sequence([ l for l in p.lines if not isinstance(l,Label) ])
+                 for p in programs ]
+    onlyLabels = [ [ l for l in p.lines if isinstance(l,Label) ]
+                   for p in programs ]
+    noisyTargets = [ p.noisyTikZ() for p in noLabels ]
     distinctPrograms = list(set(noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
     print "Rendered %d images for %s."%(len(distinctPrograms),filePrefix)
 
-    pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
+    #pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
     pixels = dict(zip(distinctPrograms,pixels))
     
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
-        pixels[noisyTargets[j]].save("%s-%d-noisy.png"%(filePrefix,j + offset))
+        unlabeledPixels = 1 - pixels[noisyTargets[j]]
+        for l in onlyLabels[j]:
+            blitCharacter(unlabeledPixels,
+                          l.p.x*16,l.p.y*16,
+                          l.c)
+        unlabeledPixels[unlabeledPixels > 1] = 1
+        unlabeledPixels = (1 - unlabeledPixels)*255
+        labeledPixels = Image.fromarray(unlabeledPixels).convert('L')
+        labeledPixels.save("%s-%d-noisy.png"%(filePrefix,j + offset))
+
+        Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
             
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
@@ -264,6 +279,7 @@ def handleGeneration(arguments):
     print "Generated %d training sequences into syntheticTrainingData/%d"%(k,startingPoint)
     
 if __name__ == '__main__':
+    loadCharacters()
     setCoordinateNoise(0.2)
     setRadiusNoise(0.1)
 

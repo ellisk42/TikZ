@@ -634,14 +634,14 @@ class Sequence(Program):
     def __hash__(self): return hash(str(self))
     def __len__(self): return len(self.lines)
 
-    def mutate(self):
+    def mutate(self, canRemove = True):
         r = random()
         if r < 0.3 or self.lines == []:
             n = randomLineOfCode()
             if n == None: n = []
             else: n = [n]
             return Sequence(self.lines + n)
-        elif r < 0.6:
+        elif r < 0.6 and canRemove:
             r = choice(self.lines)
             return Sequence([ l for l in self.lines if l != r ])
         else:

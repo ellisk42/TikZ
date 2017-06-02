@@ -37,7 +37,7 @@ def makeDistanceExamples(targets,programs, reportTime = False):
             if random() < 0.4: stuff = np.random.permutation(stuff).tolist()
             mutant = Sequence(stuff[:prefixSize])
             for _ in range(choice(range(max(prefixSize,1)))):
-                mutant = mutant.mutate()
+                mutant = mutant.mutate(canRemove = False)
             exampleImages.append(mutant.draw())
             mutantShapes = set(map(str,mutant.lines))
             extraTarget.append(len(targetShapes - mutantShapes))

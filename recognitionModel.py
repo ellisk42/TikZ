@@ -526,9 +526,6 @@ class DistanceModel():
                 print "\tTesting loss: %f"%testingLosses
                 print "Saving checkpoint: %s"%(saver.save(self.session, checkpoint))
                 flushEverything()
-        # currents, goals, ts = makeDistanceExamples(*next(iterator.epochExamples()))
-        # print self.learnedDistances(currents, goals)
-        # print ts
 
 class SearchModel():
     def __init__(self,arguments):
@@ -865,11 +862,6 @@ def handleTest(a):
     model.saveParticles(particles, parseDirectory, targetImage)
     return gotGroundTruth
     
-def picturesInDirectory(d):
-    if d.endswith('.png'): return [d]
-    if not d.endswith('/'): d = d + '/'
-    return [ d + f for f in os.listdir(d) if f.endswith('.png') ]
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
     parser.add_argument('task')

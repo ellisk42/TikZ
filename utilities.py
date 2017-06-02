@@ -1,3 +1,4 @@
+import os
 from random import random
 import math
 import sys
@@ -168,3 +169,8 @@ def frameImageNicely(x):
 def mergeDictionaries(a,b):
     return dict([ (k,a.get(k,0) + b.get(k,0))
                   for k in set(a.keys() + b.keys()) ])
+
+def picturesInDirectory(d):
+    if d.endswith('.png'): return [d]
+    if not d.endswith('/'): d = d + '/'
+    return [ d + f for f in os.listdir(d) if f.endswith('.png') ]
