@@ -1,5 +1,4 @@
 from language import *
-from fastRender import fastRender
 from utilities import *
 
 
@@ -17,7 +16,6 @@ def makeDistanceExamples(targets,programs, reportTime = False):
     extraCurrent = []
 
     for target, program in zip(targets, programs):
-        program = program.item()
         if not isinstance(program, Sequence):
             print "Fatal error: one of the entries of programs was not a sequence"
             print "programs = ",programs
@@ -26,7 +24,7 @@ def makeDistanceExamples(targets,programs, reportTime = False):
         # on policy examples
         for j in range(len(program)+1):
             exampleTargets.append(target)
-            exampleImages.append(fastRender(Sequence(program.lines[:j])))
+            exampleImages.append(Sequence(program.lines[:j]).draw())
             extraCurrent.append(0.0)
             extraTarget.append(len(program) - j)
 
@@ -40,7 +38,7 @@ def makeDistanceExamples(targets,programs, reportTime = False):
             mutant = Sequence(stuff[:prefixSize])
             for _ in range(choice(range(max(prefixSize,1)))):
                 mutant = mutant.mutate()
-            exampleImages.append(fastRender(mutant))
+            exampleImages.append(mutant.draw())
             mutantShapes = set(map(str,mutant.lines))
             extraTarget.append(len(targetShapes - mutantShapes))
             extraCurrent.append(len(mutantShapes - targetShapes))

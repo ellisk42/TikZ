@@ -5,7 +5,6 @@ from language import *
 from render import render,animateMatrices
 from utilities import *
 from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsymmetric
-from fastRender import fastRender,loadPrecomputedRenderings
 from makeSyntheticData import randomScene
 from groundTruthParses import getGroundTruthParse
 from loadTrainingExamples import *
@@ -27,9 +26,9 @@ APPROXIMATINGGRID = MAXIMUMCOORDINATE
 def coordinate2grid(c): return c*MAXIMUMCOORDINATE/APPROXIMATINGGRID
 def grid2coordinate(g): return g*APPROXIMATINGGRID/MAXIMUMCOORDINATE
 
-TESTINGFRACTION = 0.1
+TESTINGFRACTION = 0.05
 
-[STOP,CIRCLE,LINE,RECTANGLE] = range(4)
+[STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
 
 
 class StandardPrimitiveDecoder():
@@ -100,21 +99,44 @@ class CircleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Circle
     
     def __init__(self, imageRepresentation):
-        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
-        self.hiddenSizes = [None, None]
+        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y,r
+        self.hiddenSizes = [None, None, None]
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Circle(AbsolutePoint(Number(grid2coordinate(x)),Number(grid2coordinate(y))),Number(1)))
-                for s,[x,y] in self.beamTrace(session, feed, beamSize)
+        return [(s, Circle(AbsolutePoint(grid2coordinate(x),grid2coordinate(y)),r))
+                for s,[x,y,r] in self.beamTrace(session, feed, beamSize)
                 if x > 1 and y > 1 and x < MAXIMUMCOORDINATE - 1 and y < MAXIMUMCOORDINATE - 1]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Circle):
             return [coordinate2grid(l.center.x),
-                    coordinate2grid(l.center.y)]
-        return [0,0]
+                    coordinate2grid(l.center.y),
+                    coordinate2grid(l.radius)]
+        return [0,0,0]
+
+class LabelDecoder(StandardPrimitiveDecoder):
+    token = LABEL
+    languagePrimitive = Label
+    
+    def __init__(self, imageRepresentation):
+        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,len(Label.allowedLabels)] # x,y,c
+        self.hiddenSizes = [None, None, None]
+        self.makeNetwork(imageRepresentation)
+    
+    def beam(self, session, feed, beamSize):
+        return [(s, Label(AbsolutePoint(grid2coordinate(x),grid2coordinate(y)),Label.allowedLabels[l]))
+                for s,[x,y,l] in self.beamTrace(session, feed, beamSize)
+                if x > 1 and y > 1 and x < MAXIMUMCOORDINATE - 1 and y < MAXIMUMCOORDINATE - 1]
+
+    @staticmethod
+    def extractTargets(l):
+        if l != None and isinstance(l,Label):
+            return [coordinate2grid(l.p.x),
+                    coordinate2grid(l.p.y),
+                    coordinate2grid(Label.allowedLabels.index(l.c))]
+        return [0,0,0]
 
 class RectangleDecoder(StandardPrimitiveDecoder):
     token = RECTANGLE
@@ -161,10 +183,10 @@ class LineDecoder(StandardPrimitiveDecoder):
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Line.absolute(Number(grid2coordinate(x1)),
-                                  Number(grid2coordinate(y1)),
-                                  Number(grid2coordinate(x2)),
-                                  Number(grid2coordinate(y2)),
+        return [(s, Line.absolute((grid2coordinate(x1)),
+                                  (grid2coordinate(y1)),
+                                  (grid2coordinate(x2)),
+                                  (grid2coordinate(y2)),
                                   arrow = arrow == 1,solid = solid == 1))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
                 if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 and x1 > 0 and y1 > 0 and x2 > 0 and y2 > 0 ]
@@ -192,11 +214,11 @@ class StopDecoder():
     def extractTargets(_): return []
 
 class PrimitiveDecoder():
-    # It might matter in which order these classes are listed.
-    # Because you predict circle targets, then rectangle targets, then line targets
+    # It shouldn't matter in what order these are listed. If it does then I will consider that a bug.
     decoderClasses = [CircleDecoder,
                       RectangleDecoder,
                       LineDecoder,
+                      LabelDecoder,
                       StopDecoder]
     def __init__(self, imageRepresentation, trainingPredicatePlaceholder):
         self.decoders = [k(imageRepresentation) for k in PrimitiveDecoder.decoderClasses]
@@ -296,175 +318,59 @@ class Particle():
         return Sequence(self.program)
     def render(self):
         if self.output is None:
-            self.output = fastRender(self.sequence())
+            self.output = self.sequence().draw()
         return self.output
 
 class RecognitionModel():
     def __init__(self, arguments):
         self.noisy = arguments.noisy
         self.arguments = arguments
-        # current and goal images
-        self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
-        self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+        self.graph = tf.Graph()
+        self.session = tf.Session(graph = self.graph)
+        with self.session.graph.as_default():
+            # current and goal images
+            self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+            self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
 
-        self.trainingPredicatePlaceholder = tf.placeholder(tf.bool)
+            self.trainingPredicatePlaceholder = tf.placeholder(tf.bool)
 
-        imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
+            imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
-        architecture = architectures[self.arguments.architecture]
+            c1 = architectures[self.arguments.architecture].makeModel(imageInput)
+            c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
+            print "fully connected input dimensionality:",c1d
 
-        initialDilation = 1
-        horizontalKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = architecture.rectangularFilters,
-                                             kernel_size = [16/initialDilation,4/initialDilation],
-                                             padding = "same",
-                                             activation = tf.nn.relu,
-                                             dilation_rate = initialDilation,
-                                             strides = 1)
-        verticalKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = architecture.rectangularFilters,
-                                             kernel_size = [4/initialDilation,16/initialDilation],
-                                             padding = "same",
-                                             activation = tf.nn.relu,
-                                             dilation_rate = initialDilation,
-                                             strides = 1)
-        squareKernels = tf.layers.conv2d(inputs = imageInput,
-                                             filters = architecture.squareFilters,
-                                             kernel_size = [8/initialDilation,8/initialDilation],
-                                             padding = "same",
-                                             activation = tf.nn.relu,
-                                             dilation_rate = initialDilation,
-                                             strides = 1)
-        c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
-        c1 = tf.layers.max_pooling2d(inputs = c1,
-                                     pool_size = architecture.poolSizes[0],
-                                     strides = architecture.poolStrides[0],
-                                     padding = "same")
+            f1 = tf.reshape(c1, [-1, c1d])
+            if self.arguments.dropout:
+                f1 = tf.layers.dropout(f1,
+                                       training = self.trainingPredicatePlaceholder)
 
-        numberOfFilters = architecture.numberOfFilters
-        kernelSizes = architecture.kernelSizes
-        
-        poolSizes = architecture.poolSizes[1:]
-        poolStrides = architecture.poolStrides[1:]
-        nextInput = c1
-        for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
-            c1 = tf.layers.conv2d(inputs = nextInput,
-                                  filters = filterCount,
-                                  kernel_size = [kernelSize,kernelSize],
-                                  padding = "same",
-                                  activation = tf.nn.relu,
-                                  strides = 1)
-            c1 = tf.layers.max_pooling2d(inputs = c1,
-                                         pool_size = poolSize,
-                                         strides = poolStride,
-                                         padding = "same")
-            print "Convolution output:",c1
-            nextInput = c1
-        c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
-        print "fully connected input dimensionality:",c1d
+            self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder)
+            self.loss = self.decoder.loss()
+            self.averageAccuracy = self.decoder.accuracy()
 
-        f1 = tf.reshape(c1, [-1, c1d])
-        if self.arguments.dropout:
-            f1 = tf.layers.dropout(f1,
-                                   training = self.trainingPredicatePlaceholder)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
 
-        self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder)
-        self.loss = self.decoder.loss()
-        self.averageAccuracy = self.decoder.accuracy()
-
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
-
-        # Value function learning
-        self.valueTargets = tf.placeholder(tf.float32, [None,2]) # (extra target, extra current)
-        self.distanceFunction = tf.layers.dense(f1, 2, activation = tf.nn.relu)
-        self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
-        self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
-
-    def loadDistanceCheckpoint(self, checkpoint):
-        saver = tf.train.Saver()
-        self.distanceSession = tf.Session()
-        saver.restore(self.distanceSession, checkpoint)
-    def closeDistanceSession(self): self.distanceSession.close()
-    def learnedDistances(self, currentBatch, goalBatch):
-        return self.distanceSession.run(self.distanceFunction,
-                                        feed_dict = {self.currentPlaceholder: currentBatch,
-                                                     self.goalPlaceholder: goalBatch})
-    def learnedParticleDistances(self, goal, particles):
-        if particles == []: return 
-        # only do it for 50 particles at a time
-        maximumBatchSize = 50
-        if len(particles) > maximumBatchSize:
-            self.learnedParticleDistances(goal, particles[maximumBatchSize:])
-        particles = particles[:maximumBatchSize]
-        d = self.learnedDistances(np.array([ p.render() for p in particles ]),
-                                  np.tile(goal, (len(particles), 1, 1)))
-        for j,p in enumerate(particles):
-            if self.arguments.showParticles:
-                print "Distance vector:",d[j,:]
-                print "Likelihood:",p.logLikelihood
-                showImage(p.output + goal)
-            p.distance = (d[j,0], d[j,1])
-
-    def trainDistance(self, numberOfExamples, checkpoint, restore = False):
-        assert self.noisy
-        targetImages,targetPrograms = loadExamples(numberOfExamples, noisy = self.noisy, distance = True)
-        initializer = tf.global_variables_initializer()
-        iterator = BatchIterator(5,tuple([targetImages,targetPrograms]),
-                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
-        saver = tf.train.Saver()
-
-        flushEverything()
-        with tf.Session() as s:
-            if not restore:
-                s.run(initializer)
-            else:
-                saver.restore(s, checkpoint)
-            for e in range(20):
-                runningAverage = 0.0
-                runningAverageCount = 0
-                lastUpdateTime = time()
-                for images,programs in iterator.epochExamples():
-                    targets, current, distances = makeDistanceExamples(images, programs,
-                                                                       reportTime = runningAverageCount == 0)
-                    _,l = s.run([self.distanceOptimizer, self.distanceLoss],
-                                feed_dict = {self.currentPlaceholder: current,
-                                             self.goalPlaceholder: targets,
-                                             self.valueTargets: distances})
-                    runningAverage += l
-                    runningAverageCount += 1
-                    if time() - lastUpdateTime > 120:
-                        lastUpdateTime = time()
-                        print "\t\tRunning average loss: %f"%(runningAverage/runningAverageCount)
-                        flushEverything()
-                print "Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount)
-                flushEverything()
-
-                testingLosses = [ s.run(self.distanceLoss,
-                                        feed_dict = {self.currentPlaceholder: current,
-                                                     self.goalPlaceholder: targets,
-                                                     self.valueTargets: distances})
-                                  for images,programs in iterator.testingExamples()
-                                  for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
-                testingLosses = sum(testingLosses)/len(testingLosses)
-                print "\tTesting loss: %f"%testingLosses
-                print "Saving checkpoint: %s"%(saver.save(s, checkpoint))
-                flushEverything()
-
+    def loadCheckpoint(self, checkpoint):
+        with self.session.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self.session, checkpoint)
+            
     def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
         noisyTarget,programs = loadExamples(numberOfExamples)
         
-        initializer = tf.global_variables_initializer()
         iterator = BatchIterator(10,(np.array(noisyTarget),np.array(programs)),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
-        saver = tf.train.Saver()
-
         flushEverything()
 
-        with tf.Session() as s:
+        with self.session.graph.as_default():
+            initializer = tf.global_variables_initializer()
+            saver = tf.train.Saver()
+
             if not restore:
-                s.run(initializer)
+                self.session.run(initializer)
             else:
-                saver.restore(s, checkpoint)
+                saver.restore(self.session, checkpoint)
             
             for e in range(20):
                 epicLoss = []
@@ -472,7 +378,7 @@ class RecognitionModel():
                 for ts,ps in iterator.epochExamples():
                     feed = self.makeTrainingFeed(ts,ps)
                     feed[self.trainingPredicatePlaceholder] = True
-                    _,l,accuracy = s.run([self.optimizer, self.loss, self.averageAccuracy],
+                    _,l,accuracy = self.session.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
@@ -481,16 +387,16 @@ class RecognitionModel():
                 for ts,ps in iterator.testingExamples():
                     feed = self.makeTrainingFeed(ts,ps)
                     feed[self.trainingPredicatePlaceholder] = False
-                    testingAccuracy.append(s.run(self.averageAccuracy, feed_dict = feed))
+                    testingAccuracy.append(self.session.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
-                print "Saving checkpoint: %s" % saver.save(s, checkpoint)
+                print "Saving checkpoint: %s" % saver.save(self.session, checkpoint)
                 flushEverything()
 
     def makeTrainingFeed(self, targets, programs):
         # goal, current, predictions
         gs = []
         cs = []
-d        ps = []
+        ps = []
         for target, program in zip(targets, programs):
             if not self.arguments.noisy:
                 target = program.draw()
@@ -512,74 +418,129 @@ d        ps = []
         for j,p in enumerate(self.decoder.placeholders()):
             f[p] = ps[:,j]
         return f
+
+    def beam(self, current, goal, beamSize):
+        feed = {self.currentPlaceholder: np.array([current]),
+                self.goalPlaceholder: np.array([goal])}
+        return self.decoder.beam(self.session, feed, beamSize)
+
+    
+                    
+class DistanceModel():
+    def __init__(self,arguments):
+        self.arguments = arguments
+        self.graph = tf.Graph()
+        self.session = tf.Session(graph = self.graph)
+        with self.session.graph.as_default():
+            # current and goal images
+            self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+            self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+
+            imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
+
+            c1 = architectures[self.arguments.architecture].makeModel(imageInput)
+            c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
+            print "fully connected input dimensionality:",c1d
+
+            f1 = tf.reshape(c1, [-1, c1d])
+
+            # Value function learning
+            self.valueTargets = tf.placeholder(tf.float32, [None,2]) # (extra target, extra current)
+            # this line of code collapses all of the filters into batchSize*numberOfFilters
+            #f2 = tf.reduce_sum(c1, [1,2])
+            f2 = f1
+            self.distanceFunction = tf.layers.dense(f2, 2, activation = tf.nn.relu)
+            self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
+            self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
+
+    def learnedDistances(self, currentBatch, goalBatch):
+        return self.session.run(self.distanceFunction,
+                                feed_dict = {self.currentPlaceholder: currentBatch,
+                                             self.goalPlaceholder: goalBatch})
+    
+    def learnedParticleDistances(self, goal, particles):
+        if particles == []: return 
+        # only do it for 50 particles at a time
+        maximumBatchSize = 50
+        if len(particles) > maximumBatchSize:
+            self.learnedParticleDistances(goal, particles[maximumBatchSize:])
+        particles = particles[:maximumBatchSize]
+        d = self.learnedDistances(np.array([ p.render() for p in particles ]),
+                                  np.tile(goal, (len(particles), 1, 1)))
+        for j,p in enumerate(particles):
+            if self.arguments.showParticles:
+                print "Distance vector:",d[j,:]
+                print "Likelihood:",p.logLikelihood
+                showImage(p.output + goal)
+            p.distance = (d[j,0], d[j,1])
+
+    def closedSession(self): self.session.close()
+
+    def loadCheckpoint(self, checkpoint):
+        with self.session.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self.session, checkpoint)
         
+    def train(self, numberOfExamples, checkpoint, restore = False):
+        assert self.arguments.noisy
+        targetImages,targetPrograms = loadExamples(numberOfExamples)
+        iterator = BatchIterator(5,tuple([np.array(targetImages),np.array(targetPrograms)]),
+                                testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
 
-    def analyzeFailures(self, numberOfExamples, checkpoint):
-        partialImages,targetImages,targetVectors,targetLines = loadExamples(numberOfExamples,noisy = self.noisy)
-        iterator = BatchIterator(1,tuple([partialImages,targetImages] + targetVectors + [targetLines]),
-                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
-        iterator.registerPlaceholders([self.currentPlaceholder, self.goalPlaceholder] +
-                                      self.decoder.placeholders() + [None])
-        saver = tf.train.Saver()
-        failureLog = [] # pair of current goal
-        targetRanks = []
-        k = 0
+        # use the session to make sure that we save or initialize the right things
+        with self.session.graph.as_default():
+            initializer = tf.global_variables_initializer()
+            saver = tf.train.Saver()
+            flushEverything()
+            if not restore:
+                self.session.run(initializer)
+            else:
+                saver.restore(self.session, checkpoint)
+            for e in range(20):
+                runningAverage = 0.0
+                runningAverageCount = 0
+                lastUpdateTime = time()
+                for images,programs in iterator.epochExamples():
+                    targets, current, distances = makeDistanceExamples(images, programs,
+                                                                       reportTime = runningAverageCount == 0)
+                    _,l = self.session.run([self.distanceOptimizer, self.distanceLoss],
+                                feed_dict = {self.currentPlaceholder: current,
+                                             self.goalPlaceholder: targets,
+                                             self.valueTargets: distances})
+                    runningAverage += l
+                    runningAverageCount += 1
+                    if time() - lastUpdateTime > 120:
+                        lastUpdateTime = time()
+                        print "\t\tRunning average loss: %f"%(runningAverage/runningAverageCount)
+                        flushEverything()
+                print "Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount)
+                flushEverything()
 
-        with tf.Session() as s:
-            saver.restore(s,checkpoint)
-            for feed in iterator.testingFeeds():
-                targetLine = feed[None].reshape((1))[0].tolist()
-                del feed[None]
-                k += 1
-                accuracy = s.run(self.averageAccuracy,
-                                 feed_dict = feed)
-                assert accuracy == 0.0 or accuracy == 1.0
-                if accuracy < 0.5:
-                    # decode the action preferred by the model
-                    topHundred = self.decoder.beam(s, {self.currentPlaceholder: feed[self.currentPlaceholder],
-                                                       self.goalPlaceholder: feed[self.goalPlaceholder]}, 100)
-                    topHundred.sort(key = lambda foo: foo[0], reverse = True)
-                    preferredLine = topHundred[0][1]
-                    preferredLineHumanReadable = str(preferredLine)
-                    preferredLine = "\n%end of program\n" if preferredLine == None else preferredLine.TikZ()
-                    # check to see the rank of the correct line, because it wasn't the best
-                    targetLineString = str(targetLine)
-                    topHundred = [ l for _,l in topHundred]
-                    topHundredString = map(str,topHundred)
-                    
-                    if targetLineString in topHundredString:
-                        #print "Target line has rank %d in beam"%(1 + topHundred.index(targetLine))
-                        targetRanks.append(1 + topHundredString.index(targetLineString))
-                    else:
-                        print "Target line (not model preference):",targetLine
-                        print "Model preference:",preferredLineHumanReadable
-                        print "Target not in beam."
-                        if isinstance(targetLine, Line):
-                            print "The target length = %f"%(targetLine.length())
-                            print "Is the target diagonal? %s"%(str(targetLine.isDiagonal()))
-                            print "Smallest distance: %f"%(min([targetLine - h for h in topHundred ]))
-                        print ""
-                        targetRanks.append(None)
-                    
-                    failureLog.append((feed[self.currentPlaceholder][0], feed[self.goalPlaceholder][0], preferredLine))
-                    if len(failureLog) > 99:
-                        break
-                    
-        print "Failures:",len(failureLog),'/',k
-        successfulTargetRanks = [ r for r in targetRanks if r != None ]
-        print "In beam %d/%d of the time."%(len(successfulTargetRanks),len(targetRanks))
-        print "Average successful target rank: %f"%(sum(successfulTargetRanks)/float(len(successfulTargetRanks)))
-        print "Successful target ranks: %s"%(str(successfulTargetRanks))
-        
-        for j,(c,g,l) in enumerate(failureLog):
-            saveMatrixAsImage(c*255,"failures/%d-current.png"%j)
-            saveMatrixAsImage(g*255,"failures/%d-goal.png"%j)
-            pixels = render([l],yieldsPixels = True,canvas = (MAXIMUMCOORDINATE,MAXIMUMCOORDINATE))[0]
-            pixels = 1.0 - pixels
-            saveMatrixAsImage(pixels*255 + 255*c,"failures/%d-predicted.png"%j)
-                
+                testingLosses = [ self.session.run(self.distanceLoss,
+                                        feed_dict = {self.currentPlaceholder: current,
+                                                     self.goalPlaceholder: targets,
+                                                     self.valueTargets: distances})
+                                  for images,programs in iterator.testingExamples()
+                                  for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
+                testingLosses = sum(testingLosses)/len(testingLosses)
+                print "\tTesting loss: %f"%testingLosses
+                print "Saving checkpoint: %s"%(saver.save(self.session, checkpoint))
+                flushEverything()
+        # currents, goals, ts = makeDistanceExamples(*next(iterator.epochExamples()))
+        # print self.learnedDistances(currents, goals)
+        # print ts
 
-    def SMC(self, s, targetImage, beamSize = 10, beamLength = 10):
+class SearchModel():
+    def __init__(self,arguments):
+        self.arguments = arguments
+        self.recognizer = RecognitionModel(arguments)
+        self.distance = DistanceModel(arguments)
+
+        # load the networks
+        self.recognizer.loadCheckpoint(self.arguments.checkpoint)
+        self.distance.loadCheckpoint(self.arguments.distanceCheckpoint)
+
+    def SMC(self, targetImage, beamSize = 10, beamLength = 10):
         totalNumberOfRenders = 0
         targetImage = np.reshape(targetImage,(256,256))
         beam = [Particle(program = [],
@@ -601,9 +562,7 @@ d        ps = []
                 childCount = beamSize if self.arguments.beam else parent.count
                 if not self.arguments.unguided:
                     # neural network guide: decoding
-                    feed = {self.currentPlaceholder: np.array([parent.output]),
-                            self.goalPlaceholder: np.array([targetImage])}
-                    kids = self.decoder.beam(s, feed, childCount)
+                    kids = self.recognizer.beam(parent.output, targetImage, childCount)
                 else:
                     # no neural network guide: sample from the prior
                     kids = [ (0.0, randomCode) for _ in range(childCount)
@@ -650,7 +609,7 @@ d        ps = []
                 print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
 
             if self.arguments.distance: # use the learned distance metric
-                self.learnedParticleDistances(targetImage, beam)
+                self.distance.learnedParticleDistances(targetImage, beam)
                 for p in beam: p.distance = p.distance[0] + self.arguments.mistakePenalty*p.distance[1]
             else:
                 for n in beam:
@@ -769,18 +728,9 @@ d        ps = []
         startTime = time()
         assert self.arguments.fastRender
         # optimization: add the rendering of last command to the parent
-        outputs = []
-        for n in particles:
-            program = n.sequence().lines
-            o = n.parent.output
-            if len(program) > 0:
-                o = fastRender(program[-1]) + o
-                o[o > 1] = 1
-            outputs.append(o)
-            
+        # todo: get that optimization working for Cairo if it does being important
+        for n in particles: n.output = n.sequence().draw()
         if not self.arguments.quiet: print "Rendered in %f seconds"%(time() - startTime)
-        for n,o in zip(particles,outputs):
-            n.output = o
 
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
         print "Finished programs, sorted by likelihood:"
@@ -806,34 +756,6 @@ d        ps = []
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
 
-        
-    def visualizeFilters(self,checkpoint):
-        filters = []
-        saver = tf.train.Saver()
-        with tf.Session() as s:
-            saver.restore(s,checkpoint)
-            print tf.GraphKeys.TRAINABLE_VARIABLES
-            for v in tf.trainable_variables():
-                if v.name.startswith("conv2d") and v.name.endswith('kernel:0'):
-                    print v
-                    filters.append(v.eval())
-        # first layer
-        filters = filters[:3]
-        for f in filters:
-            (w,h,_,n) = f.shape
-            print f.shape
-
-            imageWidth = (w)*n + 5*(n - 1)
-            imageHeight = (2*h + 5)
-            v = np.zeros((imageWidth,imageHeight))
-            print "v = ",v.shape
-            for j in range(n):
-                print "target size",v[w*j:w*(j+1), 0:h].shape
-                print "destination size",f[:,:,0,j].shape
-                v[(w+5)*j:(w+5)*j+w, 0:h] = f[:,:,0,j]
-                v[(w+5)*j:(w+5)*j+w, h+5:2*h+5] = f[:,:,1,j]
-            saveMatrixAsImage(v*255,"/tmp/filters.png")
-            os.system("feh /tmp/filters.png")
 
     def evaluateAccuracy(self):
         # similar map but for the rank of the correct program
@@ -845,18 +767,13 @@ d        ps = []
         # how long the search took
         searchTime = {}
 
-        # load the network
-        saver = tf.train.Saver()
-        session = tf.Session()
-        saver.restore(session, self.arguments.checkpoint)
-
         # generate target programs with the same random seed so that
         # we get consistent validation sets across models
         random.seed(42)
         targetPrograms = [ randomScene(16)() for _ in range(self.arguments.numberOfExamples) ]
         
         for targetProgram in targetPrograms:
-            targetImage = fastRender(targetProgram)
+            targetImage = targetProgram.draw()
             k = len(targetProgram.lines)
             if not k in intersectionDistance:
                 intersectionDistance[k] = []
@@ -865,8 +782,7 @@ d        ps = []
                 searchTime[k] = []
             
             startTime = time()
-            particles = self.SMC(session,
-                                 targetImage,
+            particles = self.SMC(targetImage,
                                  beamSize = arguments.beamWidth,
                                  beamLength = k + 1)
             searchTime[k].append(time() - startTime)
@@ -905,9 +821,6 @@ d        ps = []
                     break
             programRank[k].append(rank)
 
-            # showImage(targetImage)
-            # showImage(preferred.output)
-
         print programRank
         print intersectionDistance
         print programDistance
@@ -921,29 +834,20 @@ d        ps = []
         print "Average program distance: %f"%(sum(programDistances)/float(len(programDistances)))
         print "Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances)))
         
-        session.close()
-                    
-
 
 def handleTest(a):
     (f,arguments) = a
     tf.reset_default_graph()
-    model = RecognitionModel(arguments)
-    if arguments.distance: model.loadDistanceCheckpoint(arguments.distanceCheckpoint)
+    model = SearchModel(arguments)
     targetImage = loadImage(f)
 
     # l = 0 implies that we should look at the ground truth and use that to abound the length
     l = arguments.beamLength
     if l == 0:
         l = len(getGroundTruthParse(f).lines) + 1        
-
-    saver = tf.train.Saver()
-    with tf.Session() as s:
-        saver.restore(s,arguments.checkpoint)
-        particles = model.SMC(s,
-                              targetImage,
-                              beamSize = arguments.beamWidth,
-                              beamLength = l)
+    particles = model.SMC(targetImage,
+                          beamSize = arguments.beamWidth,
+                          beamLength = l)
     gotGroundTruth = None
     groundTruth = getGroundTruthParse(f)
     if groundTruth != None:
@@ -959,7 +863,6 @@ def handleTest(a):
     # place where we will save the parses
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
-    if arguments.distance: model.closeDistanceSession()
     return gotGroundTruth
     
 def picturesInDirectory(d):
@@ -1019,12 +922,11 @@ if __name__ == '__main__':
     elif arguments.task == 'analyze':
         RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
     elif arguments.task == 'train':
-        worker = RecognitionModel(arguments)
         if arguments.distance:
-            worker.trainDistance(arguments.numberOfExamples, checkpoint = arguments.distanceCheckpoint, restore = arguments.r)
+            DistanceModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.distanceCheckpoint, restore = arguments.r)
         else:
-            worker.train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+            RecognitionModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
     elif arguments.task == 'evaluate':
-        RecognitionModel(arguments).evaluateAccuracy()
+        SearchModel(arguments).evaluateAccuracy()
     elif arguments.task == 'profile':
         cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))

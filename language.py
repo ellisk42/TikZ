@@ -137,7 +137,11 @@ class Label():
     def usedXCoordinates(self): return [self.p.x]
     def usedYCoordinates(self): return [self.p.y]
     def __str__(self): return "Label(%s, \"%s\")"%(self.p,self.c)
-    def mutate(self): return Label(self.p.mutate(),self.c)
+    def mutate(self):
+        if random() < 0.5:
+            return Label(self.p.mutate(),self.c)
+        else:
+            return Label(self.p,choice([l for l in Label.allowedLabels if l != self.c ]))
 
     @staticmethod
     def sample(): return Label(AbsolutePoint.sample(),
@@ -267,7 +271,10 @@ class Line(Program):
             ps = [ (p.mutate() if p == r else p) for p in ps ]
             
         if not a: ps = sorted(ps,key = lambda p: (p.x,p.y))
-        return Line(ps, arrow = a, solid = s)
+        mutant = Line(ps, arrow = a, solid = s)
+        if mutant.length() < 1: return self.mutate()
+        return mutant
+    
     @staticmethod
     def sample():
         while True:
@@ -434,8 +441,12 @@ class Rectangle(Program):
     def __str__(self):
         return "Rectangle(%s, %s)"%(str(self.p1),str(self.p2))
     def mutate(self):
-        if self.p2.y - self.p1.y == 2 and self.p2.x - self.p1.x == 2 and random() < 0.5:
-            return Circle.absolute(p1.x + 1,p1.y + 1)
+        dx = self.p2.x - self.p1.x
+        dy = self.p2.y - self.p1.y
+        if dx == dy and dx < 8 and dx%2 == 0 and random() < 0.5:
+            return Circle(AbsolutePoint(self.p1.x + dx/2,
+                                        self.p1.y + dy/2),
+                          dx/2)
         while True:
             p1 = self.p1
             p2 = self.p2
@@ -513,11 +524,16 @@ class Circle(Program):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
     
     def mutate(self):
-        if random() < 0.15:
+        if self.radius < 3 and random() < 0.15:
             return Rectangle.absolute(self.center.x - self.radius, self.center.y - self.radius,
                                       self.center.x + self.radius, self.center.y + self.radius)
         while True:
-            c = Circle(self.center.mutate(), self.radius)
+            if random() < 0.5:
+                c = Circle(self.center.mutate(), self.radius)
+            else:
+                if self.radius < 2: r = self.radius + 1
+                else: r = self.radius + choice([-1,1])
+                c = Circle(self.center, r)
             if c.inbounds():
                 return c
     def intersects(self,o):
