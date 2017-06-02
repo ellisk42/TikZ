@@ -40,7 +40,8 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
         labeledPixels = Image.fromarray(unlabeledPixels).convert('L')
         labeledPixels.save("%s-%d-noisy.png"%(filePrefix,j + offset))
 
-        Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
+        if False:
+            Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
             
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
