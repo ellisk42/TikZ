@@ -527,6 +527,20 @@ class DistanceModel():
                 print "Saving checkpoint: %s"%(saver.save(self.session, checkpoint))
                 flushEverything()
 
+    def analyzeGroundTruth(self):
+        self.loadCheckpoint(self.arguments.distanceCheckpoint)
+        targetNames = [ "drawings/expert-%d.png"%j for j in range(100) ]
+        targetImages = map(loadImage,targetNames)
+        targetSequences = map(getGroundTruthParse,targetNames)
+
+        for j in range(100):
+            d = self.learnedDistances(np.array([targetSequences[j].draw()]),
+                                      np.array([targetImages[j]]))[0]
+            print "%f\t%f"%(d[0],d[1])
+            if d[0] > 0.5 or d[1] > 0.5:
+                showImage(targetImages[j])
+        
+
 class SearchModel():
     def __init__(self,arguments):
         self.arguments = arguments
@@ -913,6 +927,8 @@ if __name__ == '__main__':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':
         RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+    elif arguments.task == 'analyzeDistance':
+        DistanceModel(arguments).analyzeGroundTruth()
     elif arguments.task == 'train':
         if arguments.distance:
             DistanceModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.distanceCheckpoint, restore = arguments.r)

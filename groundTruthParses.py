@@ -1,4 +1,3 @@
-from fastRender import fastRender
 import re
 from utilities import *
 from language import *
@@ -139,5 +138,5 @@ if __name__ == '__main__':
         print k
         print groundTruthSequence[k]
         x[0:256,:] = loadImage(k)
-        x[256:,:] = fastRender(groundTruthSequence[k])
+        x[256:,:] = groundTruthSequence[k].draw()
         showImage(x)
