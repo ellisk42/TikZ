@@ -45,7 +45,7 @@ def crossEntropyWithMask(labels, masks, predictions):
     print "l = ",l
     return l
 
-def linesIntersect(p1,q1,p2,q2,precision = 2):
+def linesIntersect(p1,q1,p2,q2,precision = 1):
     for p in [p1,p2,q1,q2]:
         p.x = round(p.x,precision)
         p.y = round(p.y,precision)
