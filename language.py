@@ -19,6 +19,10 @@ RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
 STROKESIZE = 2
 
+SNAPTOGRID = True
+def setSnapToGrid(s):
+    global SNAPTOGRID
+    SNAPTOGRID = s
 def setRadiusNoise(n):
     global RADIUSNOISE
     RADIUSNOISE = n
@@ -29,7 +33,23 @@ def setCoordinateNoise(n):
     
 
 def randomCoordinate():
-    return int(random()*(MAXIMUMCOORDINATE - 2)) + 1
+    if SNAPTOGRID:
+        return int(random()*(MAXIMUMCOORDINATE - 2)) + 1
+    else:
+        return random()*(MAXIMUMCOORDINATE - 2) + 1
+def sampleRadius(): return choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
+
+def randomCoordinatePerturbation():
+    if SNAPTOGRID:
+        return choice([-1,-2,1,-2])
+    else:
+        return 4*random() + 2
+
+def randomRadiusPerturbation():
+    if SNAPTOGRID:
+        return choice([-1,1])
+    else:
+        return 2*random() + 1
 
 
 def inbounds(p):
@@ -99,11 +119,11 @@ class AbsolutePoint(Expression):
     def mutate(self):
         while True:
             if random() > 0.5:
-                dx = choice([-2,-1,1,2])
+                dx = randomCoordinatePerturbation()
                 dy = 0
             else:
                 dx = 0
-                dy = choice([-2,-1,1,2])
+                dy = randomCoordinatePerturbation()
             dp = (self.x + dx,self.y + dy)
             if inbounds(dp):
                 return AbsolutePoint((dp[0]),(dp[1]))
@@ -234,7 +254,7 @@ class Line(Program):
             attributes = ["line width = 0.1cm"]
         if arrow:
             scale = 1.5
-            if noisy: scale = 1.2 + random()*(1.5 - 1.2)*2
+            if noisy: scale = 1.2 + random()*(1.5 - 1.2)*1.2
             scale = round(scale,1)
             differentStyles = ["-{>[scale = %f]}",
                                "-{Stealth[scale = %f]}",
@@ -282,7 +302,7 @@ class Line(Program):
             ps = [AbsolutePoint.sample(),AbsolutePoint.sample()]
             if not a: ps = sorted(ps,key = lambda p: (p.x,p.y))
             l = Line(ps, solid = random() > 0.5, arrow = a)
-            if l.length() > 0: return l
+            if l.length() > 0.9: return l
         
     def evaluate(self):
         return [Line.lineCommand([ p.evaluate() for p in self.points ],
@@ -363,10 +383,10 @@ class Rectangle(Program):
                 Line([AbsolutePoint(self.p1.x,self.p2.y), self.p1])]
     def attachmentPoints(self):
         # all of the edges
-        ps = [ (x, self.p1.y, 'v') for x in range(self.p1.x + 1, self.p2.x) ]
-        ps += [ (self.p2.x, y, 'h') for y in range(self.p1.y + 1, self.p2.y) ]
-        ps += [ (x, self.p2.y, 'v') for x in range(self.p1.x + 1, self.p2.x) ]
-        ps += [ (self.p1.x, y, 'h') for y in range(self.p1.y + 1, self.p2.y) ]
+        ps = [ (x, self.p1.y, 'v') for x in range(int(self.p1.x + 0.5) + 1, int(self.p2.x)) ]
+        ps += [ (self.p2.x, y, 'h') for y in range(int(self.p1.y + 0.5) + 1, int(self.p2.y)) ]
+        ps += [ (x, self.p2.y, 'v') for x in range(int(self.p1.x + 0.5) + 1, int(self.p2.x)) ]
+        ps += [ (self.p1.x, y, 'h') for y in range(int(self.p1.y + 0.5) + 1, int(self.p2.y)) ]
         return ps
     def usedXCoordinates(self):
         return [self.p1.x,self.p2.x]
@@ -532,7 +552,7 @@ class Circle(Program):
                 c = Circle(self.center.mutate(), self.radius)
             else:
                 if self.radius < 2: r = self.radius + 1
-                else: r = self.radius + choice([-1,1])
+                else: r = self.radius + randomRadiusPerturbation()
                 c = Circle(self.center, r)
             if c.inbounds():
                 return c
@@ -570,7 +590,7 @@ class Circle(Program):
     def sample():
         while True:
             p = AbsolutePoint.sample()
-            r = choice(range(5)) + 1
+            r = sampleRadius()
             c = Circle(p,r)
             if c.inbounds():
                 return c
@@ -656,8 +676,8 @@ class Sequence(Program):
 
         x0 = min([x0,0])
         y0 = min([y0,0])
-        x1 = max([x1,16])
-        y1 = max([y1,16])
+        x1 = max([x1,MAXIMUMCOORDINATE])
+        y1 = max([y1,MAXIMUMCOORDINATE])
 
         return (x0,y0,x1,y1)
     def framedRendering(self, reference = None):
@@ -685,6 +705,16 @@ class Sequence(Program):
         data = np.flip(data, 0)
         return data/255.0
 
+    def drawTrace(self):
+        data = np.zeros((256, 256), dtype=np.uint8)
+        surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_A8,256,256)
+        context = cairo.Context(surface)
+        t = [np.zeros((256,256))]
+        for l in self.lines:
+            l.draw(context)
+            t.append(np.flip(data, 0)/255.0)
+        return t
+
 
 def randomLineOfCode():
     k = choice(range(5))
@@ -696,7 +726,7 @@ def randomLineOfCode():
     assert False
     
 if __name__ == '__main__':
-    
+    SNAPTOGRID = True
     s = Sequence.sample(10)
     print s
     x = render([s.noisyTikZ()],yieldsPixels = True)[0]

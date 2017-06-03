@@ -400,9 +400,10 @@ class RecognitionModel():
         for target, program in zip(targets, programs):
             if not self.arguments.noisy:
                 target = program.draw()
+            cs += program.drawTrace()
             for j in range(len(program) + 1):
                 gs.append(target)
-                cs.append(Sequence(program.lines[:j]).draw())
+                #cs.append(Sequence(program.lines[:j]).draw())
                 l = None
                 if j < len(program): l = program.lines[j]
                 ps.append(self.decoder.extractTargets(l))
@@ -534,11 +535,19 @@ class DistanceModel():
         targetSequences = map(getGroundTruthParse,targetNames)
 
         for j in range(100):
-            d = self.learnedDistances(np.array([targetSequences[j].draw()]),
-                                      np.array([targetImages[j]]))[0]
-            print "%f\t%f"%(d[0],d[1])
-            if d[0] > 0.5 or d[1] > 0.5:
-                showImage(targetImages[j])
+            s = targetSequences[j]
+            for m in range(3):
+                sp = s
+                if m > 0:
+                    for _ in range(choice([1,2,3,4])):  sp = sp.mutate()
+                d = self.learnedDistances(np.array([sp.draw()]),
+                                          np.array([targetImages[j]]))[0]
+                d1 = len(set(map(str,s.lines)) - set(map(str,sp.lines)))
+                d2 = len(set(map(str,sp.lines)) - set(map(str,s.lines)))
+                print "%f\t%f"%(d[0],d[1])
+                if int(round(d[0])) != d1 or int(round(d[1])) != d2:
+                    print "\tvs:%d\t%d"%(d1,d2)
+                    showImage(targetImages[j] + sp.draw())
         
 
 class SearchModel():

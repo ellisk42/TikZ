@@ -40,7 +40,7 @@ def sampleCharacter(c):
     return choice(CHARACTERMAP[c])
 
 def blitCharacter(surface,x,y,c):
-    (x,y) = (y,x)
+    (x,y) = (int(y),int(x))
     c = sampleCharacter(c)
     (dx,dy) = c.shape
     (w,h) = surface.shape

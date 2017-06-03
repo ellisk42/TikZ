@@ -120,7 +120,7 @@ def sampleCircle(objects):
         if random() < reuseProbability:
             r = choice(existingRadii)
         else:
-            r = choice(range(4)) + 1
+            r = sampleRadius()
         c = Circle(p,r)
         if c.inbounds(): return c
 
@@ -133,9 +133,10 @@ def sampleRectangle(objects):
             x2 = (max([p1.x,p2.x]))
             y1 = (min([p1.y,p2.y]))
             y2 = (max([p1.y,p2.y]))
-            p1 = AbsolutePoint(x1,y1)
-            p2 = AbsolutePoint(x2,y2)
-            return Rectangle(p1, p2)
+            if x2 - x1 > 0.5 and y2 - y1 > 0.5:
+                p1 = AbsolutePoint(x1,y1)
+                p2 = AbsolutePoint(x2,y2)
+                return Rectangle(p1, p2)
 
 def sampleLabel(objects):
     l = Label.sample()
@@ -155,12 +156,12 @@ def sampleLine(objects, attachedLines = []):
         if choice([True,False]):
             # x1 == x2; y1 != y2
             y2 = y1
-            while y2 == y1: y2 = randomCoordinate()
+            while abs(y2 - y1) < 1: y2 = randomCoordinate()
             points = [AbsolutePoint((x1),(y1)),AbsolutePoint((x1),(y2))]
         else:
             # x1 != x2; y1 == y2
             x2 = x1
-            while x2 == x1: x2 = randomCoordinate()
+            while abs(x2 - x1) < 1: x2 = randomCoordinate()
             points = [AbsolutePoint((x1),(y1)),AbsolutePoint((x2),(y1))]
     else: # arbitrary line between two points. Don't allow these.
         while True:
@@ -203,93 +204,41 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0,labels = 0):
 
 def randomScene(maximumNumberOfObjects):
     def sampler():
-        n = choice(range(maximumNumberOfObjects)) + 1
-
-        shapeIdentities = [choice(range(4)) for _ in range(n) ]
-        return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
-                               lines = len([x for x in shapeIdentities if x == 1 ]),
-                               circles = len([x for x in shapeIdentities if x == 2 ]),
-                               labels = len([x for x in shapeIdentities if x == 3 ]))()
+        while True:
+            n = choice(range(maximumNumberOfObjects)) + 1
+            shapeIdentities = [choice(range(4)) for _ in range(n) ]
+            numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
+            # make it so that there are not too many labels
+            if numberOfLabels > n/2: continue
+            
+            return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
+                                   lines = len([x for x in shapeIdentities if x == 1 ]),
+                                   circles = len([x for x in shapeIdentities if x == 2 ]),
+                                   labels = len([x for x in shapeIdentities if x == 3 ]))()
     return sampler
 
-def hiddenMarkovModel():
-    spacing = 4
-    offset = 2
-    primitives = [ Circle(AbsolutePoint(((spacing + 2)*x + offset),
-                                        ((spacing + 2)*y + offset)), (1))
-      for x in range(3)
-      for y in range(2) ]
-    # horizontal lines connecting hidden nodes
-    primitives += [ Line.absolute(((spacing + 2)*x + offset + 1),
-                                  (offset + y*(spacing + 2)),
-                                  ((spacing + 2)*x + offset + spacing + 1),
-                                  (offset + y*(spacing + 2)),
-                                  arrow = False)
-                    for x in range(2)
-                    for y in [1] ]
-    primitives += [ Line.absolute((offset + x*(spacing + 2)),
-                                  ((spacing + 2)*y + offset + spacing + 1),
-                                  (offset + x*(spacing + 2)),
-                                  ((spacing + 2)*y + offset + 1),
-                                  arrow = False)
-                    for x in range(3)
-                    for y in [0] ]
-    return Sequence(primitives)
-    
-    
-
-    
-def icingModel():
-    spacing = 3
-    offset = 3
-    primitives = [ Circle(AbsolutePoint(((spacing + 2)*x + offset),
-                                        ((spacing + 2)*y + offset)), (1))
-      for x in range(3)
-      for y in range(3) ]
-    primitives += [ Line.absolute((offset + x*(spacing + 2)),
-                                  ((spacing + 2)*y + offset + 1),
-                                  (offset + x*(spacing + 2)),
-                                  ((spacing + 2)*y + offset + spacing + 1)
-                                  )
-                    for x in range(3)
-                    for y in range(2) ]
-    primitives += [ Line.absolute(((spacing + 2)*x + offset + 1),
-                                  (offset + y*(spacing + 2)),
-                                  ((spacing + 2)*x + offset + spacing + 1),
-                                  (offset + y*(spacing + 2)))
-                    for x in range(2)
-                    for y in range(3) ]
-    return Sequence(primitives)
-            
-
 def handleGeneration(arguments):
-    generators = {"individualCircle": multipleObjects(circles = 1),
-                  "doubleCircleLine": multipleObjects(circles = 2,lines = 1),
-                  "tripleLine": multipleObjects(lines = 3),
-                  "doubleCircle": multipleObjects(circles = 2),
-                  "randomScene": randomScene(8),
-                  "tripleCircle": multipleObjects(circles = 3),
-                  "individualRectangle": multipleObjects(rectangles = 1)}
+    generators = {"randomScene": randomScene(12)}
     (n,startingPoint,k) = arguments
     # IMPORTANT!
     # You *do not* want directories with an enormous number of files in them
     # pack it all up into a directory that we will tar together later
     
-    os.system('mkdir syntheticTrainingData/%d'%startingPoint)
-    makeSyntheticData("syntheticTrainingData/%d/%s"%(startingPoint,n), generators[n], k = k, offset = startingPoint)
-    print "Generated %d training sequences into syntheticTrainingData/%d"%(k,startingPoint)
+    os.system('mkdir %s/%d'%(outputName,startingPoint))
+    makeSyntheticData("%s/%d/%s"%(outputName,startingPoint,n), generators[n], k = k, offset = startingPoint)
+    print "Generated %d training sequences into %s/%d"%(k,outputName,startingPoint)
     
 if __name__ == '__main__':
     loadCharacters()
-    setCoordinateNoise(0.2)
-    setRadiusNoise(0.1)
 
-    if len(sys.argv) == 2 and sys.argv[1] == 'challenge':
-        setCoordinateNoise(0.1)
-        setRadiusNoise(0.05)
-        x = render([hiddenMarkovModel().noisyTikZ()],showImage = True,yieldsPixels = True)[0]
-        Image.fromarray(255*x).convert('L').save('challenge.png')
-        assert False
+    if 'continuous' in sys.argv:
+        setSnapToGrid(False)
+        outputName = 'syntheticContinuousTrainingData'
+    else:
+        # models imperfect grid alignment
+        setCoordinateNoise(0.2)
+        setRadiusNoise(0.1)
+        outputName = 'syntheticTrainingData'
 
     if len(sys.argv) > 1:
         totalNumberOfExamples = int(sys.argv[1])
@@ -299,7 +248,7 @@ if __name__ == '__main__':
     # this keeps any particular directory from getting too big
     if examplesPerBatch > 1000: examplesPerBatch = 1000
     
-    os.system('rm -r syntheticTrainingData syntheticTrainingData.tar ; mkdir syntheticTrainingData')
+    os.system('rm -r %s %s.tar ; mkdir %s'%(outputName,outputName,outputName))
     n = "randomScene"
     startingPoint = 0
     offsetsAndCounts = []
@@ -317,12 +266,12 @@ if __name__ == '__main__':
 
     if totalNumberOfExamples > 100:
         print "Generated files, building archive..."
-        os.system('tar cvf syntheticTrainingData.tar -T /dev/null')
+        os.system('tar cvf %s.tar -T /dev/null'%outputName)
 
         for _,startingPoint,_ in offsetsAndCounts:
-            os.system('cd syntheticTrainingData/%d && tar --append --file ../../syntheticTrainingData.tar . && cd ../..'%startingPoint)
+            os.system('cd %s/%d && tar --append --file ../../%s.tar . && cd ../..'%(outputName,startingPoint,outputName))
         #     if totalNumberOfExamples > 100:
         #         os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
         # os.system('rm -r syntheticTrainingData')
-        print "Done. You should see everything in syntheticTrainingData.tar if you had at least 100 examples."
+        print "Done. You should see everything in %s.tar if you had at least 100 examples."%(outputName)
