@@ -351,12 +351,17 @@ class RecognitionModel():
 
             self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
 
-    def loadCheckpoint(self, checkpoint):
+    @property
+    def checkpointPath(self):
+        return "checkpoints/recognition_%s_%s.checkpoint"%(self.arguments.architecture,
+                                                           "noisy" if self.arguments.noisy else "clean")
+    
+    def loadCheckpoint(self):
         with self.session.graph.as_default():
             saver = tf.train.Saver()
-            saver.restore(self.session, checkpoint)
+            saver.restore(self.session, self.checkpointPath)
             
-    def train(self, numberOfExamples, checkpoint = "/tmp/model.checkpoint", restore = False):
+    def train(self, numberOfExamples, restore = False):
         noisyTarget,programs = loadExamples(numberOfExamples)
         
         iterator = BatchIterator(10,(np.array(noisyTarget),np.array(programs)),
@@ -370,7 +375,7 @@ class RecognitionModel():
             if not restore:
                 self.session.run(initializer)
             else:
-                saver.restore(self.session, checkpoint)
+                saver.restore(self.session, self.checkpointPath)
             
             for e in range(20):
                 epicLoss = []
@@ -389,7 +394,7 @@ class RecognitionModel():
                     feed[self.trainingPredicatePlaceholder] = False
                     testingAccuracy.append(self.session.run(self.averageAccuracy, feed_dict = feed))
                 print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
-                print "Saving checkpoint: %s" % saver.save(self.session, checkpoint)
+                print "Saving checkpoint: %s" % saver.save(self.session, self.checkpointPath)
                 flushEverything()
 
     def makeTrainingFeed(self, targets, programs):
@@ -454,6 +459,11 @@ class DistanceModel():
             self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
             self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
 
+    @property
+    def checkpointPath(self):
+        return "checkpoints/distance_%s_%s.checkpoint"%(self.arguments.architecture,
+                                                        "noisy" if self.arguments.noisy else "clean")
+    
     def learnedDistances(self, currentBatch, goalBatch):
         return self.session.run(self.distanceFunction,
                                 feed_dict = {self.currentPlaceholder: currentBatch,
@@ -475,14 +485,12 @@ class DistanceModel():
                 showImage(p.output + goal)
             p.distance = (d[j,0], d[j,1])
 
-    def closedSession(self): self.session.close()
-
-    def loadCheckpoint(self, checkpoint):
+    def loadCheckpoint(self):
         with self.session.graph.as_default():
             saver = tf.train.Saver()
-            saver.restore(self.session, checkpoint)
+            saver.restore(self.session, self.checkpointPath)
         
-    def train(self, numberOfExamples, checkpoint, restore = False):
+    def train(self, numberOfExamples, restore = False):
         assert self.arguments.noisy
         targetImages,targetPrograms = loadExamples(numberOfExamples)
         iterator = BatchIterator(5,tuple([np.array(targetImages),np.array(targetPrograms)]),
@@ -496,7 +504,7 @@ class DistanceModel():
             if not restore:
                 self.session.run(initializer)
             else:
-                saver.restore(self.session, checkpoint)
+                saver.restore(self.session, self.checkpointPath)
             for e in range(20):
                 runningAverage = 0.0
                 runningAverageCount = 0
@@ -525,11 +533,11 @@ class DistanceModel():
                                   for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
                 testingLosses = sum(testingLosses)/len(testingLosses)
                 print "\tTesting loss: %f"%testingLosses
-                print "Saving checkpoint: %s"%(saver.save(self.session, checkpoint))
+                print "Saving checkpoint: %s"%(saver.save(self.session, self.checkpointPath))
                 flushEverything()
 
     def analyzeGroundTruth(self):
-        self.loadCheckpoint(self.arguments.distanceCheckpoint)
+        self.loadCheckpoint(self.checkpointPath)
         targetNames = [ "drawings/expert-%d.png"%j for j in range(100) ]
         targetImages = map(loadImage,targetNames)
         targetSequences = map(getGroundTruthParse,targetNames)
@@ -557,8 +565,8 @@ class SearchModel():
         self.distance = DistanceModel(arguments)
 
         # load the networks
-        self.recognizer.loadCheckpoint(self.arguments.checkpoint)
-        self.distance.loadCheckpoint(self.arguments.distanceCheckpoint)
+        self.recognizer.loadCheckpoint()
+        self.distance.loadCheckpoint()
 
     def SMC(self, targetImage, beamSize = 10, beamLength = 10):
         totalNumberOfRenders = 0
@@ -746,7 +754,6 @@ class SearchModel():
     
     def renderParticles(self,particles):
         startTime = time()
-        assert self.arguments.fastRender
         # optimization: add the rendering of last command to the parent
         # todo: get that optimization working for Cairo if it does being important
         for n in particles: n.output = n.sequence().draw()
@@ -888,8 +895,6 @@ def handleTest(a):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
     parser.add_argument('task')
-    parser.add_argument('-c','--checkpoint', default = "checkpoints/model.checkpoint", type = str)
-    parser.add_argument('-d','--distanceCheckpoint', default = "checkpoints/distance.checkpoint", type = str)
     parser.add_argument('-n','--numberOfExamples', default = 100000, type = int)
     parser.add_argument('-l','--beamLength', default = 13, type = int)
     parser.add_argument('-b','--beamWidth', default = 10, type = int)
@@ -911,7 +916,6 @@ if __name__ == '__main__':
     parser.add_argument('--priorCoefficient', default = 0.0, type = float)
     parser.add_argument('--mistakePenalty', default = 5.0, type = float)
     parser.add_argument('--beam', action = "store_true", default = False)
-    parser.add_argument('--fastRender', action = "store_true", default = True)
     parser.add_argument('--unguided', action = "store_true", default = False)
     parser.add_argument('--noIntersections', action = "store_true", default = False)
     parser.add_argument('--showParticles', action = "store_true", default = False)
