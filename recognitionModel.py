@@ -1,3 +1,4 @@
+from mixtureDensityNetwork import *
 from distanceExamples import *
 from architectures import architectures
 from batch import BatchIterator
@@ -20,12 +21,6 @@ import cProfile
 from multiprocessing import Pool
 import random
 
-# The data is generated on a  MAXIMUMCOORDINATExMAXIMUMCOORDINATE grid
-# We can interpolate between stochastic search and neural networks by downsampling to a smaller grid
-APPROXIMATINGGRID = MAXIMUMCOORDINATE
-def coordinate2grid(c): return c*MAXIMUMCOORDINATE/APPROXIMATINGGRID
-def grid2coordinate(g): return g*APPROXIMATINGGRID/MAXIMUMCOORDINATE
-
 TESTINGFRACTION = 0.05
 
 [STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
@@ -34,41 +29,64 @@ TESTINGFRACTION = 0.05
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
         # A placeholder for each target
-        self.targetPlaceholder = [ (tf.placeholder(tf.int32, [None]) if d >= 0
+        self.targetPlaceholder = [ (tf.placeholder(tf.int32, [None]) if t == int
                                     else tf.placeholder(tf.float32, [None]))
-                                   for d in self.outputDimensions ]
+                                   for t,d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
 
         # A prediction for each target
         self.prediction = []
-        # populate self.production
+        # "hard" predictions (integers or floats)
+        self.hard = []
+        # "soft" predictions (logits: only for categorical variables)
+        self.soft = []
+
+        # variable in the graph representing the loss of this decoder
+        self.loss = []
+        
+        # populate the above arrays
         predictionInputs = imageRepresentation
-        for j,d in enumerate(self.outputDimensions):
-            if self.hiddenSizes[j] == None or self.hiddenSizes[j] == 0:
-                self.prediction.append(tf.layers.dense(predictionInputs, d, activation = None))
-            else:
+        for j,(t,d) in enumerate(self.outputDimensions):
+            # construct the intermediate representation, if the decoder has one
+            intermediateRepresentation = predictionInputs
+            if self.hiddenSizes[j] != None and self.hiddenSizes[j] > 0:
                 intermediateRepresentation = tf.layers.dense(predictionInputs,
                                                              self.hiddenSizes[j],
-                                                             activation = tf.nn.sigmoid)
-                self.prediction.append(tf.layers.dense(intermediateRepresentation, d, activation = None))
-#            if :
-            predictionInputs = tf.concat([predictionInputs,
-                                          tf.one_hot(self.targetPlaceholder[j], d)],
-                                         axis = 1)
-        # "hard" predictions (integers)
-        self.hard = [ tf.cast(tf.argmax(p,dimension = 1),tf.int32) for p in self.prediction ]
+                                                             activation = tf.nn.relu)
+            # decoding of categorical variables
+            if t == int:
+                # p = prediction
+                p = tf.layers.dense(intermediateRepresentation, d, activation = None)
+                self.prediction.append(p)
+                predictionInputs = tf.concat([predictionInputs,
+                                              tf.one_hot(self.targetPlaceholder[j], d)],
+                                             axis = 1)
+                self.hard.append(tf.cast(tf.argmax(p,dimension = 1),tf.int32))
+                self.soft.append(tf.nn.log_softmax(p))
+                self.loss.append(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder[j],
+                                                                                logits = p))
+            elif t == float:
+                mixtureParameters = mixtureDensityLayer(d,intermediateRepresentation)
+                self.prediction.append(mixtureParameters)
+                predictionInputs = tf.concat([predictionInputs,
+                                              tf.reshape(self.targetPlaceholder[j], [-1,1])],
+                                             axis = 1)
+                self.loss.append(-mixtureDensityLogLikelihood(mixtureParameters,
+                                                              self.targetPlaceholder[j]))
+                self.soft += [None]
+                self.hard += [None]
 
-        # "soft" predictions (logits)
-        self.soft = [ tf.nn.log_softmax(p) for p in self.prediction ]
+        self.loss = sum(self.loss)
 
-    def loss(self):
-        return sum([ tf.nn.sparse_softmax_cross_entropy_with_logits(labels = l, logits = p)
-                     for l,p in zip(self.targetPlaceholder, self.prediction) ])
     def accuracyVector(self):
         '''For each example in the batch, do hard predictions match the target? ty = [None,bool]'''
-        return reduce(tf.logical_and,
-                      [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)])
+        hard = [tf.equal(h,t) for h,t in zip(self.hard,self.targetPlaceholder)
+                if h != None ]
+        if hard != []:
+            return reduce(tf.logical_and, hard)
+        else:
+            return True
     def placeholders(self): return self.targetPlaceholder
 
     @property
@@ -76,18 +94,28 @@ class StandardPrimitiveDecoder():
 
     def beamTrace(self, session, feed, beamSize):
         originalFeed = feed
+        # makes a copy of the feed
         feed = dict([(k,feed[k]) for k in feed])
-        
+
+        # traces is a list of tuples of (log likelihood, sequence of predictions)
         traces = [(0.0,[])]
         for j in range(len(self.outputDimensions)):
             for k in range(j):
                 feed[self.targetPlaceholder[k]] = np.array([ t[1][k] for t in traces ])
             for p in originalFeed:
                 feed[p] = np.repeat(originalFeed[p], len(traces), axis = 0)
-            soft = session.run(self.soft[j], feed_dict = feed)
-            traces = [(s + coordinateScore, trace + [coordinateIndex])
-                  for traceIndex,(s,trace) in enumerate(traces)
-                  for coordinateIndex,coordinateScore in enumerate(soft[traceIndex]) ]
+            if self.outputDimensions[j][0] == int:
+                soft = session.run(self.soft[j], feed_dict = feed)
+                traces = [(s + coordinateScore, trace + [coordinateIndex])
+                          for traceIndex,(s,trace) in enumerate(traces)
+                          for coordinateIndex,coordinateScore in enumerate(soft[traceIndex]) ]
+            elif self.outputDimensions[j][0] == float:
+                [u,v,p] = session.run(list(self.prediction[j]), feed_dict = feed)
+                traces = [(s + coordinateScore, trace + [coordinate])
+                          for traceIndex,(s,trace) in enumerate(traces)
+                          for coordinate, coordinateScore in
+                          beamMixture(u[traceIndex],v[traceIndex],p[traceIndex],
+                                      np.arange(1,MAXIMUMCOORDINATE-1,0.2), beamSize)]
             traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
         return traces
 
@@ -98,82 +126,91 @@ class CircleDecoder(StandardPrimitiveDecoder):
     token = CIRCLE
     languagePrimitive = Circle
     
-    def __init__(self, imageRepresentation):
-        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y,r
-        self.hiddenSizes = [None, None, None]
+    def __init__(self, imageRepresentation, continuous):
+        if continuous:
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*3 # x,y,r
+            self.hiddenSizes = [None,None,None]
+        else:
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*3 # x,y,r
+            self.hiddenSizes = [None, None, None]
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Circle(AbsolutePoint(grid2coordinate(x),grid2coordinate(y)),r))
+        return [(s, Circle(AbsolutePoint(x,y),r))
                 for s,[x,y,r] in self.beamTrace(session, feed, beamSize)
-                if x > 1 and y > 1 and x < MAXIMUMCOORDINATE - 1 and y < MAXIMUMCOORDINATE - 1]
+                if x - r > 0 and y - r > 0 and x + r < MAXIMUMCOORDINATE and y + r < MAXIMUMCOORDINATE]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Circle):
-            return [coordinate2grid(l.center.x),
-                    coordinate2grid(l.center.y),
-                    coordinate2grid(l.radius)]
+            return [l.center.x,
+                    l.center.y,
+                    l.radius]
         return [0,0,0]
 
 class LabelDecoder(StandardPrimitiveDecoder):
     token = LABEL
     languagePrimitive = Label
     
-    def __init__(self, imageRepresentation):
-        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,len(Label.allowedLabels)] # x,y,c
-        self.hiddenSizes = [None, None, None]
+    def __init__(self, imageRepresentation, continuous):
+        if continuous:
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*2+[(int,len(Label.allowedLabels))] # x,y,c
+            self.hiddenSizes = [None, None, None]
+        else:
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*2+[(int,len(Label.allowedLabels))] # x,y,c
+            self.hiddenSizes = [None, None, None]
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Label(AbsolutePoint(grid2coordinate(x),grid2coordinate(y)),Label.allowedLabels[l]))
+        return [(s, Label(AbsolutePoint(x,y),Label.allowedLabels[l]))
                 for s,[x,y,l] in self.beamTrace(session, feed, beamSize)
-                if x > 1 and y > 1 and x < MAXIMUMCOORDINATE - 1 and y < MAXIMUMCOORDINATE - 1]
+                if x > 0 and y > 0 and x < MAXIMUMCOORDINATE and y < MAXIMUMCOORDINATE ]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Label):
-            return [coordinate2grid(l.p.x),
-                    coordinate2grid(l.p.y),
-                    coordinate2grid(Label.allowedLabels.index(l.c))]
+            return [l.p.x,
+                    l.p.y,
+                    Label.allowedLabels.index(l.c)]
         return [0,0,0]
 
 class RectangleDecoder(StandardPrimitiveDecoder):
     token = RECTANGLE
     languagePrimitive = Rectangle
 
-    def __init__(self, imageRepresentation):
-        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID] # x,y
-        self.hiddenSizes = [None,
-                            None,
-                            None,
-                            None]
+    def __init__(self, imageRepresentation, continuous):
+        if continuous:
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 # x,y
+            self.hiddenSizes = [None]*4
+        else:
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*4 # x,y
+            self.hiddenSizes = [None]*4
         self.makeNetwork(imageRepresentation)
             
 
     def beam(self, session, feed, beamSize):
-        return [(s, Rectangle.absolute(grid2coordinate(x1),
-                                       grid2coordinate(y1),
-                                       grid2coordinate(x2),
-                                       grid2coordinate(y2)))
+        return [(s, Rectangle.absolute(x1,y1,x2,y2))
                 for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize)
-                if x1 != x2 and y1 != y2 and x1 > 0 and x2 > 0 and y1 > 0 and y2 > 0 ]
+                if x1 < x2 and y1 < y2 and x1 > 0 and x2 > 0 and y1 > 0 and y2 > 0 ]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Rectangle):
-            return [coordinate2grid(l.p1.x),
-                    coordinate2grid(l.p1.y),
-                    coordinate2grid(l.p2.x),
-                    coordinate2grid(l.p2.y)]
+            return [l.p1.x,
+                    l.p1.y,
+                    l.p2.x,
+                    l.p2.y]
         return [0]*4
 
 class LineDecoder(StandardPrimitiveDecoder):
     token = LINE
     languagePrimitive = Line
 
-    def __init__(self, imageRepresentation):
-        self.outputDimensions = [APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,APPROXIMATINGGRID,2,2] # x,y for beginning and end; arrow/-
+    def __init__(self, imageRepresentation, continuous):
+        if continuous:
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 + [(int,2)]*2 # x,y for beginning and end; arrow/-
+        else:
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*4 + [(int,2)]*2 # x,y for beginning and end; arrow/-
         self.hiddenSizes = [None,
                             32,
                             32,
@@ -183,29 +220,22 @@ class LineDecoder(StandardPrimitiveDecoder):
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Line.absolute((grid2coordinate(x1)),
-                                  (grid2coordinate(y1)),
-                                  (grid2coordinate(x2)),
-                                  (grid2coordinate(y2)),
-                                  arrow = arrow == 1,solid = solid == 1))
+        return [(s, Line.absolute(x1,y1,x2,y2,arrow = arrow == 1,solid = solid == 1))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
                 if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 and x1 > 0 and y1 > 0 and x2 > 0 and y2 > 0 ]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Line):
-            return [coordinate2grid(l.points[0].x),
-                    coordinate2grid(l.points[0].y),
-                    coordinate2grid(l.points[1].x),
-                    coordinate2grid(l.points[1].y),
+            return [l.points[0].x,l.points[0].y,l.points[1].x,l.points[1].y,
                     int(l.arrow),
                     int(l.solid)]
         return [0]*6
 
 class StopDecoder():
-    def __init__(self, imageRepresentation):
+    def __init__(self, imageRepresentation, continuous):
         self.outputDimensions = []
-    def loss(self): return 0.0
+        self.loss = 0.0
     token = STOP
     languagePrimitive = None
     def placeholders(self): return []
@@ -220,8 +250,8 @@ class PrimitiveDecoder():
                       LineDecoder,
                       LabelDecoder,
                       StopDecoder]
-    def __init__(self, imageRepresentation, trainingPredicatePlaceholder):
-        self.decoders = [k(imageRepresentation) for k in PrimitiveDecoder.decoderClasses]
+    def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous):
+        self.decoders = [k(imageRepresentation,continuous) for k in PrimitiveDecoder.decoderClasses]
 
         self.prediction = tf.layers.dense(imageRepresentation, len(self.decoders))
         self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
@@ -235,9 +265,8 @@ class PrimitiveDecoder():
         ll = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder,
                                                                           logits = self.prediction))
         for decoder in self.decoders:
-            decoderLosses = decoder.loss()
             decoderMask = tf.cast(tf.equal(self.targetPlaceholder, decoder.token), tf.float32)
-            decoderLoss = tf.reduce_sum(tf.multiply(decoderMask,decoderLosses))
+            decoderLoss = tf.reduce_sum(tf.multiply(decoderMask,decoder.loss))
             ll += decoderLoss
 
         return ll
@@ -246,9 +275,10 @@ class PrimitiveDecoder():
         a = tf.equal(self.hard,self.targetPlaceholder)
         for decoder in self.decoders:
             if decoder.token != STOP:
-                a = tf.logical_and(a,
-                                   tf.logical_or(decoder.accuracyVector(),
-                                                 tf.not_equal(self.hard,decoder.token)))
+                vector = decoder.accuracyVector()
+                if vector != True:
+                    a = tf.logical_and(a,
+                                       tf.logical_or(vector, tf.not_equal(self.hard,decoder.token)))
         return tf.reduce_mean(tf.cast(a, tf.float32))
 
     def placeholders(self):
@@ -258,7 +288,7 @@ class PrimitiveDecoder():
 
     @staticmethod
     def extractTargets(l):
-        '''Given a line of code l, what is the array of targets (int's) we expect the decoder to produce?'''
+        '''Given a line of code l, what is the array of targets (int's for categorical and float's for continuous) we expect the decoder to produce?'''
         t = [STOP]
         for d in PrimitiveDecoder.decoderClasses:
             if l != None and isinstance(l,d.languagePrimitive):
@@ -345,7 +375,7 @@ class RecognitionModel():
                 f1 = tf.layers.dropout(f1,
                                        training = self.trainingPredicatePlaceholder)
 
-            self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder)
+            self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder, arguments.continuous)
             self.loss = self.decoder.loss()
             self.averageAccuracy = self.decoder.accuracy()
 
@@ -353,8 +383,9 @@ class RecognitionModel():
 
     @property
     def checkpointPath(self):
-        return "checkpoints/recognition_%s_%s.checkpoint"%(self.arguments.architecture,
-                                                           "noisy" if self.arguments.noisy else "clean")
+        return "checkpoints/recognition_%s_%s_%s.checkpoint"%(self.arguments.architecture,
+                                                              "noisy" if self.arguments.noisy else "clean",
+                                                              "continuous" if self.arguments.continuous else "discrete")
     
     def loadCheckpoint(self):
         with self.session.graph.as_default():
@@ -362,7 +393,7 @@ class RecognitionModel():
             saver.restore(self.session, self.checkpointPath)
             
     def train(self, numberOfExamples, restore = False):
-        noisyTarget,programs = loadExamples(numberOfExamples)
+        noisyTarget,programs = loadExamples(numberOfExamples, self.arguments.trainingData)
         
         iterator = BatchIterator(10,(np.array(noisyTarget),np.array(programs)),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
@@ -416,13 +447,18 @@ class RecognitionModel():
         gs = np.array(gs)
         cs = np.array(cs)
         ps = np.array(ps)
+
+        if False:
+            for j in range(10):
+                print ps[j,:]
+                showImage(np.concatenate([gs[j],cs[j]]))
         
         if self.arguments.noisy: gs = augmentData(gs)
         
         f = {self.goalPlaceholder: gs,
              self.currentPlaceholder: cs}
         for j,p in enumerate(self.decoder.placeholders()):
-            f[p] = ps[:,j]
+            f[p] = ps[:,j] #np.array([ ps[i][j] for i in range(len(ps)) ])
         return f
 
     def beam(self, current, goal, beamSize):
@@ -492,7 +528,7 @@ class DistanceModel():
         
     def train(self, numberOfExamples, restore = False):
         assert self.arguments.noisy
-        targetImages,targetPrograms = loadExamples(numberOfExamples)
+        targetImages,targetPrograms = loadExamples(numberOfExamples, self.arguments.trainingData)
         iterator = BatchIterator(5,tuple([np.array(targetImages),np.array(targetPrograms)]),
                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
 
@@ -906,7 +942,8 @@ if __name__ == '__main__':
     parser.add_argument('--dropout',action = "store_true", default = False)
     parser.add_argument('--distance',action = "store_true", default = False)
     parser.add_argument('--learningRate', default = 0.001, type = float)
-    parser.add_argument('--architecture', default = "original", type = str)    
+    parser.add_argument('--architecture', default = "original", type = str)
+    parser.add_argument('--continuous', action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
@@ -922,8 +959,7 @@ if __name__ == '__main__':
 
     arguments = parser.parse_args()
 
-    if arguments.task == 'evaluate':
-        assert 'clean' in arguments.checkpoint
+    arguments.trainingData = "syntheticContinuousTrainingData.tar" if arguments.continuous else "syntheticTrainingData.tar"
     
     if arguments.task == 'showSynthetic':
         print "not implemented"
@@ -944,10 +980,8 @@ if __name__ == '__main__':
         DistanceModel(arguments).analyzeGroundTruth()
     elif arguments.task == 'train':
         if arguments.distance:
-            DistanceModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.distanceCheckpoint, restore = arguments.r)
+            DistanceModel(arguments).train(arguments.numberOfExamples, restore = arguments.r)
         else:
-            RecognitionModel(arguments).train(arguments.numberOfExamples, checkpoint = arguments.checkpoint, restore = arguments.r)
+            RecognitionModel(arguments).train(arguments.numberOfExamples, restore = arguments.r)
     elif arguments.task == 'evaluate':
         SearchModel(arguments).evaluateAccuracy()
-    elif arguments.task == 'profile':
-        cProfile.run('loadExamples(%d)'%(arguments.numberOfExamples))

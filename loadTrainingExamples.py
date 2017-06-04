@@ -27,8 +27,8 @@ def loadTar(f = 'syntheticTrainingData.tar'):
     return members
 
 
-def loadExamples(numberOfExamples):
-    members = loadTar()
+def loadExamples(numberOfExamples, f = 'syntheticTrainingData.tar'):
+    members = loadTar(f)
     programNames = [ "./randomScene-%d.p"%(j)
                      for j in range(numberOfExamples) ]
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]

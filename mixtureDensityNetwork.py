@@ -16,10 +16,10 @@ def mixtureDensityLayer(components, inputs):
     return (u,v,p)
 
 def mixtureDensityLogLikelihood((u,v,p), target):
-    print "u = ",u
-    print "target = ",target
+    #print "u = ",u
+    #print "target = ",target
     components = u.shape[1]
-    print "stacked target = ",tf.stack([target]*components,axis = 1)
+    #print "stacked target = ",tf.stack([target]*components,axis = 1)
     
     d = u - tf.stack([target]*components,axis = 1)
     logLikelihoods = -d*d*tf.reciprocal(2.0*v) - 0.5*tf.log(v) + tf.log(p)
