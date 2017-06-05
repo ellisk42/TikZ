@@ -47,7 +47,7 @@ if __name__ == '__main__':
     hidden = tf.layers.dense(regressionInput, 15,
                              activation = tf.nn.sigmoid)
     
-    mixtureOutput = mixtureDensityLayer(5, hidden)
+    mixtureOutput = mixtureDensityLayer(5, hidden, epsilon = 0.01)
     mixtureLikelihoods = mixtureDensityLogLikelihood(mixtureOutput, regressionOutput)
 
     loss =  - tf.reduce_sum(mixtureLikelihoods)
@@ -83,8 +83,8 @@ if __name__ == '__main__':
     y_predicted = [sampleMixture(predictMeans[j],predictVariance[j],predictMixture[j])
                    for j in range(NSAMPLE) ]
     xs = np.arange(-10,10,0.1)
-    y_predicted = [beamMixture(predictMeans[j],predictVariance[j],predictMixture[j], xs, 1)[0][0]
-    for j in range(NSAMPLE) ]
+    #y_predicted = [beamMixture(predictMeans[j],predictVariance[j],predictMixture[j], xs, 1)[0][0]
+    #for j in range(NSAMPLE) ]
 
     
     plot.figure(figsize=(8, 8))
