@@ -602,7 +602,8 @@ class SearchModel():
 
         # load the networks
         self.recognizer.loadCheckpoint()
-        self.distance.loadCheckpoint()
+        if not self.arguments.unguided and self.arguments.noisy:
+            self.distance.loadCheckpoint()
 
     def SMC(self, targetImage, beamSize = 10, beamLength = 10):
         totalNumberOfRenders = 0
@@ -677,9 +678,7 @@ class SearchModel():
                 for p in beam: p.distance = p.distance[0] + self.arguments.mistakePenalty*p.distance[1]
             else:
                 for n in beam:
-                    if self.arguments.task == 'evaluate':
-                        # evaluation is  on noiseless data
-                        assert not self.arguments.noisy
+                    if not self.arguments.noisy:
                         difference = targetImage - n.output
                         n.distance = np.sum(np.abs(difference[difference > 0])) + 20*np.sum(np.abs(difference[difference < 0]))
                     else:
@@ -833,7 +832,7 @@ class SearchModel():
         # generate target programs with the same random seed so that
         # we get consistent validation sets across models
         random.seed(42)
-        targetPrograms = [ randomScene(16)() for _ in range(self.arguments.numberOfExamples) ]
+        targetPrograms = [ randomScene(5)() for _ in range(self.arguments.numberOfExamples) ]
         
         for targetProgram in targetPrograms:
             targetImage = targetProgram.draw()
@@ -975,7 +974,7 @@ if __name__ == '__main__':
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':
-        RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples, checkpoint = arguments.checkpoint)
+        RecognitionModel(arguments).analyzeFailures(arguments.numberOfExamples)
     elif arguments.task == 'analyzeDistance':
         DistanceModel(arguments).analyzeGroundTruth()
     elif arguments.task == 'train':

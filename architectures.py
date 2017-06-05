@@ -94,5 +94,17 @@ architectures['v3'] = Architecture(128,
                                    kernelSizes = [4,4],
                                    poolSizes = [4,4],
                                    poolStrides = [2,4])
+architectures['v4'] = Architecture(128,
+                                   32,2,
+                                   numberOfFilters = [10],
+                                   kernelSizes = [4,4],
+                                   poolSizes = [4,4],
+                                   poolStrides = [2,4])
+architectures['v5'] = Architecture(256,
+                                   32,2,
+                                   numberOfFilters = [10],
+                                   kernelSizes = [8,8],
+                                   poolSizes = [8,4],
+                                   poolStrides = [4,4])
 # v1 was a little bit better
 architectures["original"] = architectures["v1"]

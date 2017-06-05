@@ -38,16 +38,24 @@ def beamMixture(u,v,p,interval,k):
     scores = [(i,score(i)) for i in interval ]
     return sorted(scores,key = lambda z: z[1],reverse = True)[:k]
 
+def approximateMixtureMAP((u,v,p)):
+    maximums = tf.one_hot(tf.argmax(p,axis = 1), u.shape[1])#, dtype = tf.int32)
+    print u
+    print maximums
+    mostLikelyMean = tf.reduce_sum(u*maximums,axis = 1)
+    assert False
+
 if __name__ == '__main__':
     NSAMPLE = 1000
     
-    regressionInput = tf.placeholder(tf.float32, [NSAMPLE,1])
-    regressionOutput = tf.placeholder(tf.float32, [NSAMPLE])
+    regressionInput = tf.placeholder(tf.float32, [None,1])
+    regressionOutput = tf.placeholder(tf.float32, [None])
 
     hidden = tf.layers.dense(regressionInput, 15,
                              activation = tf.nn.sigmoid)
     
     mixtureOutput = mixtureDensityLayer(5, hidden, epsilon = 0.01)
+    scalerPrediction = approximateMixtureMAP(mixtureOutput)
     mixtureLikelihoods = mixtureDensityLogLikelihood(mixtureOutput, regressionOutput)
 
     loss =  - tf.reduce_sum(mixtureLikelihoods)
@@ -69,9 +77,12 @@ if __name__ == '__main__':
     s.run(tf.global_variables_initializer())
 
     for _ in range(10000):
+        feed = {regressionInput: x_data.reshape((NSAMPLE,1)),
+                regressionOutput: y_data.reshape((NSAMPLE,))}
         print s.run([loss,optimize],
-                    feed_dict = {regressionInput: x_data.reshape((NSAMPLE,1)),
-                                 regressionOutput: y_data.reshape((NSAMPLE,))})[0]
+                    feed_dict = feed)[0]
+        print s.run(scalerPrediction, feed_dict = feed)
+        assert False
 
 
     (predictMeans,predictVariance,predictMixture) = s.run(list(mixtureOutput),
