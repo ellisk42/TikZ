@@ -5,11 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plot
 import tensorflow as tf
 
-def mixtureDensityLayer(components, inputs):
+def mixtureDensityLayer(components, inputs, epsilon = 0.0):
     # predicted means
     u = tf.layers.dense(inputs, components)
     # predicted variance
-    v = tf.layers.dense(inputs, components, activation = tf.exp)
+    v = tf.layers.dense(inputs, components, activation = tf.nn.softplus) + epsilon
     # mixture coefficients
     p = tf.layers.dense(inputs, components, activation = tf.nn.softmax)
 

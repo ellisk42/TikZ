@@ -67,7 +67,7 @@ class StandardPrimitiveDecoder():
                 self.loss.append(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder[j],
                                                                                 logits = p))
             elif t == float:
-                mixtureParameters = mixtureDensityLayer(d,intermediateRepresentation)
+                mixtureParameters = mixtureDensityLayer(d,intermediateRepresentation,epsilon = 0.01)
                 self.prediction.append(mixtureParameters)
                 predictionInputs = tf.concat([predictionInputs,
                                               tf.reshape(self.targetPlaceholder[j], [-1,1])],
