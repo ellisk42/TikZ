@@ -19,7 +19,8 @@ class Architecture():
         self.poolSizes = poolSizes
 
     def makeModel(self,imageInput):
-        imageInput = tf.image.resize_bilinear(imageInput, [self.inputSize]*2)
+        if imageInput.shape[1] != self.inputSize:
+            imageInput = tf.image.resize_bilinear(imageInput, [self.inputSize]*2)
 
         horizontalKernels = tf.layers.conv2d(inputs = imageInput,
                                              filters = self.rectangularFilters,
@@ -103,6 +104,12 @@ architectures['v4'] = Architecture(128,
 architectures['v5'] = Architecture(256,
                                    32,2,
                                    numberOfFilters = [10],
+                                   kernelSizes = [8,8],
+                                   poolSizes = [8,4],
+                                   poolStrides = [4,4])
+architectures['v5'] = Architecture(256,
+                                   32,2,
+                                   numberOfFilters = [15],
                                    kernelSizes = [8,8],
                                    poolSizes = [8,4],
                                    poolStrides = [4,4])

@@ -416,6 +416,7 @@ class RecognitionModel():
                     feed[self.trainingPredicatePlaceholder] = True
                     _,l,accuracy = self.session.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
+                    print "\t",len(epicAccuracy),l,accuracy
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
@@ -465,6 +466,32 @@ class RecognitionModel():
         feed = {self.currentPlaceholder: np.array([current]),
                 self.goalPlaceholder: np.array([goal])}
         return self.decoder.beam(self.session, feed, beamSize)
+
+    def analyzeFailures(self, numberOfExamples):
+        noisyTarget,programs = loadExamples(numberOfExamples, self.arguments.trainingData)
+        
+        iterator = BatchIterator(1,(np.array(noisyTarget),np.array(programs)),
+                                 testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
+        with self.session.graph.as_default():
+            saver = tf.train.Saver()
+            saver.restore(self.session, self.checkpointPath)
+
+            for ts,ps in iterator.testingExamples():
+                feed = self.makeTrainingFeed(ts,ps)
+                # break the feed up into single actions
+                for j in range(feed[self.goalPlaceholder].shape[0]):
+                    singleFeed = dict([(placeholder, feed[placeholder][j,...])
+                                       for placeholder in feed ])
+                    singleFeed[self.trainingPredicatePlaceholder] = False
+                    a = self.session.run(self.averageAccuracy, feed_dict = singleFeed)
+                    assert a == 0.0 or a == 1.0
+                    if a == 0.0:
+                        print "Failure in recognition model:"
+                        print ps[0].items[j]
+                    else:
+                        print "success"
+
+
 
     
                     
@@ -818,7 +845,6 @@ class SearchModel():
             saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
 
-
     def evaluateAccuracy(self):
         # similar map but for the rank of the correct program
         programRank = {}
@@ -832,7 +858,7 @@ class SearchModel():
         # generate target programs with the same random seed so that
         # we get consistent validation sets across models
         random.seed(42)
-        targetPrograms = [ randomScene(5)() for _ in range(self.arguments.numberOfExamples) ]
+        targetPrograms = [ randomScene(16)() for _ in range(self.arguments.numberOfExamples) ]
         
         for targetProgram in targetPrograms:
             targetImage = targetProgram.draw()
