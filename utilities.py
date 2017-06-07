@@ -1,5 +1,5 @@
 import os
-from random import random
+from random import random,shuffle
 import math
 import sys
 import io
@@ -174,3 +174,8 @@ def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
     if not d.endswith('/'): d = d + '/'
     return [ d + f for f in os.listdir(d) if f.endswith('.png') ]
+
+def randomlyPermuteList(l):
+    l = list(l)
+    shuffle(l)
+    return l

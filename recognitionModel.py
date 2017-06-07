@@ -437,6 +437,8 @@ class RecognitionModel():
         for target, program in zip(targets, programs):
             if not self.arguments.noisy:
                 target = program.draw()
+            if self.arguments.randomizeOrder:
+                program = Sequence(randomlyPermuteList(program.lines))
             cs += program.drawTrace()
             for j in range(len(program) + 1):
                 gs.append(target)
@@ -969,6 +971,7 @@ if __name__ == '__main__':
     parser.add_argument('--learningRate', default = 0.001, type = float)
     parser.add_argument('--architecture', default = "original", type = str)
     parser.add_argument('--continuous', action = "store_true", default = False)
+    parser.add_argument('--randomizeOrder', action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
