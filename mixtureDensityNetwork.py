@@ -5,9 +5,13 @@ import numpy as np
 import matplotlib.pyplot as plot
 import tensorflow as tf
 
-def mixtureDensityLayer(components, inputs, epsilon = 0.0):
+def mixtureDensityLayer(components, inputs, epsilon = 0.0, bounds = None):
     # predicted means
     u = tf.layers.dense(inputs, components)
+    if bounds != None:
+        (upper, lower) = bounds
+        d = upper - lower
+        u = d*tf.nn.sigmoid(u) + lower
     # predicted variance
     v = tf.layers.dense(inputs, components, activation = tf.nn.softplus) + epsilon
     # mixture coefficients
@@ -43,7 +47,7 @@ def approximateMixtureMAP((u,v,p)):
     print u
     print maximums
     mostLikelyMean = tf.reduce_sum(u*maximums,axis = 1)
-    assert False
+
 
 if __name__ == '__main__':
     NSAMPLE = 1000
@@ -54,7 +58,7 @@ if __name__ == '__main__':
     hidden = tf.layers.dense(regressionInput, 15,
                              activation = tf.nn.sigmoid)
     
-    mixtureOutput = mixtureDensityLayer(5, hidden, epsilon = 0.01)
+    mixtureOutput = mixtureDensityLayer(5, hidden, epsilon = 0.01, bounds = (-20,20))
     scalerPrediction = approximateMixtureMAP(mixtureOutput)
     mixtureLikelihoods = mixtureDensityLogLikelihood(mixtureOutput, regressionOutput)
 
@@ -81,8 +85,8 @@ if __name__ == '__main__':
                 regressionOutput: y_data.reshape((NSAMPLE,))}
         print s.run([loss,optimize],
                     feed_dict = feed)[0]
-        print s.run(scalerPrediction, feed_dict = feed)
-        assert False
+        # print s.run(scalerPrediction, feed_dict = feed)
+        # assert False
 
 
     (predictMeans,predictVariance,predictMixture) = s.run(list(mixtureOutput),

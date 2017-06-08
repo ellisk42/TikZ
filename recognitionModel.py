@@ -67,7 +67,9 @@ class StandardPrimitiveDecoder():
                 self.loss.append(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder[j],
                                                                                 logits = p))
             elif t == float:
-                mixtureParameters = mixtureDensityLayer(d,intermediateRepresentation,epsilon = 0.01)
+                mixtureParameters = mixtureDensityLayer(d,intermediateRepresentation,
+                                                        epsilon = 0.01,
+                                                        bounds = (0,MAXIMUMCOORDINATE))
                 self.prediction.append(mixtureParameters)
                 predictionInputs = tf.concat([predictionInputs,
                                               tf.reshape(self.targetPlaceholder[j], [-1,1])],
@@ -467,9 +469,10 @@ class RecognitionModel():
     def beam(self, current, goal, beamSize):
         feed = {self.currentPlaceholder: np.array([current]),
                 self.goalPlaceholder: np.array([goal])}
-        return self.decoder.beam(self.session, feed, beamSize)
+        return sorted(self.decoder.beam(self.session, feed, beamSize), reverse = True)
 
     def analyzeFailures(self, numberOfExamples):
+        failures = []
         noisyTarget,programs = loadExamples(numberOfExamples, self.arguments.trainingData)
         
         iterator = BatchIterator(1,(np.array(noisyTarget),np.array(programs)),
@@ -478,22 +481,54 @@ class RecognitionModel():
             saver = tf.train.Saver()
             saver.restore(self.session, self.checkpointPath)
 
+            totalNumberOfAttempts = 0
             for ts,ps in iterator.testingExamples():
+                if len(failures) > 100: break
+                
+                targetProgram = ps[0]
                 feed = self.makeTrainingFeed(ts,ps)
                 # break the feed up into single actions
-                for j in range(feed[self.goalPlaceholder].shape[0]):
-                    singleFeed = dict([(placeholder, feed[placeholder][j,...])
+                for j in range(len(targetProgram)):
+                    if len(failures) > 100: break
+                    
+                    singleFeed = dict([(placeholder, np.array([feed[placeholder][j,...]]))
                                        for placeholder in feed ])
                     singleFeed[self.trainingPredicatePlaceholder] = False
                     a = self.session.run(self.averageAccuracy, feed_dict = singleFeed)
                     assert a == 0.0 or a == 1.0
+                    totalNumberOfAttempts += 1
                     if a == 0.0:
-                        print "Failure in recognition model:"
-                        print ps[0].items[j]
+                        current, goal = singleFeed[self.currentPlaceholder][0], singleFeed[self.goalPlaceholder][0]
+                        failures.append({'current': current, 'goal': goal,
+                                         'target': targetProgram.lines[j],
+                                         'predictions': self.beam(current, goal, 100)})
+                        print "(failure)"
                     else:
-                        print "success"
+                        print "(success)"
 
+        # report failures
+        print "%d/%d (%f%%) failure rate"%(len(failures),totalNumberOfAttempts,
+                                           100*float(len(failures))/totalNumberOfAttempts)
+        # compute the average rank of the failure
+        ranks = [ None if not f['target'] in map(snd,f['predictions']) else map(snd,f['predictions']).index(f['target']) + 1
+                  for f in failures ]
+        print ranks
+        print "In the frontier %d/%d"%(len([r for r in ranks if r != None ]),len(ranks))
+        ranks = [r for r in ranks if r != None ]
+        print ranks
+        if len(ranks) > 0:
+            print "Average rank: %f"%(sum(ranks)/float(len(ranks)))
 
+        for j,failure in enumerate(failures):
+            saveMatrixAsImage(255*failure['current'], 'failures/%d-current.png'%j)
+            saveMatrixAsImage(255*failure['goal'], 'failures/%d-goal.png'%j)
+            p = failure['predictions'][0][1]
+            if p == None: p = []
+            else: p = [p]
+            p = Sequence(p).draw()
+            saveMatrixAsImage(255*(p + failure['current']), 'failures/%d-predicted.png'%j)
+        
+        
 
     
                     
