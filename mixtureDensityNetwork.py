@@ -14,8 +14,8 @@ def mixtureDensityLayer(components, inputs, epsilon = 0.0, bounds = None):
         u = d*tf.nn.sigmoid(u) + lower
     # predicted variance
     v = tf.layers.dense(inputs, components, activation = tf.nn.softplus) + epsilon
-    # mixture coefficients
-    p = tf.layers.dense(inputs, components, activation = tf.nn.softmax)
+    # log mixture coefficients
+    p = tf.layers.dense(inputs, components, activation = tf.nn.log_softmax)
 
     return (u,v,p)
 
@@ -26,18 +26,21 @@ def mixtureDensityLogLikelihood((u,v,p), target):
     #print "stacked target = ",tf.stack([target]*components,axis = 1)
     
     d = u - tf.stack([target]*components,axis = 1)
-    logLikelihoods = -d*d*tf.reciprocal(2.0*v) - 0.5*tf.log(v) + tf.log(p)
+    logLikelihoods = -d*d*tf.reciprocal(2.0*v) - 0.5*tf.log(v) + p#tf.log(p)
 
     return tf.reduce_logsumexp(logLikelihoods,axis = 1)
 
 def sampleMixture(u,v,p):
     components = len(u)
+    p = map(math.exp, p)
+    z = sum(p)
+    p = [q/z for q in p ]
     j = np.random.choice(range(components),p = p)
     return np.random.normal()*(v[j]**0.5) + u[j]
 
 def beamMixture(u,v,p,interval,k):
     def score(x):
-        return lseList([ math.log(p[j]) - 0.5*math.log(v[j]) - 0.5*(x - u[j])**2/v[j]
+        return lseList([ p[j] - 0.5*math.log(v[j]) - 0.5*(x - u[j])**2/v[j]
                          for j in range(len(u)) ])
     scores = [(i,score(i)) for i in interval ]
     return sorted(scores,key = lambda z: z[1],reverse = True)[:k]
