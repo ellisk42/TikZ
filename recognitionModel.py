@@ -36,9 +36,9 @@ class StandardPrimitiveDecoder():
                                    for t,d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
-        if not hasattr(self, 'attentionIndex'):
-            self.attentionIndex = None
-            self.attentionTransform = None
+        if not hasattr(self, 'attentionIndices'):
+            self.attentionIndices = []
+        self.attentionTransforms = []
 
         # A prediction for each target
         self.prediction = []
@@ -55,7 +55,7 @@ class StandardPrimitiveDecoder():
         predictionInputs = [flattenImageOutput(imageRepresentation)]
         for j,(t,d) in enumerate(self.outputDimensions):
             # should we modify the image representation using a spatial transformer?
-            if j == self.attentionIndex:
+            if j in self.attentionIndices:
                 theta0 = np.array([[1., 0, 0], [0, 1., 0]]).astype('float32').flatten()
                 theta = tf.layers.dense(tf.concat(predictionInputs[1:],axis = 1),
                                         6,
@@ -63,7 +63,7 @@ class StandardPrimitiveDecoder():
                                         bias_initializer=tf.constant_initializer(theta0),
                                         kernel_initializer = tf.zeros_initializer())
                 # save the transform as a field so that we can visualize it later
-                self.attentionTransform = theta
+                self.attentionTransforms += [theta]
                 # clobber the existing image input with the region that attention is focusing on
                 attentionSize = 8
                 C = int(imageRepresentation.shape[3]) # channel count
@@ -148,6 +148,14 @@ class StandardPrimitiveDecoder():
             traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
         return traces
 
+    def attentionSequence(self, session, feed, l):
+        # what is the sequence of attention transformations when decoding line l?
+        ts = self.__class__.extractTargets(l)
+        # makes a copy of the feed
+        feed = dict([(k,feed[k]) for k in feed])
+        for t,p in zip(ts,self.targetPlaceholder): feed[p] = np.array([t])
+        return session.run(self.attentionTransforms,
+                           feed_dict = feed)
 
 
 
@@ -156,6 +164,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Circle
     
     def __init__(self, imageRepresentation, continuous, attention):
+        if attention: self.attentionIndices = [1,2]
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*3 # x,y,r
             self.hiddenSizes = [None,None,None]
@@ -182,7 +191,7 @@ class LabelDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Label
     
     def __init__(self, imageRepresentation, continuous, attention):
-        if attention: self.attentionIndex = 2
+        if attention: self.attentionIndices = [1,2]
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*2+[(int,len(Label.allowedLabels))] # x,y,c
             self.hiddenSizes = [None, None, None]
@@ -209,6 +218,7 @@ class RectangleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Rectangle
 
     def __init__(self, imageRepresentation, continuous, attention):
+        if attention: self.attentionIndices = [1,2,3]
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 # x,y
             self.hiddenSizes = [None]*4
@@ -237,6 +247,7 @@ class LineDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Line
 
     def __init__(self, imageRepresentation, continuous, attention):
+        if attention: self.attentionIndices = [1,2,3,4,5]
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 + [(int,2)]*2 # x,y for beginning and end; arrow/-
         else:
@@ -348,6 +359,14 @@ class PrimitiveDecoder():
 #        assert False
         return b
 
+    def attentionSequence(self, session, feed, l):
+        imageRepresentation = session.run(self.imageRepresentation, feed_dict = feed)
+        feed[self.imageRepresentation] = imageRepresentation
+        for d in self.decoders:
+            if isinstance(l,d.__class__.languagePrimitive):
+                if d.attentionTransforms == []: return []
+                return d.attentionSequence(session, feed, l)
+
 class RecurrentDecoder():
     def __init__(self, imageFeatures):
         self.unit = LSTM(imageFeatures)
@@ -408,9 +427,10 @@ class RecognitionModel():
 
     @property
     def checkpointPath(self):
-        return "checkpoints/recognition_%s_%s_%s.checkpoint"%(self.arguments.architecture,
+        return "checkpoints/recognition_%s_%s_%s%s.checkpoint"%(self.arguments.architecture,
                                                               "noisy" if self.arguments.noisy else "clean",
-                                                              "continuous" if self.arguments.continuous else "discrete")
+                                                              "continuous" if self.arguments.continuous else "discrete",
+                                                              "_attention" if self.arguments.attention else '')
     
     def loadCheckpoint(self):
         with self.session.graph.as_default():
@@ -494,7 +514,12 @@ class RecognitionModel():
         feed = {self.currentPlaceholder: np.array([current]),
                 self.goalPlaceholder: np.array([goal])}
         return sorted(self.decoder.beam(self.session, feed, beamSize), reverse = True)
-
+    
+    def attentionSequence(self, current, goal, l):
+        feed = {self.currentPlaceholder: np.array([current]),
+                self.goalPlaceholder: np.array([goal])}
+        return self.decoder.attentionSequence(self.session, feed, l)
+    
     def analyzeFailures(self, numberOfExamples):
         failures = []
         noisyTarget,programs = loadExamples(numberOfExamples, self.arguments.trainingData)
@@ -530,8 +555,12 @@ class RecognitionModel():
                         print "(failure)"
                         print "\tExpected:",target
                         print "\tActually:",predictions[0][1]
-                    else:
+                    elif self.arguments.attention:
                         print "(success)"
+                        attention = self.attentionSequence(current, goal, target)
+                        if attention != []:
+                            print attention
+                            assert False
 
         # report failures
         print "%d/%d (%f%%) failure rate"%(len(failures),totalNumberOfAttempts,
