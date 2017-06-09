@@ -76,6 +76,10 @@ class AbsolutePoint(Expression):
         self.x = x
         self.y = y
 
+    def round(self,p):
+        return AbsolutePoint(p*round(self.x/p),
+                             p*round(self.y/p))
+
     def __add__(self,o):
         return AbsolutePoint(self.x + o.x,self.y + o.y)
     def __sub__(self,o):
@@ -129,11 +133,14 @@ class AbsolutePoint(Expression):
                 return AbsolutePoint((dp[0]),(dp[1]))
 
 
-class Label():
+class Label(Program):
     allowedLabels = ['A','B','C','X','Y','Z']
     def __init__(self, p, c):
         self.p = p
         self.c = c
+
+    def round(self,p):
+        return Label(self.p.round(p),self.c)
 
     def draw(self,context):
         context.set_source_rgb(256,256,256)
@@ -185,6 +192,10 @@ class Line(Program):
         if self.length() == 0.0:
             # craise Exception('Attempt to create line with zero length')
             pass
+
+    def round(self, p):
+        return Line([q.round(p) for q in self.points ],
+                    self.arrow, self.solid)
 
     def draw(self,context):
         context.set_line_width(STROKESIZE)
@@ -359,6 +370,9 @@ class Rectangle(Program):
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
+
+    def round(self,p):
+        return Rectangle(self.p1.round(p),self.p2.round(p))
         
     def draw(self,context):
         context.set_line_width(STROKESIZE)
@@ -495,6 +509,10 @@ class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
         self.radius = radius
+
+    def round(self,p):
+        return Circle(self.center.round(p),
+                      round(self.radius/p)*p)
 
     def draw(self,context):
         context.set_line_width(STROKESIZE)
@@ -714,6 +732,9 @@ class Sequence(Program):
             l.draw(context)
             t.append(np.flip(data, 0)/255.0)
         return t
+
+    def round(self,p):
+        return Sequence([x.round(p) for x in self.items ])
 
 
 def randomLineOfCode():

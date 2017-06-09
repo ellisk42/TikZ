@@ -28,6 +28,9 @@ def mixtureDensityLogLikelihood((u,v,p), target):
     d = u - tf.stack([target]*components,axis = 1)
     logLikelihoods = -d*d*tf.reciprocal(2.0*v) - 0.5*tf.log(v) + p#tf.log(p)
 
+    # normalizing constant
+    logLikelihoods -= 0.39908993417 # -log(1/sqrt(2pi))
+
     return tf.reduce_logsumexp(logLikelihoods,axis = 1)
 
 def sampleMixture(u,v,p):

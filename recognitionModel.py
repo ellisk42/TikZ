@@ -23,6 +23,7 @@ from multiprocessing import Pool
 import random
 
 TESTINGFRACTION = 0.05
+CONTINUOUSROUNDING = 1
 
 [STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
 
@@ -37,6 +38,7 @@ class StandardPrimitiveDecoder():
             self.hiddenSizes = [None]*len(self.outputDimensions)
         if not hasattr(self, 'attentionIndex'):
             self.attentionIndex = None
+            self.attentionTransform = None
 
         # A prediction for each target
         self.prediction = []
@@ -60,6 +62,8 @@ class StandardPrimitiveDecoder():
                                         activation = tf.nn.tanh,
                                         bias_initializer=tf.constant_initializer(theta0),
                                         kernel_initializer = tf.zeros_initializer())
+                # save the transform as a field so that we can visualize it later
+                self.attentionTransform = theta
                 # clobber the existing image input with the region that attention is focusing on
                 attentionSize = 8
                 C = int(imageRepresentation.shape[3]) # channel count
@@ -139,7 +143,8 @@ class StandardPrimitiveDecoder():
                           for traceIndex,(s,trace) in enumerate(traces)
                           for coordinate, coordinateScore in
                           beamMixture(u[traceIndex],v[traceIndex],p[traceIndex],
-                                      np.arange(1,MAXIMUMCOORDINATE-1,0.2), beamSize)]
+                                      np.arange(0,MAXIMUMCOORDINATE-1,CONTINUOUSROUNDING,dtype = 'float'),
+                                      beamSize)]
             traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
         return traces
 
@@ -278,8 +283,8 @@ class PrimitiveDecoder():
     def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous, attention):
         self.decoders = [k(imageRepresentation,continuous,attention) for k in PrimitiveDecoder.decoderClasses]
 
-        self.imageRepresentation = flattenImageOutput(imageRepresentation)
-        self.prediction = tf.layers.dense(self.imageRepresentation, len(self.decoders))
+        self.imageRepresentation = imageRepresentation
+        self.prediction = tf.layers.dense(flattenImageOutput(self.imageRepresentation), len(self.decoders))
         self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
         self.soft = tf.nn.log_softmax(self.prediction)
         self.targetPlaceholder = tf.placeholder(tf.int32, [None])
@@ -436,7 +441,8 @@ class RecognitionModel():
                     feed[self.trainingPredicatePlaceholder] = True
                     _,l,accuracy = self.session.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
-                    print "\t",len(epicAccuracy),l,accuracy
+                    if len(epicAccuracy)%1000 == 0:
+                        print "\t",len(epicAccuracy),l,accuracy                    
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
                 print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
@@ -511,16 +517,19 @@ class RecognitionModel():
                     
                     singleFeed = dict([(placeholder, np.array([feed[placeholder][j,...]]))
                                        for placeholder in feed ])
+                    current, goal = singleFeed[self.currentPlaceholder][0], singleFeed[self.goalPlaceholder][0]
+                    target = targetProgram.lines[j]
+                    if self.arguments.continuous: target = target.round(CONTINUOUSROUNDING)
                     singleFeed[self.trainingPredicatePlaceholder] = False
-                    a = self.session.run(self.averageAccuracy, feed_dict = singleFeed)
-                    assert a == 0.0 or a == 1.0
+                    predictions = self.beam(current, goal, 100)
                     totalNumberOfAttempts += 1
-                    if a == 0.0:
-                        current, goal = singleFeed[self.currentPlaceholder][0], singleFeed[self.goalPlaceholder][0]
+                    if predictions[0][1] != target:
                         failures.append({'current': current, 'goal': goal,
-                                         'target': targetProgram.lines[j],
-                                         'predictions': self.beam(current, goal, 100)})
+                                         'target': target,
+                                         'predictions': predictions})
                         print "(failure)"
+                        print "\tExpected:",target
+                        print "\tActually:",predictions[0][1]
                     else:
                         print "(success)"
 
@@ -536,6 +545,19 @@ class RecognitionModel():
         print ranks
         if len(ranks) > 0:
             print "Average rank: %f"%(sum(ranks)/float(len(ranks)))
+
+        # How many failures were of each type
+        print "Circle failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Circle)]))
+        print "Line failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Line)]))
+        print "Rectangle failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Rectangle)]))
+        print "Label failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Label)]))
+        print "Stop failures: %d"%(len([ None for f in failures
+                                         if None == f['target']]))
+            
 
         for j,failure in enumerate(failures):
             saveMatrixAsImage(255*failure['current'], 'failures/%d-current.png'%j)
