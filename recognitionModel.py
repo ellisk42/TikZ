@@ -1,3 +1,4 @@
+from spatial_transformer import *
 from mixtureDensityNetwork import *
 from distanceExamples import *
 from architectures import architectures
@@ -34,6 +35,8 @@ class StandardPrimitiveDecoder():
                                    for t,d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
+        if not hasattr(self, 'attentionIndex'):
+            self.attentionIndex = None
 
         # A prediction for each target
         self.prediction = []
@@ -46,12 +49,35 @@ class StandardPrimitiveDecoder():
         self.loss = []
         
         # populate the above arrays
-        predictionInputs = imageRepresentation
+        
+        predictionInputs = [flattenImageOutput(imageRepresentation)]
         for j,(t,d) in enumerate(self.outputDimensions):
+            # should we modify the image representation using a spatial transformer?
+            if j == self.attentionIndex:
+                theta0 = np.array([[1., 0, 0], [0, 1., 0]]).astype('float32').flatten()
+                theta = tf.layers.dense(tf.concat(predictionInputs[1:],axis = 1),
+                                        6,
+                                        activation = tf.nn.tanh,
+                                        bias_initializer=tf.constant_initializer(theta0),
+                                        kernel_initializer = tf.zeros_initializer())
+                # clobber the existing image input with the region that attention is focusing on
+                attentionSize = 8
+                C = int(imageRepresentation.shape[3]) # channel count
+                print "c = ",C
+                transformed = spatial_transformer_network(imageRepresentation,
+                                                          theta,
+                                                          (attentionSize,attentionSize))
+                print "transfodrmed",transformed
+                flat = tf.reshape(transformed,
+                                  [-1, attentionSize*attentionSize*C])
+                print "flat",flat
+                predictionInputs[0] = flat
+                
             # construct the intermediate representation, if the decoder has one
-            intermediateRepresentation = predictionInputs
+            intermediateRepresentation = tf.concat(predictionInputs,axis = 1)
+            
             if self.hiddenSizes[j] != None and self.hiddenSizes[j] > 0:
-                intermediateRepresentation = tf.layers.dense(predictionInputs,
+                intermediateRepresentation = tf.layers.dense(intermediateRepresentation,
                                                              self.hiddenSizes[j],
                                                              activation = tf.nn.relu)
             # decoding of categorical variables
@@ -59,9 +85,7 @@ class StandardPrimitiveDecoder():
                 # p = prediction
                 p = tf.layers.dense(intermediateRepresentation, d, activation = None)
                 self.prediction.append(p)
-                predictionInputs = tf.concat([predictionInputs,
-                                              tf.one_hot(self.targetPlaceholder[j], d)],
-                                             axis = 1)
+                predictionInputs.append(tf.one_hot(self.targetPlaceholder[j], d))
                 self.hard.append(tf.cast(tf.argmax(p,dimension = 1),tf.int32))
                 self.soft.append(tf.nn.log_softmax(p))
                 self.loss.append(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder[j],
@@ -71,9 +95,7 @@ class StandardPrimitiveDecoder():
                                                         epsilon = 0.01,
                                                         bounds = (0,MAXIMUMCOORDINATE))
                 self.prediction.append(mixtureParameters)
-                predictionInputs = tf.concat([predictionInputs,
-                                              tf.reshape(self.targetPlaceholder[j], [-1,1])],
-                                             axis = 1)
+                predictionInputs.append(tf.reshape(self.targetPlaceholder[j], [-1,1]))
                 self.loss.append(-mixtureDensityLogLikelihood(mixtureParameters,
                                                               self.targetPlaceholder[j]))
                 self.soft += [None]
@@ -128,7 +150,7 @@ class CircleDecoder(StandardPrimitiveDecoder):
     token = CIRCLE
     languagePrimitive = Circle
     
-    def __init__(self, imageRepresentation, continuous):
+    def __init__(self, imageRepresentation, continuous, attention):
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*3 # x,y,r
             self.hiddenSizes = [None,None,None]
@@ -154,7 +176,8 @@ class LabelDecoder(StandardPrimitiveDecoder):
     token = LABEL
     languagePrimitive = Label
     
-    def __init__(self, imageRepresentation, continuous):
+    def __init__(self, imageRepresentation, continuous, attention):
+        if attention: self.attentionIndex = 2
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*2+[(int,len(Label.allowedLabels))] # x,y,c
             self.hiddenSizes = [None, None, None]
@@ -180,7 +203,7 @@ class RectangleDecoder(StandardPrimitiveDecoder):
     token = RECTANGLE
     languagePrimitive = Rectangle
 
-    def __init__(self, imageRepresentation, continuous):
+    def __init__(self, imageRepresentation, continuous, attention):
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 # x,y
             self.hiddenSizes = [None]*4
@@ -208,7 +231,7 @@ class LineDecoder(StandardPrimitiveDecoder):
     token = LINE
     languagePrimitive = Line
 
-    def __init__(self, imageRepresentation, continuous):
+    def __init__(self, imageRepresentation, continuous, attention):
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 + [(int,2)]*2 # x,y for beginning and end; arrow/-
         else:
@@ -235,7 +258,7 @@ class LineDecoder(StandardPrimitiveDecoder):
         return [0]*6
 
 class StopDecoder():
-    def __init__(self, imageRepresentation, continuous):
+    def __init__(self, imageRepresentation, continuous, attention):
         self.outputDimensions = []
         self.loss = 0.0
     token = STOP
@@ -252,14 +275,14 @@ class PrimitiveDecoder():
                       LineDecoder,
                       LabelDecoder,
                       StopDecoder]
-    def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous):
-        self.decoders = [k(imageRepresentation,continuous) for k in PrimitiveDecoder.decoderClasses]
+    def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous, attention):
+        self.decoders = [k(imageRepresentation,continuous,attention) for k in PrimitiveDecoder.decoderClasses]
 
-        self.prediction = tf.layers.dense(imageRepresentation, len(self.decoders))
+        self.imageRepresentation = flattenImageOutput(imageRepresentation)
+        self.prediction = tf.layers.dense(self.imageRepresentation, len(self.decoders))
         self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
         self.soft = tf.nn.log_softmax(self.prediction)
         self.targetPlaceholder = tf.placeholder(tf.int32, [None])
-        self.imageRepresentation = imageRepresentation
         self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
 
     def loss(self):
@@ -369,15 +392,10 @@ class RecognitionModel():
             imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
             c1 = architectures[self.arguments.architecture].makeModel(imageInput)
-            c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
-            print "fully connected input dimensionality:",c1d
 
-            f1 = tf.reshape(c1, [-1, c1d])
-            if self.arguments.dropout:
-                f1 = tf.layers.dropout(f1,
-                                       training = self.trainingPredicatePlaceholder)
-
-            self.decoder = PrimitiveDecoder(f1, self.trainingPredicatePlaceholder, arguments.continuous)
+            self.decoder = PrimitiveDecoder(c1, self.trainingPredicatePlaceholder,
+                                            arguments.continuous,
+                                            arguments.attention)
             self.loss = self.decoder.loss()
             self.averageAccuracy = self.decoder.accuracy()
 
@@ -1001,11 +1019,11 @@ if __name__ == '__main__':
     parser.add_argument('-m','--cores', default = 1, type = int)
     parser.add_argument('--noisy',action = "store_true", default = False)
     parser.add_argument('--quiet',action = "store_true", default = False)
-    parser.add_argument('--dropout',action = "store_true", default = False)
     parser.add_argument('--distance',action = "store_true", default = False)
     parser.add_argument('--learningRate', default = 0.001, type = float)
     parser.add_argument('--architecture', default = "original", type = str)
     parser.add_argument('--continuous', action = "store_true", default = False)
+    parser.add_argument('--attention', action = "store_true", default = False)
     parser.add_argument('--randomizeOrder', action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo

@@ -15,10 +15,12 @@
 import tensorflow as tf
 
 
-def transformer(U, theta, out_size, name='SpatialTransformer', **kwargs):
+def spatial_transformer_network(U, theta, out_size, name='SpatialTransformer', **kwargs):
     """Spatial Transformer Layer
+
     Implements a spatial transformer layer as described in [1]_.
     Based on [2]_ and edited by David Dao for Tensorflow.
+
     Parameters
     ----------
     U : float
@@ -29,12 +31,14 @@ def transformer(U, theta, out_size, name='SpatialTransformer', **kwargs):
         localisation network should be [num_batch, 6].
     out_size: tuple of two ints
         The size of the output of the network (height, width)
+
     References
     ----------
     .. [1]  Spatial Transformer Networks
             Max Jaderberg, Karen Simonyan, Andrew Zisserman, Koray Kavukcuoglu
             Submitted on 5 Jun 2015
     .. [2]  https://github.com/skaae/transformer_network/blob/master/transformerlayer.py
+
     Notes
     -----
     To initialize the network to the identity transform init
@@ -43,6 +47,7 @@ def transformer(U, theta, out_size, name='SpatialTransformer', **kwargs):
                              [0., 1., 0.]])
         identity = identity.flatten()
         theta = tf.Variable(initial_value=identity)
+
     """
 
     def _repeat(x, n_repeats):
@@ -177,14 +182,17 @@ def transformer(U, theta, out_size, name='SpatialTransformer', **kwargs):
 
 def batch_transformer(U, thetas, out_size, name='BatchSpatialTransformer'):
     """Batch Spatial Transformer Layer
+
     Parameters
     ----------
+
     U : float
         tensor of inputs [num_batch,height,width,num_channels]
     thetas : float
         a set of transformations for each input [num_batch,num_transforms,6]
     out_size : int
         the size of the output [out_height,out_width]
+
     Returns: float
         Tensor of size [num_batch*num_transforms,out_height,out_width,num_channels]
     """

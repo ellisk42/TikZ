@@ -182,3 +182,10 @@ def randomlyPermuteList(l):
 
 def fst(x): return x[0]
 def snd(x): return x[1]
+
+def flattenImageOutput(c1):
+    c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
+    print "fully connected input dimensionality:",c1d
+
+    f1 = tf.reshape(c1, [-1, c1d])
+    return f1
