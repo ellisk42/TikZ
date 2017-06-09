@@ -555,12 +555,16 @@ class RecognitionModel():
                         print "(failure)"
                         print "\tExpected:",target
                         print "\tActually:",predictions[0][1]
-                    elif self.arguments.attention:
+                    else:
                         print "(success)"
-                        attention = self.attentionSequence(current, goal, target)
-                        if attention != []:
-                            print attention
-                            assert False
+                        if self.arguments.attention:
+                            attention = self.attentionSequence(current, goal, target)
+                            if attention != []:
+                                print attention
+                                print target
+                                illustration = drawAttentionSequence(goal, attention, target)
+                                illustration = (illustration*255).astype(np.uint8)
+                                saveMatrixAsImage(illustration, 'attentionIllustrations/%d.png'%(totalNumberOfAttempts - len(failures)))
 
         # report failures
         print "%d/%d (%f%%) failure rate"%(len(failures),totalNumberOfAttempts,

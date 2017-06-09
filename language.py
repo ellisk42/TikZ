@@ -1,7 +1,7 @@
 from render import render
 from random import random,choice
 import numpy as np
-from utilities import linesIntersect,truncatedNormal,showImage
+from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation
 
 
 import math
@@ -745,6 +745,50 @@ def randomLineOfCode():
     if k == 3: return Rectangle.sample()
     if k == 4: return Label.sample()
     assert False
+
+def drawAttentionSequence(background, transformations, l):
+    # RGB background
+    background = np.flip(background*256,0)
+    background[background > 255] = 255
+    background = np.stack([background]*4,axis = 2)
+    data = np.zeros((256, 256, 4), dtype=np.uint8)
+    data[:,:,:] = background[:,:,:]
+    data[:,:,0] = 255
+    surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_ARGB32,256,256)
+    context = cairo.Context(surface)
+    for t,color in zip(transformations,[(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255)]):
+        points = [ np.array(applyLinearTransformation(t,p))*128 + 128
+                   for p in [(-1,-1),
+                             (-1,1),
+                             (1,1),
+                             (1,-1)] ]
+        for p in points:
+            p[1] = 255 - p[1]
+            pass
+        context.set_line_width(1)
+        context.set_source_rgb(*color) #(256,256,256)
+        for j in range(4):
+            context.move_to(points[j][0],points[j][1])
+            context.line_to(points[(j+1)%4][0],points[(j+1)%4][1])
+        context.stroke()
+
+    # label it with the line of code that is trying to explain
+    context.set_source_rgb(128,128,128)
+    context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, 
+                             cairo.FONT_WEIGHT_BOLD)
+    context.set_font_size(12)
+    (x, y, width, height, dx, dy) = context.text_extents(str(l))
+    context.move_to(10,10)
+    context.scale(1,-1)
+    context.show_text(str(l))
+    context.scale(1,-1)
+    context.stroke()
+
+    l.draw(context)
+        
+    data = np.flip(data, 0)[:,:,[1,2,3]].reshape((256,256,3))
+    return 1 - data/255.0
+    
     
 if __name__ == '__main__':
     SNAPTOGRID = True

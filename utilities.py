@@ -28,7 +28,10 @@ def cacheImage(n,content): IMAGEBYTES[n] = content
 
 def showImage(image):
     import matplotlib.pyplot as plot
-    plot.imshow(image,cmap = 'gray')
+    if len(image.shape) == 2:
+        plot.imshow(image,cmap = 'gray')
+    else:
+        plot.imshow(image)
     plot.show()
 
 def saveMatrixAsImage(m,f):
@@ -189,3 +192,8 @@ def flattenImageOutput(c1):
 
     f1 = tf.reshape(c1, [-1, c1d])
     return f1
+
+def applyLinearTransformation(t,p):
+    p = np.array([p[0],p[1],1.0])
+    t = t.reshape((2,3))
+    return np.matmul(t,p).tolist()
