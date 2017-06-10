@@ -24,6 +24,7 @@ import random
 
 TESTINGFRACTION = 0.05
 CONTINUOUSROUNDING = 1
+ATTENTIONCANROTATE = True
 
 [STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
 
@@ -62,6 +63,9 @@ class StandardPrimitiveDecoder():
                                         activation = tf.nn.tanh,
                                         bias_initializer=tf.constant_initializer(theta0),
                                         kernel_initializer = tf.zeros_initializer())
+                if not ATTENTIONCANROTATE:
+                    # force the off diagonal entries to be 0
+                    theta = tf.multiply(theta, np.array([[1., 0, 1], [0, 1., 1]]).astype('float32').flatten())
                 # save the transform as a field so that we can visualize it later
                 self.attentionTransforms += [theta]
                 # clobber the existing image input with the region that attention is focusing on
