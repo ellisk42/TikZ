@@ -956,7 +956,7 @@ class SearchModel():
                 print "Distance: %s"%(str(n.distance))
                 print ""
 
-            saveMatrixAsImage(fastRender(n.program)*255, "%s/%d.png"%(parseDirectory, j))
+            saveMatrixAsImage(n.program.draw()*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
 
     def evaluateAccuracy(self):
