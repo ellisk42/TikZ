@@ -710,7 +710,7 @@ class DistanceModel():
                 flushEverything()
 
     def analyzeGroundTruth(self):
-        self.loadCheckpoint(self.checkpointPath)
+        self.loadCheckpoint()
         targetNames = [ "drawings/expert-%d.png"%j for j in range(100) ]
         targetImages = map(loadImage,targetNames)
         targetSequences = map(getGroundTruthParse,targetNames)
@@ -937,7 +937,7 @@ class SearchModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
-        self.learnedParticleDistances(targetImage, finishedPrograms)
+        self.distance.learnedParticleDistances(targetImage, finishedPrograms)
         likelihoodCoefficient = 0.3
         distanceCoefficient = (-7,-7)
         priorCoefficient = 0.05

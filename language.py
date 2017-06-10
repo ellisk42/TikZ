@@ -1,7 +1,8 @@
 from render import render
 from random import random,choice
 import numpy as np
-from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation
+
+from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation
 
 
 import math
@@ -757,7 +758,8 @@ def drawAttentionSequence(background, transformations, l):
     surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_ARGB32,256,256)
     context = cairo.Context(surface)
     for t,color in zip(transformations,[(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255)]):
-        points = [ np.array(applyLinearTransformation(t,p))*128 + 128
+        #t = invertTransformation(t)
+        points = [ np.array(applyLinearTransformation(t,p))*127 + 128
                    for p in [(-1,-1),
                              (-1,1),
                              (1,1),

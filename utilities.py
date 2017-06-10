@@ -197,3 +197,7 @@ def applyLinearTransformation(t,p):
     p = np.array([p[0],p[1],1.0])
     t = t.reshape((2,3))
     return np.matmul(t,p).tolist()
+
+def invertTransformation(t):
+    return np.linalg.inv(np.concatenate([t.reshape((2,3)),np.array([0,0,1.0]).reshape((1,3))]))[[0,1],:]
+    
