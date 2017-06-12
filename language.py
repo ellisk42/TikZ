@@ -19,6 +19,7 @@ MAXIMUMCOORDINATE = 16
 RADIUSNOISE = 0.0
 COORDINATENOISE = 0.0
 STROKESIZE = 2
+FONTSIZE = 12
 
 SNAPTOGRID = True
 def setSnapToGrid(s):
@@ -147,7 +148,7 @@ class Label(Program):
         context.set_source_rgb(256,256,256)
         context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, 
                                  cairo.FONT_WEIGHT_BOLD)
-        context.set_font_size(12)
+        context.set_font_size(FONTSIZE)
         (x, y, width, height, dx, dy) = context.text_extents(self.c)
         context.move_to(self.p.x*16 - width/2, self.p.y*16 - height/2)
         context.scale(1,-1)
@@ -748,48 +749,70 @@ def randomLineOfCode():
     assert False
 
 def drawAttentionSequence(background, transformations, l):
-    # RGB background
-    background = np.flip(background*256,0)
-    background[background > 255] = 255
-    background = np.stack([background]*4,axis = 2)
-    data = np.zeros((256, 256, 4), dtype=np.uint8)
-    data[:,:,:] = background[:,:,:]
-    data[:,:,0] = 255
-    surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_ARGB32,256,256)
-    context = cairo.Context(surface)
-    for t,color in zip(transformations,[(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255)]):
-        #t = invertTransformation(t)
+    global FONTSIZE
+    # RGB canvas
+    canvas = np.zeros((256, 256, 3))*0.0
+    colors = [(1,0,0),(0,1,0),(0,0,1),(0,1,1),(1,0,1)]
+    # invert the colors: the whole image gets inverted at the end so this makes the colors turn out right
+    colors = [(1 - r,1 - g,1 - b) for (r,g,b) in colors ]
+    for t,color in zip(transformations,colors):
         points = [ np.array(applyLinearTransformation(t,p))*127 + 128
-                   for p in [(-1,-1),
-                             (-1,1),
-                             (1,1),
-                             (1,-1)] ]
-        for p in points:
-            p[1] = 255 - p[1]
-            pass
-        context.set_line_width(1)
-        context.set_source_rgb(*color) #(256,256,256)
+                   for p in [(-1.125,-1.125),
+                             (-1.125,1.125),
+                             (1.125,1.125),
+                             (1.125,-1.125)] ]
+        for p in points: p[1] = 255 - p[1]
         for j in range(4):
-            context.move_to(points[j][0],points[j][1])
-            context.line_to(points[(j+1)%4][0],points[(j+1)%4][1])
-        context.stroke()
+            command = Line.absolute(points[j][0]/16,points[j][1]/16,
+                                    points[(j+1)%4][0]/16,points[(j+1)%4][1]/16)
+            output = Sequence([command]).draw() # should be drawn in white
+            for c in range(3):
+                canvas[:,:,c] += output*color[c]
 
-    # label it with the line of code that is trying to explain
-    context.set_source_rgb(128,128,128)
-    context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, 
-                             cairo.FONT_WEIGHT_BOLD)
-    context.set_font_size(12)
-    (x, y, width, height, dx, dy) = context.text_extents(str(l))
-    context.move_to(10,10)
-    context.scale(1,-1)
-    context.show_text(str(l))
-    context.scale(1,-1)
-    context.stroke()
 
-    l.draw(context)
-        
-    data = np.flip(data, 0)[:,:,[1,2,3]].reshape((256,256,3))
-    return 1 - data/255.0
+    # illustrate the order of attention
+    fs = FONTSIZE
+    FONTSIZE = 15
+    
+    colorX = 1
+    for j,color in enumerate(colors[:len(transformations)]):
+        output = Sequence([Label(AbsolutePoint(colorX,15),str(j+1))]).draw()
+        colorX += 1
+        for c in range(3):
+            canvas[:,:,c] += output*color[c]
+    
+    FONTSIZE = 8
+    output = Sequence([Label(AbsolutePoint(8,1),str(l))]).draw()
+    FONTSIZE = fs
+    
+    canvas[:,:,:] += np.stack([output]*3,axis = 2)
+
+    canvas[:,:,:] += np.stack([background + Sequence([l]).draw()]*3,axis = 2)
+    
+    canvas[canvas > 1] = 1
+    canvas = 1 - canvas
+    canvas = (canvas*255).astype(np.uint8)
+    return canvas
+    showImage(canvas)
+
+
+    
+
+    data = np.flip(data, 0)[:,:,[0,1,2]].reshape((256,256,3))
+    showImage(1 - data/255.0)
+    assert False
+
+    # add back in the background
+    background = np.stack([background]*3,axis = 2)
+    composite = background + data.astype(np.float32)/256.0
+
+    # add back in the target line
+    l = Sequence([l]).draw()
+    l = np.stack([l]*3,axis = 2)
+    composite += l
+    
+    composite[composite > 1] = 1.0
+    return 1 - composite
     
     
 if __name__ == '__main__':

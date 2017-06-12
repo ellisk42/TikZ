@@ -24,7 +24,7 @@ import random
 
 TESTINGFRACTION = 0.05
 CONTINUOUSROUNDING = 1
-ATTENTIONCANROTATE = False
+ATTENTIONCANROTATE = True
 
 [STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
 
@@ -567,7 +567,6 @@ class RecognitionModel():
                                 print attention
                                 print target
                                 illustration = drawAttentionSequence(goal, attention, target)
-                                illustration = (illustration*255).astype(np.uint8)
                                 saveMatrixAsImage(illustration, 'attentionIllustrations/%d.png'%(totalNumberOfAttempts - len(failures)))
 
         # report failures
@@ -1038,9 +1037,7 @@ class SearchModel():
         
 
 def handleTest(a):
-    (f,arguments) = a
-    tf.reset_default_graph()
-    model = SearchModel(arguments)
+    (f,arguments,model) = a
     targetImage = loadImage(f)
 
     # l = 0 implies that we should look at the ground truth and use that to abound the length
@@ -1105,10 +1102,11 @@ if __name__ == '__main__':
         print "not implemented"
     elif arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)
+        model = SearchModel(arguments)
         if arguments.cores == 1:
-            gt = map(handleTest, [ (f,arguments) for f in fs ])
+            gt = map(handleTest, [ (f,arguments,model) for f in fs ])
         else:
-            gt = Pool(arguments.cores).map(handleTest, [ (f,arguments) for f in fs ])
+            gt = Pool(arguments.cores).map(handleTest, [ (f,arguments,model) for f in fs ])
         gt = [ g for g in gt if g != None ]
         print "Got a ground truth parse correct %f"%(float(len([None for g in gt if g ]))/float(len(gt)))
     
