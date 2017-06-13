@@ -55,3 +55,45 @@ def makeDistanceExamples(targets,programs, reportTime = False):
 
     if reportTime: print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
     return exampleTargets, np.array(exampleImages), t
+
+def smoothDistance(p, q, tolerance):
+
+    def d(a,b):
+        if not isinstance(a,b.__class__): return None
+
+        if isinstance(a,Line):
+            if a.solid != b.solid or a.arrow != b.arrow: return None
+            ds = sum([len(x - y) for x,y in zip(a.points,b.points) ])
+            if ds > tolerance: return None
+            return ds
+
+        if isinstance(a,Label):
+            if a.c != b.c: return None
+            z = len(a.p - b.p)
+            if z > tolerance: return None
+            return z
+
+        if isinstance(a,Rectangle):
+            z = len(a.p1 - b.p1) + len(a.p2 - b.p2)
+            if z > tolerance: return None
+            return z
+
+        if isinstance(a,Circle):
+            z = len(a.center - b.center) + abs(a.radius - b.radius)
+            if z > tolerance: return None
+            return z
+
+    # adjacency matrix
+    adjacency = ([ [ d(a,b) for b in q.items ]
+                   for a in p.items ])
+
+    # compute minimum cost alignment
+    alignment = [ None for _ in p.items ]
+
+    for a in range(len(p)):
+        if len([ None for z in adjacency[a] if z != None]) == 1:
+            pass
+    
+
+    
+    

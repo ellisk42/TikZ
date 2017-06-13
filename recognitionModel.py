@@ -69,15 +69,14 @@ class StandardPrimitiveDecoder():
                 # save the transform as a field so that we can visualize it later
                 self.attentionTransforms += [theta]
                 # clobber the existing image input with the region that attention is focusing on
-                attentionSize = 8
                 C = int(imageRepresentation.shape[3]) # channel count
                 print "c = ",C
                 transformed = spatial_transformer_network(imageRepresentation,
                                                           theta,
-                                                          (attentionSize,attentionSize))
+                                                          (self.attentionSize,self.attentionSize))
                 print "transfodrmed",transformed
                 flat = tf.reshape(transformed,
-                                  [-1, attentionSize*attentionSize*C])
+                                  [-1, self.attentionSize*self.attentionSize*C])
                 print "flat",flat
                 predictionInputs[0] = flat
                 
@@ -168,7 +167,9 @@ class CircleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Circle
     
     def __init__(self, imageRepresentation, continuous, attention):
-        if attention: self.attentionIndices = [1,2]
+        if attention > 0:
+            self.attentionIndices = [1,2]
+            self.attentionSize = attention
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*3 # x,y,r
             self.hiddenSizes = [None,None,None]
@@ -195,7 +196,9 @@ class LabelDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Label
     
     def __init__(self, imageRepresentation, continuous, attention):
-        if attention: self.attentionIndices = [1,2]
+        if attention > 0:
+            self.attentionIndices = [1,2]
+            self.attentionSize = attention
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*2+[(int,len(Label.allowedLabels))] # x,y,c
             self.hiddenSizes = [None, None, None]
@@ -222,7 +225,9 @@ class RectangleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Rectangle
 
     def __init__(self, imageRepresentation, continuous, attention):
-        if attention: self.attentionIndices = [1,2,3]
+        if attention > 0:
+            self.attentionIndices = [1,2,3]
+            self.attentionSize = attention
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 # x,y
             self.hiddenSizes = [None]*4
@@ -251,7 +256,9 @@ class LineDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Line
 
     def __init__(self, imageRepresentation, continuous, attention):
-        if attention: self.attentionIndices = [1,2,3,4,5]
+        if attention > 0:
+            self.attentionIndices = [1,2,3,4,5]
+            self.attentionSize = attention
         if continuous:
             self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4 + [(int,2)]*2 # x,y for beginning and end; arrow/-
         else:
@@ -434,7 +441,7 @@ class RecognitionModel():
         return "checkpoints/recognition_%s_%s_%s%s.checkpoint"%(self.arguments.architecture,
                                                               "noisy" if self.arguments.noisy else "clean",
                                                               "continuous" if self.arguments.continuous else "discrete",
-                                                              "_attention" if self.arguments.attention else '')
+                                                              ("_attention%d"%self.arguments.attention) if self.arguments.attention > 0 else '')
     
     def loadCheckpoint(self):
         with self.session.graph.as_default():
@@ -561,7 +568,7 @@ class RecognitionModel():
                         print "\tActually:",predictions[0][1]
                     else:
                         print "(success)"
-                        if self.arguments.attention:
+                        if self.arguments.attention > 0:
                             attention = self.attentionSequence(current, goal, target)
                             if attention != []:
                                 print attention

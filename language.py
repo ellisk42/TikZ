@@ -88,6 +88,7 @@ class AbsolutePoint(Expression):
         return AbsolutePoint(self.x - o.x,self.y - o.y)
     def __mul__(self,s):
         return AbsolutePoint(s*self.x,s*self.y)
+    def __len__(self): return math.sqrt(self.x*self.x + self.y*self.y)
 
     def normalized(self):
         l = (self.x*self.x + self.y*self.y)**0.5
