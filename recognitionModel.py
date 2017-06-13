@@ -81,7 +81,11 @@ class StandardPrimitiveDecoder():
                 predictionInputs[0] = flat
                 
             # construct the intermediate representation, if the decoder has one
-            intermediateRepresentation = tf.concat(predictionInputs,axis = 1)
+            # also pass along the transformation if we have it
+            if j in self.attentionIndices:
+                intermediateRepresentation = tf.concat(predictionInputs + [theta],axis = 1)
+            else:
+                intermediateRepresentation = tf.concat(predictionInputs,axis = 1)
             
             if self.hiddenSizes[j] != None and self.hiddenSizes[j] > 0:
                 intermediateRepresentation = tf.layers.dense(intermediateRepresentation,
