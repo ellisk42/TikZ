@@ -130,7 +130,7 @@ def perturbNoisyIntensities(b):
     
 def perturbOffset(b):
     p = np.copy(b)
-    w = 3
+    w = 5
     for j in range(b.shape[0]):
         dx = int(random()*(w*2 + 1)) - w
         dy = int(random()*(w*2 + 1)) - w
