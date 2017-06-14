@@ -512,12 +512,15 @@ class RecognitionModel():
         cs = np.array(cs)
         ps = np.array(ps)
 
-        if False:
+        if self.arguments.noisy: gs = augmentData(gs)
+
+        if True:
             for j in range(10):
                 print ps[j,:]
                 showImage(np.concatenate([gs[j],cs[j]]))
         
-        if self.arguments.noisy: gs = augmentData(gs)
+        
+        
         
         f = {self.goalPlaceholder: gs,
              self.currentPlaceholder: cs}

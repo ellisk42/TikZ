@@ -137,7 +137,17 @@ def perturbOffset(b):
         p[j,:,:] = np.roll(np.roll(p[j,:,:], dx, axis = 1), dy, axis = 0)
     return p
 
-def augmentData(b): return perturbOffset(perturbNoisyIntensities(b))
+def perturbSaltAndPepper(p,n = 20):
+    (c,w,h) = p.shape
+    for j in range(c):
+        for _ in range(n):
+            x = int(random()*w)
+            y = int(random()*h)
+            p[j,x,y] = 1 - p[j,x,y]
+    return p
+    
+
+def augmentData(b): return perturbSaltAndPepper(perturbOffset(perturbNoisyIntensities(b)))
     
 def translateArray(a,dx,dy):
     return np.roll(np.roll(a,dx,axis = 1),dy,axis = 0)
