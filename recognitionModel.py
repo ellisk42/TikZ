@@ -514,7 +514,7 @@ class RecognitionModel():
 
         if self.arguments.noisy: gs = augmentData(gs)
 
-        if True:
+        if False:
             for j in range(10):
                 print ps[j,:]
                 showImage(np.concatenate([gs[j],cs[j]]))
