@@ -1090,7 +1090,7 @@ if __name__ == '__main__':
     parser.add_argument('--learningRate', default = 0.001, type = float)
     parser.add_argument('--architecture', default = "original", type = str)
     parser.add_argument('--continuous', action = "store_true", default = False)
-    parser.add_argument('--attention', action = "store_true", default = False)
+    parser.add_argument('--attention', default = 0, type = int)
     parser.add_argument('--randomizeOrder', action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
