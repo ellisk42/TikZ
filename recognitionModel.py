@@ -386,35 +386,6 @@ class RecurrentDecoder():
     def __init__(self, imageFeatures):
         self.unit = LSTM(imageFeatures)
 
-# Particle in sequential Monte Carlo
-class Particle():
-    def __init__(self, program = None,
-                 time = 0.0,
-                 parent = None,
-                 output = None,
-                 distance = None,
-                 count = None,
-                 logLikelihood = None,
-                 score = None):
-        self.time = time
-        self.score = score
-        self.count = count
-        self.program = program
-        self.parent = parent
-        self.output = output
-        self.distance = distance
-        self.logLikelihood = logLikelihood
-    # once a program is finished we wrap it up in a sedquence object
-    def finished(self): return isinstance(self.program, Sequence)
-    # wraps it up in a sequence object if it hasn't already
-    def sequence(self):
-        if self.finished(): return self.program
-        return Sequence(self.program)
-    def render(self):
-        if self.output is None:
-            self.output = self.sequence().draw()
-        return self.output
-
 class RecognitionModel():
     def __init__(self, arguments):
         self.noisy = arguments.noisy
@@ -620,11 +591,41 @@ class RecognitionModel():
         
         
 
-    
+# Particle in sequential Monte Carlo
+class Particle():
+    def __init__(self, program = None,
+                 time = 0.0,
+                 parent = None,
+                 output = None,
+                 distance = None,
+                 count = None,
+                 logLikelihood = None,
+                 score = None):
+        self.time = time
+        self.score = score
+        self.count = count
+        self.program = program
+        self.parent = parent
+        self.output = output
+        self.distance = distance
+        self.logLikelihood = logLikelihood
+    # once a program is finished we wrap it up in a sedquence object
+    def finished(self): return isinstance(self.program, Sequence)
+    # wraps it up in a sequence object if it hasn't already
+    def sequence(self):
+        if self.finished(): return self.program
+        return Sequence(self.program)
+    def render(self):
+        if self.output is None:
+            self.output = self.sequence().draw()
+        return self.output
                     
 class DistanceModel():
     def __init__(self,arguments):
         self.arguments = arguments
+        if self.arguments.continuous:
+            setSnapToGrid(False)
+        
         self.graph = tf.Graph()
         self.session = tf.Session(graph = self.graph)
         with self.session.graph.as_default():
@@ -701,6 +702,7 @@ class DistanceModel():
                 lastUpdateTime = time()
                 for images,programs in iterator.epochExamples():
                     targets, current, distances = makeDistanceExamples(images, programs,
+                                                                       continuous = self.arguments.continuous,
                                                                        reportTime = runningAverageCount == 0)
                     _,l = self.session.run([self.distanceOptimizer, self.distanceLoss],
                                 feed_dict = {self.currentPlaceholder: current,

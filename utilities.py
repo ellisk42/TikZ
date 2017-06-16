@@ -130,14 +130,14 @@ def perturbNoisyIntensities(b):
     
 def perturbOffset(b):
     p = np.copy(b)
-    w = 5
+    w = 4
     for j in range(b.shape[0]):
         dx = int(random()*(w*2 + 1)) - w
         dy = int(random()*(w*2 + 1)) - w
         p[j,:,:] = np.roll(np.roll(p[j,:,:], dx, axis = 1), dy, axis = 0)
     return p
 
-def perturbSaltAndPepper(p,n = 20):
+def perturbSaltAndPepper(p,n = 10):
     (c,w,h) = p.shape
     for j in range(c):
         for _ in range(n):
