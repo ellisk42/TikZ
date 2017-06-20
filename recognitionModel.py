@@ -439,7 +439,7 @@ class RecognitionModel():
             else:
                 saver.restore(self.session, self.checkpointPath)
             
-            for e in range(20):
+            for e in range(100):
                 epicLoss = []
                 epicAccuracy = []
                 for ts,ps in iterator.epochExamples():
