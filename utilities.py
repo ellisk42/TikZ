@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 
+def NIPSPRIMITIVES(): return True
+
 def image2array(p):
     p = p.convert('L')
     (w,h) = p.size

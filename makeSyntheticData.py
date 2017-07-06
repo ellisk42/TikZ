@@ -7,7 +7,7 @@ from character import *
 from PIL import Image
 import pickle
 from random import choice,shuffle
-from utilities import showImage
+from utilities import showImage,NIPSPRIMITIVES
 
 CANONICAL = True
 
@@ -206,10 +206,13 @@ def randomScene(maximumNumberOfObjects):
     def sampler():
         while True:
             n = choice(range(maximumNumberOfObjects)) + 1
-            shapeIdentities = [choice(range(4)) for _ in range(n) ]
-            numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
-            # make it so that there are not too many labels
-            if numberOfLabels > n/2: continue
+            if NIPSPRIMITIVES():
+                shapeIdentities = [choice(range(3)) for _ in range(n) ]
+            else:
+                shapeIdentities = [choice(range(4)) for _ in range(n) ]
+                numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
+                # make it so that there are not too many labels
+                if numberOfLabels > n/2: continue
             
             return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
                                    lines = len([x for x in shapeIdentities if x == 1 ]),

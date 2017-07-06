@@ -2,7 +2,7 @@ from render import render
 from random import random,choice
 import numpy as np
 
-from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation
+from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES
 
 
 import math
@@ -39,7 +39,9 @@ def randomCoordinate():
         return int(random()*(MAXIMUMCOORDINATE - 2)) + 1
     else:
         return random()*(MAXIMUMCOORDINATE - 2) + 1
-def sampleRadius(): return choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
+def sampleRadius():
+    if NIPSPRIMITIVES(): return 1
+    return choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
 
 def randomCoordinatePerturbation():
     if SNAPTOGRID:
@@ -480,7 +482,7 @@ class Rectangle(Program):
     def mutate(self):
         dx = self.p2.x - self.p1.x
         dy = self.p2.y - self.p1.y
-        if dx == dy and dx < 8 and dx%2 == 0 and random() < 0.5:
+        if dx == dy and dx < 8 and dx%2 == 0 and random() < 0.5 and (dx == 2 or (not NIPSPRIMITIVES())):
             return Circle(AbsolutePoint(self.p1.x + dx/2,
                                         self.p1.y + dy/2),
                           dx/2)
@@ -569,7 +571,7 @@ class Circle(Program):
             return Rectangle.absolute(self.center.x - self.radius, self.center.y - self.radius,
                                       self.center.x + self.radius, self.center.y + self.radius)
         while True:
-            if random() < 0.5:
+            if random() < 0.5 or NIPSPRIMITIVES():
                 c = Circle(self.center.mutate(), self.radius)
             else:
                 if self.radius < 2: r = self.radius + 1
@@ -611,7 +613,7 @@ class Circle(Program):
     def sample():
         while True:
             p = AbsolutePoint.sample()
-            r = sampleRadius()
+            r = 1 if NIPSPRIMITIVES() else sampleRadius()
             c = Circle(p,r)
             if c.inbounds():
                 return c
@@ -746,6 +748,7 @@ def randomLineOfCode():
     if k == 1: return Circle.sample()
     if k == 2: return Line.sample()
     if k == 3: return Rectangle.sample()
+    if NIPSPRIMITIVES(): return randomLineOfCode()
     if k == 4: return Label.sample()
     assert False
 

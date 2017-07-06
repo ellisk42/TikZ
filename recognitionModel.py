@@ -22,6 +22,7 @@ import cProfile
 from multiprocessing import Pool
 import random
 
+
 TESTINGFRACTION = 0.05
 CONTINUOUSROUNDING = 1
 ATTENTIONCANROTATE = True
@@ -180,20 +181,31 @@ class CircleDecoder(StandardPrimitiveDecoder):
         else:
             self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*3 # x,y,r
             self.hiddenSizes = [None, None, None]
+
+        if NIPSPRIMITIVES(): # fixed radius: radius is the last thing so remove that
+            self.attentionIndices = self.attentionIndices[:-1]
+            self.outputDimensions = self.outputDimensions[:-1]
+            self.hiddenSizes = self.hiddenSizes[:-1]
+            
         self.makeNetwork(imageRepresentation)
     
     def beam(self, session, feed, beamSize):
-        return [(s, Circle(AbsolutePoint(x,y),r))
-                for s,[x,y,r] in self.beamTrace(session, feed, beamSize)
-                if x - r > 0 and y - r > 0 and x + r < MAXIMUMCOORDINATE and y + r < MAXIMUMCOORDINATE]
+        if NIPSPRIMITIVES():
+            r = 1
+            return [(s, Circle(AbsolutePoint(x,y),r))
+                    for s,[x,y] in self.beamTrace(session, feed, beamSize)
+                    if x - r > 0 and y - r > 0 and x + r < MAXIMUMCOORDINATE and y + r < MAXIMUMCOORDINATE]
+        else:
+            return [(s, Circle(AbsolutePoint(x,y),r))
+                    for s,[x,y,r] in self.beamTrace(session, feed, beamSize)
+                    if x - r > 0 and y - r > 0 and x + r < MAXIMUMCOORDINATE and y + r < MAXIMUMCOORDINATE]
 
     @staticmethod
     def extractTargets(l):
         if l != None and isinstance(l,Circle):
             return [l.center.x,
-                    l.center.y,
-                    l.radius]
-        return [0,0,0]
+                    l.center.y] + ([] if NIPSPRIMITIVES() else [l.radius])
+        return [0,0] + ([] if NIPSPRIMITIVES() else [0])
 
 class LabelDecoder(StandardPrimitiveDecoder):
     token = LABEL
@@ -301,11 +313,7 @@ class StopDecoder():
 
 class PrimitiveDecoder():
     # It shouldn't matter in what order these are listed. If it does then I will consider that a bug.
-    decoderClasses = [CircleDecoder,
-                      RectangleDecoder,
-                      LineDecoder,
-                      LabelDecoder,
-                      StopDecoder]
+    decoderClasses = [CircleDecoder, RectangleDecoder, LineDecoder, StopDecoder] if NIPSPRIMITIVES() else [CircleDecoder, RectangleDecoder, LineDecoder, LabelDecoder, StopDecoder]
     def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous, attention):
         self.decoders = [k(imageRepresentation,continuous,attention) for k in PrimitiveDecoder.decoderClasses]
 
