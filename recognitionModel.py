@@ -183,7 +183,8 @@ class CircleDecoder(StandardPrimitiveDecoder):
             self.hiddenSizes = [None, None, None]
 
         if NIPSPRIMITIVES(): # fixed radius: radius is the last thing so remove that
-            self.attentionIndices = self.attentionIndices[:-1]
+            if attention > 0:
+                self.attentionIndices = self.attentionIndices[:-1]
             self.outputDimensions = self.outputDimensions[:-1]
             self.hiddenSizes = self.hiddenSizes[:-1]
             
@@ -391,8 +392,32 @@ class PrimitiveDecoder():
                 return d.attentionSequence(session, feed, l)
 
 class RecurrentDecoder():
-    def __init__(self, imageFeatures):
+    def __init__(self, imageFeatures, trainingPredicatePlaceholder, continuous, attention):
+        assert not continuous
+        assert not attention
+        assert NIPSPRIMITIVES()
+
         self.unit = LSTM(imageFeatures)
+
+    def targetsOfProgram(s):
+        t = []
+        for l in s.lines:
+            for j,k in PrimitiveDecoder.decoderClasses:
+                if isinstance(l,k.languagePrimitive):
+                    t.append(j)
+                    t += k.extractTargets(l)
+                    break
+        # append the stop symbol
+        t += [PrimitiveDecoder.decoderClasses.index(StopDecoder)]
+        return t
+
+    def accuracy(self):
+        raise Exception('not implemented')
+
+    def beam(self, goal, k):
+        raise Exception('not implemented')
+
+    
 
 class RecognitionModel():
     def __init__(self, arguments):
@@ -421,10 +446,11 @@ class RecognitionModel():
 
     @property
     def checkpointPath(self):
-        return "checkpoints/recognition_%s_%s_%s%s.checkpoint"%(self.arguments.architecture,
-                                                              "noisy" if self.arguments.noisy else "clean",
-                                                              "continuous" if self.arguments.continuous else "discrete",
-                                                              ("_attention%d"%self.arguments.attention) if self.arguments.attention > 0 else '')
+        return "checkpoints/recognition_%s_%s_%s%s%s.checkpoint"%(self.arguments.architecture,
+                                                                  "noisy" if self.arguments.noisy else "clean",
+                                                                  "continuous" if self.arguments.continuous else "discrete",
+                                                                  ("_attention%d"%self.arguments.attention) if self.arguments.attention > 0 else '',
+                                                                  "_recurrent" if self.arguments.LSTM else '')
     
     def loadCheckpoint(self):
         with self.session.graph.as_default():
@@ -1105,6 +1131,7 @@ if __name__ == '__main__':
     parser.add_argument('--continuous', action = "store_true", default = False)
     parser.add_argument('--attention', default = 0, type = int)
     parser.add_argument('--randomizeOrder', action = "store_true", default = False)
+    parser.add_argument('--LSTM',action = "store_true", default = False)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
