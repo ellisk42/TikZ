@@ -6,8 +6,6 @@ import tensorflow as tf
 import tensorflow.contrib.rnn as rnn
 from tensorflow.python.ops import array_ops
 
-VOCABULARYSIZE = 3
-L = 8
 
 def sampleSequence():
     if choice([True,False]):
@@ -27,6 +25,7 @@ class RecurrentNetwork():
         self.lengthPlaceholder = tf.placeholder(tf.int32, shape = None,name = 'LENGTH')
 
         self.maximumLength = maximumLength
+        self.dictionarySize = dictionarySize
 
         if inputFeatures != None:
             transformedInputFeatures = [ tf.layers.dense(inputs = inputFeatures,
@@ -98,8 +97,38 @@ class RecurrentNetwork():
             if n == stopSymbol: break
         return sequenceSoFar
 
+    def beam(self, session, k, stopSymbol = None, baseFeed = None):
+        particles = [(0.0,[])] #(log likelihood,sequence)
+        finishedParticles = []
+        for j in range(self.maximumLength):
+            B = len(particles)
+            feed = dict([ (key,np.tile(baseFeed[key],(B,1))) for key in baseFeed ]) if baseFeed != None else {}
+            feed[self.lengthPlaceholder] = np.array([len(s) + 1 for _,s in particles ])
+            i = np.zeros((B,self.maximumLength))
+            for b in range(B):
+                i[b,1:len(particles[b][1])+1] = np.array(particles[b][1])
+            feed[self.inputPlaceholder] = i
+            distribution = session.run(self.outputDistribution, feed)[:,j,:]
+
+            particles = [ (particles[b][0] + distribution[b,w], particles[b][1] + [w])
+                          for b in range(B)
+                          for w in range(self.dictionarySize) ]
+            if stopSymbol != None:
+                finishedParticles += [ p for p in particles if p[1][-1] == stopSymbol ]
+                particles = [ p for p in particles if p[1][-1] != stopSymbol ]
+            elif j == self.maximumLength - 1:
+                finishedParticles = particles
+
+            particles = sorted(particles,reverse = True)[:k]
+
+        return sorted(finishedParticles,reverse = True)
+            
+        
+
 
 if __name__ == '__main__':
+    VOCABULARYSIZE = 3
+    L = 8
     hint = tf.placeholder(tf.float32, shape = [None,1],name = 'HINT')        
     m = RecurrentNetwork(5,VOCABULARYSIZE,L,hint)
     labels = tf.placeholder(tf.int32, shape = [None,L],name = 'LABELS')
@@ -120,6 +149,7 @@ if __name__ == '__main__':
             if i%1000 == 0:
                 print i,l
         for h in [1.0,2.0]:
+            print "Sampling h = %s"%h
             samples = [ tuple(m.sample(session,
                                        stopSymbol = 0,
                                        baseFeed = {hint: np.array([[h]])}))
@@ -129,3 +159,8 @@ if __name__ == '__main__':
             histogram = sorted([(histogram[s],s) for s in histogram ])
             print "\n".join(map(str,histogram[-10:]))
 
+
+            print "Beaming h = %s"%h
+            b = m.beam(session, k = 3, stopSymbol = 0,
+                       baseFeed = {hint: np.array([h])})
+            print "\n".join(map(str,b))
