@@ -430,8 +430,7 @@ class RecurrentDecoder():
         return self.unit.decodesIntoLoss(self.outputPlaceholder)
 
     def beam(self, session, feed, k):
-        feed[self.trainingPredicatePlaceholder] = False
-        feed[self.imageRepresentation] = session.run(self.imageRepresentation, feed)[0]
+        feed = {self.imageRepresentation: session.run(self.imageRepresentation, feed)[0]}
         
         primitiveArguments = [[MAXIMUMCOORDINATE,MAXIMUMCOORDINATE], # circle
                               [MAXIMUMCOORDINATE]*4, # rectangle
@@ -441,39 +440,49 @@ class RecurrentDecoder():
                     lambda a,b,p,q: Rectangle.absolute(a,b,p,q),
                     lambda a,b,p,q,arrow, solid: Line.absolute(a,b,p,q,arrow = arrow == 1,solid = solid == 1)]
         def Checker(sequence):
+            #print "checking sequence:",sequence
             j = 0
             while j < len(sequence):
+                if sequence[j] >= len(primitiveArguments):
+                    #print "Invalid"
+                    return RecurrentNetwork.INVALIDSEQUENCE
                 k = PrimitiveDecoder.decoderClasses[sequence[j]]
                 if k == StopDecoder:
+                    #print "Finished"
                     assert j == len(sequence) - 1
                     return RecurrentNetwork.FINISHEDSEQUENCE
 
                 j += 1
-                for upperBound in primitiveArguments[j - 1]:
-                    if j == len(sequence): return RecurrentNetwork.VALIDSEQUENCE
+                for upperBound in primitiveArguments[sequence[j - 1]]:
+                    if j == len(sequence):
+                        #print "valid and in the middle of parsing the primitive"
+                        return RecurrentNetwork.VALIDSEQUENCE
                     if sequence[j] < upperBound: j += 1
-                    else: return RecurrentNetwork.INVALIDSEQUENCE
-            
+                    else:
+                        #print "invalid because out of range"
+                        return RecurrentNetwork.INVALIDSEQUENCE
+            #print "valid because expecting next primitive"
             return RecurrentNetwork.VALIDSEQUENCE
 
         def decodeSequence(sequence):
             lines = []
             j = 0
             while j < len(sequence):
-                k = PrimitiveDecoder.decoderClasses[sequence[j]]
+                primitiveIndex = sequence[j]
+                k = PrimitiveDecoder.decoderClasses[primitiveIndex]
                 if k == StopDecoder:
                     assert j == len(sequence) - 1
                     return Sequence(lines)
 
                 j += 1
                 arguments = []
-                for upperBound in primitiveArguments[j - 1]:
+                for upperBound in primitiveArguments[primitiveIndex]:
                     assert j < len(sequence)
                     assert sequence[j] < upperBound
                     arguments.append(sequence[j])
                     j += 1
 
-                lines.append(builders[sequence[j]](*arguments))
+                lines.append(builders[primitiveIndex](*arguments))
             
             assert False
 

@@ -134,6 +134,7 @@ class RecurrentNetwork():
         finishedParticles = []
         for j in range(self.maximumLength):
             B = len(particles)
+            print "iteration",j+1,"# particles",B
             if baseFeed == None:
                 feed = {}
             else:
@@ -151,10 +152,10 @@ class RecurrentNetwork():
                           for w in range(self.dictionarySize) ]
             if sequenceChecker != None:
                 checks = [ sequenceChecker(s) for _,s in particles ]
-                finishedParticles += [ p for k,p in zip(checks,particles)
-                                       if k == RecurrentNetwork.FINISHEDSEQUENCE ]
-                particles = [ p for k,p in zip(checks,particles)
-                              if k == RecurrentNetwork.VALIDSEQUENCE ]
+                finishedParticles += [ p for check,p in zip(checks,particles)
+                                       if check == RecurrentNetwork.FINISHEDSEQUENCE ]
+                particles = [ p for check,p in zip(checks,particles)
+                              if check == RecurrentNetwork.VALIDSEQUENCE ]
             elif j == self.maximumLength - 1:
                 finishedParticles = particles
 
