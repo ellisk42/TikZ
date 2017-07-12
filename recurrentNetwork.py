@@ -22,7 +22,7 @@ class RecurrentNetwork():
         
         self.loadingMatrix = tf.Variable(tf.random_uniform([numberOfUnits,dictionarySize],-1.0,1.0))
 
-        self.lengthPlaceholder = tf.placeholder(tf.int32, shape = None,name = 'LENGTH')
+        self.lengthPlaceholder = tf.placeholder(tf.int32, shape = [None],name = 'LENGTH')
 
         self.maximumLength = maximumLength
         self.dictionarySize = dictionarySize
@@ -43,8 +43,10 @@ class RecurrentNetwork():
                                                       dtype = tf.float32,
                                                       sequence_length = self.lengthPlaceholder,
                                                       initial_state = transformedInputFeatures)
+        # projectedOutputs: None x timeSteps x dictionarySize
         projectedOutputs = tf.tensordot(self.outputs, self.loadingMatrix, axes = [[2],[0]])
         self.outputDistribution = tf.nn.log_softmax(projectedOutputs)
+        self.hardOutputs = tf.cast(tf.argmax(projectedOutputs,dimension = 2),tf.int32)
 
 
     # sequence prediction model with prediction fed into input
@@ -57,6 +59,25 @@ class RecurrentNetwork():
         l = tf.reduce_sum(l,axis = -1)
         # reduce across each example
         return tf.reduce_mean(l)
+
+    def decodesIntoAccuracy(self, labels, perSymbol = True):
+        # as the dimensions None x L
+        accuracyMatrix = tf.equal(self.hardOutputs, labels)
+
+        # zero out anything past the labeled length
+        accuracyMatrix = tf.logical_and(accuracyMatrix,
+                                        tf.sequence_mask(self.lengthPlaceholder, maxlen = self.maximumLength))
+
+        # Some across all of the time steps to get the total number of predictions correct in each batch entry
+        accuracyVector = tf.reduce_sum(tf.cast(accuracyMatrix,tf.int32),axis = 1)
+        if perSymbol:
+            # Now normalize it by the sequence length and take the average
+            accuracyVector = tf.divide(tf.cast(accuracyVector,tf.float32),
+                                       tf.cast(self.lengthPlaceholder,tf.float32))
+        if not perSymbol:
+            # accuracy is measured per sequence
+            accuracyVector = tf.cast(tf.equal(accuracyVector,self.lengthPlaceholder),tf.float32)
+        return tf.reduce_mean(accuracyVector)
     
     def decodingTrainingFeed(self, sequences, labels = None):
         # batch size
@@ -130,8 +151,10 @@ if __name__ == '__main__':
     VOCABULARYSIZE = 3
     L = 8
     hint = tf.placeholder(tf.float32, shape = [None,1],name = 'HINT')        
-    m = RecurrentNetwork(5,VOCABULARYSIZE,L,hint)
+    m = RecurrentNetwork(5,VOCABULARYSIZE,L)#,hint)
     labels = tf.placeholder(tf.int32, shape = [None,L],name = 'LABELS')
+
+    accuracy = m.decodesIntoAccuracy(labels,False)
 
     loss = m.decodesIntoLoss(labels)
     Optimizer = tf.train.AdamOptimizer(learning_rate = 10**-4).minimize(loss)
@@ -140,14 +163,14 @@ if __name__ == '__main__':
         session.run(tf.global_variables_initializer())
 
         for i in range(20000):
-            sequences = [sampleSequence() for _ in range(10) ]
+            sequences = [sampleSequence() for _ in range(100) ]
             hints = np.array([ s[0] for s in sequences ])
             feed = m.decodingTrainingFeed(sequences, labels)
             feed[hint] = hints.reshape((len(sequences),1))
-            l,_ = session.run([loss,Optimizer],
+            l,a,_ = session.run([loss,accuracy,Optimizer],
                               feed)
             if i%1000 == 0:
-                print i,l
+                print i,l,a
         for h in [1.0,2.0]:
             print "Sampling h = %s"%h
             samples = [ tuple(m.sample(session,

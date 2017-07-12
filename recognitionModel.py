@@ -397,7 +397,14 @@ class RecurrentDecoder():
         assert not attention
         assert NIPSPRIMITIVES()
 
-        self.unit = LSTM(imageFeatures)
+        RECURRENTDICTIONARYSIZE = 16
+        MAXIMUMRECURRENT = 1 + 12*(6) #  + 1stop symbol, 12 instructions, 6 arguments for a line
+
+        self.unit = RecurrentNetwork(512,
+                                     imageFeatures,
+                                     RECURRENTDICTIONARYSIZE,
+                                     MAXIMUMRECURRENT,
+                                     flattenImageOutput(imageFeatures))
 
     def targetsOfProgram(s):
         t = []
@@ -1084,7 +1091,14 @@ class SearchModel():
         print "Got the correct program %d/%d times"%(len(ranks),n)
         print "Average program distance: %f"%(sum(programDistances)/float(len(programDistances)))
         print "Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances)))
-        
+
+    def pickleSearchResults(self, fileAndParticles):
+        path = self.recognizer.checkpointPath.replace('checkpoint','')
+        if not self.arguments.unguided and self.arguments.noisy:
+            path += self.distance.checkpointPath.replace('checkpoint','')
+        path += '.p'
+        with open(path,'wb') as handle:
+            pickle.dump(dict(fileAndParticles), handle)
 
 def handleTest(a):
     (f,arguments,model) = a
@@ -1109,10 +1123,12 @@ def handleTest(a):
                 break
         if not gotGroundTruth:
             print "Did not get ground truth for %s"%f
+    else:
+        raise Exception('No ground truth annotated for %s'%f)
     # place where we will save the parses
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
-    return gotGroundTruth
+    return gotGroundTruth,particles
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
@@ -1158,8 +1174,8 @@ if __name__ == '__main__':
             gt = map(handleTest, [ (f,arguments,model) for f in fs ])
         else:
             gt = Pool(arguments.cores).map(handleTest, [ (f,arguments,model) for f in fs ])
-        gt = [ g for g in gt if g != None ]
-        print "Got a ground truth parse correct %f"%(float(len([None for g in gt if g ]))/float(len(gt)))
+        print "Got a ground truth parse correct %f"%(float(len([None for g,_ in gt if g ]))/float(len(gt)))
+        model.pickleSearchResults([ (f,p) for (f,(_,p)) in zip(fs,gt) ])
     
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
