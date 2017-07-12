@@ -1099,7 +1099,7 @@ class SearchModel():
         path += '.p'
         with open(path,'wb') as handle:
             pickle.dump(dict(fileAndParticles), handle)
-
+        print "Dumped search results to %s"%path
 def handleTest(a):
     (f,arguments,model) = a
     targetImage = loadImage(f)
