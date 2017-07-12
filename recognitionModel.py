@@ -10,6 +10,7 @@ from distanceMetrics import blurredDistance,asymmetricBlurredDistance,analyzeAsy
 from makeSyntheticData import randomScene
 from groundTruthParses import getGroundTruthParse
 from loadTrainingExamples import *
+from recurrentNetwork import RecurrentNetwork
 
 import argparse
 import sys
@@ -400,16 +401,20 @@ class RecurrentDecoder():
         RECURRENTDICTIONARYSIZE = 16
         MAXIMUMRECURRENT = 1 + 12*(6) #  + 1stop symbol, 12 instructions, 6 arguments for a line
 
-        self.unit = RecurrentNetwork(512,
-                                     imageFeatures,
+        self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
+        self.outputPlaceholder = tf.placeholder(tf.int32, shape = [None,MAXIMUMRECURRENT],
+                                                name = 'recurrentOutputPlaceholder')
+
+        self.imageRepresentation = flattenImageOutput(imageFeatures)
+        self.unit = RecurrentNetwork(32,
                                      RECURRENTDICTIONARYSIZE,
                                      MAXIMUMRECURRENT,
-                                     flattenImageOutput(imageFeatures))
-
+                                     self.imageRepresentation)
+    @staticmethod
     def targetsOfProgram(s):
         t = []
         for l in s.lines:
-            for j,k in PrimitiveDecoder.decoderClasses:
+            for j,k in enumerate(PrimitiveDecoder.decoderClasses):
                 if isinstance(l,k.languagePrimitive):
                     t.append(j)
                     t += k.extractTargets(l)
@@ -419,10 +424,63 @@ class RecurrentDecoder():
         return t
 
     def accuracy(self):
-        raise Exception('not implemented')
+        return self.unit.decodesIntoAccuracy(self.outputPlaceholder)
 
-    def beam(self, goal, k):
-        raise Exception('not implemented')
+    def loss(self):
+        return self.unit.decodesIntoLoss(self.outputPlaceholder)
+
+    def beam(self, session, feed, k):
+        feed[self.trainingPredicatePlaceholder] = False
+        feed[self.imageRepresentation] = session.run(self.imageRepresentation, feed)[0]
+        
+        primitiveArguments = [[MAXIMUMCOORDINATE,MAXIMUMCOORDINATE], # circle
+                              [MAXIMUMCOORDINATE]*4, # rectangle
+                              [MAXIMUMCOORDINATE]*4 + [2,2], # line
+                              []] # stop
+        builders = [lambda x,y: Circle(AbsolutePoint(x,y),1),
+                    lambda a,b,p,q: Rectangle.absolute(a,b,p,q),
+                    lambda a,b,p,q,arrow, solid: Line.absolute(a,b,p,q,arrow = arrow == 1,solid = solid == 1)]
+        def Checker(sequence):
+            j = 0
+            while j < len(sequence):
+                k = PrimitiveDecoder.decoderClasses[sequence[j]]
+                if k == StopDecoder:
+                    assert j == len(sequence) - 1
+                    return RecurrentNetwork.FINISHEDSEQUENCE
+
+                j += 1
+                for upperBound in primitiveArguments[j - 1]:
+                    if j == len(sequence): return RecurrentNetwork.VALIDSEQUENCE
+                    if sequence[j] < upperBound: j += 1
+                    else: return RecurrentNetwork.INVALIDSEQUENCE
+            
+            return RecurrentNetwork.VALIDSEQUENCE
+
+        def decodeSequence(sequence):
+            lines = []
+            j = 0
+            while j < len(sequence):
+                k = PrimitiveDecoder.decoderClasses[sequence[j]]
+                if k == StopDecoder:
+                    assert j == len(sequence) - 1
+                    return Sequence(lines)
+
+                j += 1
+                arguments = []
+                for upperBound in primitiveArguments[j - 1]:
+                    assert j < len(sequence)
+                    assert sequence[j] < upperBound
+                    arguments.append(sequence[j])
+                    j += 1
+
+                lines.append(builders[sequence[j]](*arguments))
+            
+            assert False
+
+        return [ (s,decodeSequence(q)) for s,q in self.unit.beam(session,
+                                                                 k,
+                                                                 sequenceChecker = Checker,
+                                                                 baseFeed = feed) ]
 
     
 
@@ -434,16 +492,21 @@ class RecognitionModel():
         self.session = tf.Session(graph = self.graph)
         with self.session.graph.as_default():
             # current and goal images
-            self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+            if not self.arguments.LSTM:
+                self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
             self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
 
             self.trainingPredicatePlaceholder = tf.placeholder(tf.bool)
 
-            imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
+            if self.arguments.LSTM:
+                imageInput = tf.stack([self.goalPlaceholder], axis = 3)
+            else:
+                imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
             c1 = architectures[self.arguments.architecture].makeModel(imageInput)
 
-            self.decoder = PrimitiveDecoder(c1, self.trainingPredicatePlaceholder,
+            decoderClass = RecurrentDecoder if self.arguments.LSTM else PrimitiveDecoder
+            self.decoder = decoderClass(c1, self.trainingPredicatePlaceholder,
                                             arguments.continuous,
                                             arguments.attention)
             self.loss = self.decoder.loss()
@@ -512,19 +575,31 @@ class RecognitionModel():
                 target = program.draw()
             if self.arguments.randomizeOrder:
                 program = Sequence(randomlyPermuteList(program.lines))
-            cs += program.drawTrace()
-            for j in range(len(program) + 1):
+
+            if self.arguments.LSTM:
                 gs.append(target)
-                #cs.append(Sequence(program.lines[:j]).draw())
-                l = None
-                if j < len(program): l = program.lines[j]
-                ps.append(self.decoder.extractTargets(l))
+                ps.append(self.decoder.__class__.targetsOfProgram(program))
+            else:            
+                cs += program.drawTrace()
+                for j in range(len(program) + 1):
+                    gs.append(target)
+                    l = None
+                    if j < len(program): l = program.lines[j]
+                    ps.append(self.decoder.extractTargets(l))
 
         gs = np.array(gs)
+        if self.arguments.noisy: gs = augmentData(gs)
+
+        if self.arguments.LSTM:
+            feed = self.decoder.unit.decodingTrainingFeed(ps, self.decoder.outputPlaceholder)
+            feed.update({self.goalPlaceholder: gs})
+            return feed
+        
         cs = np.array(cs)
         ps = np.array(ps)
 
-        if self.arguments.noisy: gs = augmentData(gs)
+        
+
 
         if False:
             for j in range(10):
@@ -541,8 +616,11 @@ class RecognitionModel():
         return f
 
     def beam(self, current, goal, beamSize):
-        feed = {self.currentPlaceholder: np.array([current]),
-                self.goalPlaceholder: np.array([goal])}
+        if self.arguments.LSTM:
+            feed = {self.goalPlaceholder: np.array([goal])}
+        else:            
+            feed = {self.currentPlaceholder: np.array([current]),
+                    self.goalPlaceholder: np.array([goal])}
         return sorted(self.decoder.beam(self.session, feed, beamSize), reverse = True)
     
     def attentionSequence(self, current, goal, l):
@@ -803,6 +881,8 @@ class SearchModel():
             self.distance.loadCheckpoint()
 
     def SMC(self, targetImage, beamSize = 10, beamLength = 10):
+        assert not self.arguments.LSTM
+        
         totalNumberOfRenders = 0
         targetImage = np.reshape(targetImage,(256,256))
         beam = [Particle(program = [],
@@ -1040,9 +1120,16 @@ class SearchModel():
                 searchTime[k] = []
             
             startTime = time()
-            particles = self.SMC(targetImage,
-                                 beamSize = arguments.beamWidth,
-                                 beamLength = k + 1)
+            if self.arguments.LSTM:
+                particles = self.recognizer.beam(None,targetImage,arguments.beamWidth)
+                # particles is now a list of tuples of likelihood and sequences
+                # converted into a list particle objects
+                particles = [Particle(program = program,logLikelihood = ll)
+                             for ll,program in particles ]
+            else:
+                particles = self.SMC(targetImage,
+                                     beamSize = arguments.beamWidth,
+                                     beamLength = k + 1)
             searchTime[k].append(time() - startTime)
             if particles == []:
                 print "No solutions."
@@ -1100,6 +1187,7 @@ class SearchModel():
         with open(path,'wb') as handle:
             pickle.dump(dict(fileAndParticles), handle)
         print "Dumped search results to %s"%path
+        
 def handleTest(a):
     (f,arguments,model) = a
     targetImage = loadImage(f)

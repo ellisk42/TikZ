@@ -80,6 +80,10 @@ class RecurrentNetwork():
         return tf.reduce_mean(accuracyVector)
     
     def decodingTrainingFeed(self, sequences, labels = None):
+        '''
+        sequences: a list of lists. Each element of sequences can be a different length.
+        labels: (optional) the placeholders being used to calculate the loss and accuracy
+        '''
         # batch size
         B = len(sequences)
 
@@ -118,12 +122,23 @@ class RecurrentNetwork():
             if n == stopSymbol: break
         return sequenceSoFar
 
-    def beam(self, session, k, stopSymbol = None, baseFeed = None):
+    INVALIDSEQUENCE = 0
+    FINISHEDSEQUENCE = 1
+    VALIDSEQUENCE = 2
+    def beam(self, session, k, stopSymbol = None, sequenceChecker = None, baseFeed = None):
+        assert int(stopSymbol != None) + int(sequenceChecker != None) < 2
+        if stopSymbol != None:
+            sequenceChecker = lambda sq: RecurrentNetwork.FINISHEDSEQUENCE if sq[-1] == stopSymbol else RecurrentNetwork.VALIDSEQUENCE
+            
         particles = [(0.0,[])] #(log likelihood,sequence)
         finishedParticles = []
         for j in range(self.maximumLength):
             B = len(particles)
-            feed = dict([ (key,np.tile(baseFeed[key],(B,1))) for key in baseFeed ]) if baseFeed != None else {}
+            if baseFeed == None:
+                feed = {}
+            else:
+                feed = dict([ (key,np.tile(baseFeed[key],(B,1))) for key in baseFeed ])
+                
             feed[self.lengthPlaceholder] = np.array([len(s) + 1 for _,s in particles ])
             i = np.zeros((B,self.maximumLength))
             for b in range(B):
@@ -134,9 +149,12 @@ class RecurrentNetwork():
             particles = [ (particles[b][0] + distribution[b,w], particles[b][1] + [w])
                           for b in range(B)
                           for w in range(self.dictionarySize) ]
-            if stopSymbol != None:
-                finishedParticles += [ p for p in particles if p[1][-1] == stopSymbol ]
-                particles = [ p for p in particles if p[1][-1] != stopSymbol ]
+            if sequenceChecker != None:
+                checks = [ sequenceChecker(s) for _,s in particles ]
+                finishedParticles += [ p for k,p in zip(checks,particles)
+                                       if k == RecurrentNetwork.FINISHEDSEQUENCE ]
+                particles = [ p for k,p in zip(checks,particles)
+                              if k == RecurrentNetwork.VALIDSEQUENCE ]
             elif j == self.maximumLength - 1:
                 finishedParticles = particles
 
