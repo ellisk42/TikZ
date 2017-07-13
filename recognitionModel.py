@@ -1189,9 +1189,10 @@ class SearchModel():
         print "Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances)))
 
     def pickleSearchResults(self, fileAndParticles):
-        path = self.recognizer.checkpointPath.replace('checkpoint','')
+        path = self.recognizer.checkpointPath
         if not self.arguments.unguided and self.arguments.noisy:
-            path += self.distance.checkpointPath.replace('checkpoint','')
+            path += self.distance.checkpointPath
+        path = path.replace('checkpoints/','').replace('.checkpoint','')
         path += '.p'
         with open(path,'wb') as handle:
             pickle.dump(dict(fileAndParticles), handle)
