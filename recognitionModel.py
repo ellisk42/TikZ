@@ -399,7 +399,7 @@ class RecurrentDecoder():
         assert NIPSPRIMITIVES()
 
         RECURRENTDICTIONARYSIZE = 16
-        MAXIMUMRECURRENT = 1 + 12*(6) #  + 1stop symbol, 12 instructions, 6 arguments for a line
+        MAXIMUMRECURRENT = 1 + 12*(7) #  + 1stop symbol, 12 instructions, 6+1 arguments for a line
 
         self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
         self.outputPlaceholder = tf.placeholder(tf.int32, shape = [None,MAXIMUMRECURRENT],
@@ -421,7 +421,7 @@ class RecurrentDecoder():
                     break
         # append the stop symbol
         t += [PrimitiveDecoder.decoderClasses.index(StopDecoder)]
-        assert len(t) < 1 + 12*6 + 1
+        assert len(t) < 1 + 12*7 + 1
         return t
 
     def accuracy(self):
