@@ -421,6 +421,7 @@ class RecurrentDecoder():
                     break
         # append the stop symbol
         t += [PrimitiveDecoder.decoderClasses.index(StopDecoder)]
+        assert len(t) < 1 + 12*6 + 1
         return t
 
     def accuracy(self):
