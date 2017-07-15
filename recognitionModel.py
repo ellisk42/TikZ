@@ -1149,7 +1149,7 @@ class SearchModel():
                 continue
 
             # Sort the particles. Our preference depends on how the search was done.
-            if self.arguments.beam:
+            if self.arguments.beam or self.arguments.LSTM:
                 preference = lambda p: p.logLikelihood
             elif self.arguments.unguided:
                 preference = lambda p: p.program.logPrior() - p.distance

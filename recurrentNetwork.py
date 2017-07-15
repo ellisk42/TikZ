@@ -134,7 +134,7 @@ class RecurrentNetwork():
         finishedParticles = []
         for j in range(self.maximumLength):
             B = len(particles)
-            print "iteration",j+1,"# particles",B
+            #print "iteration",j+1,"# particles",B
             if baseFeed == None:
                 feed = {}
             else:
