@@ -887,7 +887,8 @@ class SearchModel():
 
         # load the networks
         self.recognizer.loadCheckpoint()
-        if not self.arguments.unguided and self.arguments.noisy:
+        if self.arguments.distance:
+            assert self.arguments.noisy
             self.distance.loadCheckpoint()
 
     def SMC(self, targetImage, beamSize = 10, beamLength = 10):
