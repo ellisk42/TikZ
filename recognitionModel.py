@@ -533,9 +533,11 @@ class RecognitionModel():
                                                                   "_recurrent" if self.arguments.LSTM else '')
     
     def loadCheckpoint(self):
+        path = self.checkpointPath
+        print "Loading recognition model checkpoint:",path
         with self.session.graph.as_default():
             saver = tf.train.Saver()
-            saver.restore(self.session, self.checkpointPath)
+            saver.restore(self.session, path)
             
     def train(self, numberOfExamples, restore = False):
         noisyTarget,programs = loadExamples(numberOfExamples, self.arguments.trainingData)
@@ -766,7 +768,6 @@ class DistanceModel():
 
             c1 = architectures[self.arguments.architecture].makeModel(imageInput)
             c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
-            print "fully connected input dimensionality:",c1d
 
             f1 = tf.reshape(c1, [-1, c1d])
 
@@ -806,6 +807,7 @@ class DistanceModel():
             p.distance = (d[j,0], d[j,1])
 
     def loadCheckpoint(self):
+        print "Loading distance checkpoint from",self.checkpointPath
         with self.session.graph.as_default():
             saver = tf.train.Saver()
             saver.restore(self.session, self.checkpointPath)

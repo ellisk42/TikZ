@@ -65,7 +65,6 @@ class Architecture():
                                          pool_size = poolSize,
                                          strides = poolStride,
                                          padding = "same")
-            print "Convolution output:",c1
             nextInput = c1
         return nextInput
 
