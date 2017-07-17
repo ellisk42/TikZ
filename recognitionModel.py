@@ -406,7 +406,7 @@ class RecurrentDecoder():
                                                 name = 'recurrentOutputPlaceholder')
 
         self.imageRepresentation = flattenImageOutput(imageFeatures)
-        self.unit = RecurrentNetwork(32,
+        self.unit = RecurrentNetwork(arguments.LSTM,
                                      RECURRENTDICTIONARYSIZE,
                                      MAXIMUMRECURRENT,
                                      self.imageRepresentation)
@@ -530,7 +530,7 @@ class RecognitionModel():
                                                                   "noisy" if self.arguments.noisy else "clean",
                                                                   "continuous" if self.arguments.continuous else "discrete",
                                                                   ("_attention%d"%self.arguments.attention) if self.arguments.attention > 0 else '',
-                                                                  "_recurrent" if self.arguments.LSTM else '')
+                                                                  ("_recurrent%d"%self.arguments.LSTM if self.arguments.LSTM else ''))
     
     def loadCheckpoint(self):
         path = self.checkpointPath
@@ -1254,7 +1254,7 @@ if __name__ == '__main__':
     parser.add_argument('--continuous', action = "store_true", default = False)
     parser.add_argument('--attention', default = 0, type = int)
     parser.add_argument('--randomizeOrder', action = "store_true", default = False)
-    parser.add_argument('--LSTM',action = "store_true", default = False)
+    parser.add_argument('--LSTM',default = 0,type = int)
 
     # parameters of sequential Monte Carlo
     parser.add_argument('-T','--temperature', default = 1.0, type = float)
