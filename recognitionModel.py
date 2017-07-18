@@ -1122,7 +1122,7 @@ class SearchModel():
         # generate target programs with the same random seed so that
         # we get consistent validation sets across models
         random.seed(42)
-        targetPrograms = [ randomScene(16)() for _ in range(self.arguments.numberOfExamples) ]
+        targetPrograms = [ randomScene(24)() for _ in range(self.arguments.numberOfExamples) ]
         
         for targetProgram in targetPrograms:
             targetImage = targetProgram.draw()
