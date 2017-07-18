@@ -17,10 +17,10 @@ def sampleSequence():
         return [choice([2,1])]*(L/2) + [0]
     
 class RecurrentNetwork():
-    def __init__(self, numberOfUnits, dictionarySize, maximumLength, inputFeatures = None):
+    def __init__(self, numberOfUnits, dictionarySize, maximumLength, inputFeatures = None, alwaysProvideInput = False):
         self.model = rnn.LSTMCell(numberOfUnits)
         
-        self.loadingMatrix = tf.Variable(tf.random_uniform([numberOfUnits,dictionarySize],-1.0,1.0))
+        self.loadingMatrix = tf.Variable(tf.random_uniform([numberOfUnits,dictionarySize],-1.0,1.0),name = 'LOADINGMATRIX')
 
         self.lengthPlaceholder = tf.placeholder(tf.int32, shape = [None],name = 'LENGTH')
 
@@ -33,13 +33,23 @@ class RecurrentNetwork():
                                                          activation = tf.nn.tanh)
                                          for s in self.model.state_size ]
             transformedInputFeatures = rnn.LSTMStateTuple(*transformedInputFeatures)
+            if alwaysProvideInput:
+                alwaysProvidedInput = tf.layers.dense(inputs = inputFeatures,
+                                                      units = numberOfUnits,
+                                                      activation = tf.nn.tanh)                
         else: transformedInputFeatures = None
 
         # Unrolls some number of steps L
         self.inputPlaceholder = tf.placeholder(tf.int32, shape = [None,maximumLength],name = 'INPUT')
-        self.embeddedInputs = tf.nn.embedding_lookup(tf.transpose(self.loadingMatrix),self.inputPlaceholder)
+        embeddedInputs = tf.nn.embedding_lookup(tf.transpose(self.loadingMatrix),self.inputPlaceholder)
+        if alwaysProvideInput:
+            # alwaysProvidedInput: [None,numberOfUnits]
+            # we want to duplicate it along the time axis to get [None,numberOfTimesSteps,numberOfUnits]
+            alwaysProvidedInput = tf.reshape(alwaysProvidedInput,[-1,1,numberOfUnits])
+            alwaysProvidedInput = tf.tile(alwaysProvidedInput, [1,maximumLength,1])
+            embeddedInputs = embeddedInputs + alwaysProvidedInput
         self.outputs, self.states = tf.nn.dynamic_rnn(self.model,
-                                                      inputs = self.embeddedInputs,
+                                                      inputs = embeddedInputs,
                                                       dtype = tf.float32,
                                                       sequence_length = self.lengthPlaceholder,
                                                       initial_state = transformedInputFeatures)
@@ -170,7 +180,7 @@ if __name__ == '__main__':
     VOCABULARYSIZE = 3
     L = 8
     hint = tf.placeholder(tf.float32, shape = [None,1],name = 'HINT')        
-    m = RecurrentNetwork(5,VOCABULARYSIZE,L)#,hint)
+    m = RecurrentNetwork(5,VOCABULARYSIZE,L,hint,alwaysProvideInput = True)
     labels = tf.placeholder(tf.int32, shape = [None,L],name = 'LABELS')
 
     accuracy = m.decodesIntoAccuracy(labels,False)

@@ -409,7 +409,8 @@ class RecurrentDecoder():
         self.unit = RecurrentNetwork(arguments.LSTM,
                                      RECURRENTDICTIONARYSIZE,
                                      MAXIMUMRECURRENT,
-                                     self.imageRepresentation)
+                                     self.imageRepresentation,
+                                     alwaysProvideInput = True)
     @staticmethod
     def targetsOfProgram(s):
         t = []
