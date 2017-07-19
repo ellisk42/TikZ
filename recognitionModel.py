@@ -889,7 +889,8 @@ class SearchModel():
         self.distance = DistanceModel(arguments)
 
         # load the networks
-        self.recognizer.loadCheckpoint()
+        if not self.arguments.unguided:
+            self.recognizer.loadCheckpoint()
         if self.arguments.distance:
             assert self.arguments.noisy
             self.distance.loadCheckpoint()
