@@ -1095,7 +1095,8 @@ class SearchModel():
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
             os.system('mkdir %s'%(parseDirectory))
-        self.distance.learnedParticleDistances(targetImage, finishedPrograms)
+        if self.arguments.distance:
+            self.distance.learnedParticleDistances(targetImage, finishedPrograms)
         likelihoodCoefficient = 0.3
         distanceCoefficient = (-7,-7)
         priorCoefficient = 0.05
