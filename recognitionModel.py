@@ -1100,8 +1100,12 @@ class SearchModel():
         likelihoodCoefficient = 0.3
         distanceCoefficient = (-7,-7)
         priorCoefficient = 0.05
-        finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient[0]*n.distance[0] + distanceCoefficient[1]*n.distance[1] + priorCoefficient*n.program.logPrior(),
-                              reverse = True)
+        if self.arguments.distance:
+            finishedPrograms.sort(key = lambda n: likelihoodCoefficient*n.logLikelihood + distanceCoefficient[0]*n.distance[0] + distanceCoefficient[1]*n.distance[1] + priorCoefficient*n.program.logPrior(),
+                                  reverse = True)
+        else:
+            finishedPrograms.sort(key = lambda n: n.logLikelihood - 0.1*n.distance,
+                                  reverse = True)
         for j,n in enumerate(finishedPrograms[:500]):
             n.parent = None
             n.output = None
