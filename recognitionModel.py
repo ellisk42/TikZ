@@ -1220,7 +1220,7 @@ def handleTest(a):
     if arguments.noisy:
         targetImage = loadImage(f)
     else:
-        targetImage = getGroundTruthParse(targetImage).draw()
+        targetImage = getGroundTruthParse(f).draw()
 
     # l = 0 implies that we should look at the ground truth and use that to abound the length
     l = arguments.beamLength
