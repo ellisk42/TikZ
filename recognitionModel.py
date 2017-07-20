@@ -1216,7 +1216,10 @@ class SearchModel():
         
 def handleTest(a):
     (f,arguments,model) = a
-    targetImage = loadImage(f)
+    if arguments.noisy:
+        targetImage = loadImage(f)
+    else:
+        targetImage = getGroundTruthParse(targetImage).draw()
 
     # l = 0 implies that we should look at the ground truth and use that to abound the length
     l = arguments.beamLength
