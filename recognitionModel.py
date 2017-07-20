@@ -364,7 +364,9 @@ class PrimitiveDecoder():
             t += d.extractTargets(l)
         return t
 
-    def beam(self, session, feed, beamSize):
+    def beam(self, session, feed, beamSize, maximumLength = None):
+        assert maximumLength == None
+        
         feed[self.trainingPredicatePlaceholder] = False
         # to accelerate beam decoding, we can cash the image representation
         [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
@@ -422,7 +424,6 @@ class RecurrentDecoder():
                     break
         # append the stop symbol
         t += [PrimitiveDecoder.decoderClasses.index(StopDecoder)]
-        assert len(t) < 1 + 12*7 + 1
         return t
 
     def accuracy(self):
@@ -431,7 +432,7 @@ class RecurrentDecoder():
     def loss(self):
         return self.unit.decodesIntoLoss(self.outputPlaceholder)
 
-    def beam(self, session, feed, k):
+    def beam(self, session, feed, k, maximumLength = None):
         feed = {self.imageRepresentation: session.run(self.imageRepresentation, feed)[0]}
         
         primitiveArguments = [[MAXIMUMCOORDINATE,MAXIMUMCOORDINATE], # circle
@@ -491,7 +492,8 @@ class RecurrentDecoder():
         return [ (s,decodeSequence(q)) for s,q in self.unit.beam(session,
                                                                  k,
                                                                  sequenceChecker = Checker,
-                                                                 baseFeed = feed) ]
+                                                                 baseFeed = feed,
+                                                                 maximumLength = maximumLength) ]
 
     
 
@@ -628,13 +630,14 @@ class RecognitionModel():
             f[p] = ps[:,j] #np.array([ ps[i][j] for i in range(len(ps)) ])
         return f
 
-    def beam(self, current, goal, beamSize):
+    def beam(self, current, goal, beamSize, maximumLength = None):
         if self.arguments.LSTM:
             feed = {self.goalPlaceholder: np.array([goal])}
         else:            
             feed = {self.currentPlaceholder: np.array([current]),
                     self.goalPlaceholder: np.array([goal])}
-        return sorted(self.decoder.beam(self.session, feed, beamSize), reverse = True)
+        return sorted(self.decoder.beam(self.session, feed, beamSize, maximumLength = maximumLength),
+                      reverse = True)
     
     def attentionSequence(self, current, goal, l):
         feed = {self.currentPlaceholder: np.array([current]),
@@ -1136,7 +1139,9 @@ class SearchModel():
             
             startTime = time()
             if self.arguments.LSTM:
-                particles = self.recognizer.beam(None,targetImage,arguments.beamWidth)
+                maximumLength = len(self.recognizer.decoder.targetsOfProgram(targetProgram)) + 1
+                particles = self.recognizer.beam(None,targetImage,arguments.beamWidth,
+                                                 maximumLength = maximumLength)
                 # particles is now a list of tuples of likelihood and sequences
                 # converted into a list particle objects
                 particles = [Particle(program = program,logLikelihood = ll)
