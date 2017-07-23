@@ -4,6 +4,8 @@ import matplotlib.pyplot as plot
 
 xs = range(1,25)
 
+MAXIMUMY = None
+
 def standardError(l):
     d = np.array(l) - average(l)
     d = d*d
@@ -19,22 +21,29 @@ def average(l):
     return np.array(l).sum()/float(len(l))
 
 def plotAverages(d,f):
+    global MAXIMUMY
     y = [average(d[x]) for x in xs ]
     e = [standardError(d[x]) for x in xs ]
     plot.errorbar(xs,y,fmt = f,yerr = e)
+    MAXIMUMY = max(y + [MAXIMUMY])
 def plotBernoulli(d,f):
+    global MAXIMUMY
     d = [ [ (1 if z == 1 else 0) for z in d[x] ]
           for x in xs ]
     
     y = [average(z) for z in d ]
     e = [ bernoulliStandardError(z) for z in d ]
     plot.errorbar(xs,y,fmt = f,yerr = e)
+    MAXIMUMY = max(y + [MAXIMUMY])
 
 def showFigure(y):
     plot.xlabel('# objects')
     plot.ylabel(y)
     plot.xticks(xs,
                 ['1'] + ['']*10 + ['12'] + ['']*11 + ['24'])
+    ys = range(-1,int(MAXIMUMY + 1))
+    print MAXIMUMY
+    plot.ylim(ymin = -1)
     #plot.axvline(x = 12,ymin = 0,ymax = 24,color = 'k')
     # plot.annotate("Within-sample generalization",
     #               rotation = 90,

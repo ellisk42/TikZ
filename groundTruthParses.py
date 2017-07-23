@@ -133,6 +133,8 @@ def getGroundTruthParse(f):
 
 
 if __name__ == '__main__':
+    print '\n\n'.join(['\n'.join(groundTruth['drawings/expert-%d.png'%j]) for j in  [29,52,38,75,72]])
+    assert False
     for k in groundTruthSequence:
         x = np.zeros((256*2,256))
         print k

@@ -1,4 +1,4 @@
-from language import Rectangle,Circle,Line,AbsolutePoint,Number,Sequence
+from language import Rectangle,Circle,Line,AbsolutePoint,Sequence
 from utilities import *
 from fastRender import fastRender
 from render import render
@@ -24,12 +24,12 @@ class line():
         self.x2 = x2
         self.y2 = y2
     def evaluate(self):
-        return Line.absoluteNumbered(self.x1,
-                                     self.y1,
-                                     self.x2,
-                                     self.y2,
-                                     arrow = self.arrow,
-                                     solid = self.solid)
+        return Line.absolute(self.x1,
+                             self.y1,
+                             self.x2,
+                             self.y2,
+                             arrow = self.arrow,
+                             solid = self.solid)
     def reflect(self, x = None,y = None):
         (x1,y1) = reflectPoint(x,y,self.x1,self.y1)
         (x2,y2) = reflectPoint(x,y,self.x2,self.y2)
@@ -65,8 +65,8 @@ class circle():
         self.x = x
         self.y = y
     def evaluate(self):
-        return Circle(center = AbsolutePoint(Number(self.x),Number(self.y)),
-                      radius = Number(1))
+        return Circle(center = AbsolutePoint(self.x,self.y)),
+                      radius = 1)
     def reflect(self, x = None,y = None):
         return circle(*reflectPoint(x,y,self.x,self.y))
 
