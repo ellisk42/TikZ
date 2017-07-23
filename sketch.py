@@ -28,24 +28,24 @@ def synthesizeProgram(parse,usePrior = True):
     
     for p in parse.lines:
         if isinstance(p,Circle):
-            parts.append("_c(%d,%d)"%(p.center.x.n - x0,
-                                      p.center.y.n - y0))
+            parts.append("_c(%d,%d)"%(p.center.x - x0,
+                                      p.center.y - y0))
             hasCircles = True
         elif isinstance(p,Rectangle):
             hasRectangles = True
-            parts.append("_r(%d,%d,%d,%d)"%(p.p1.x.n - x0,
-                                            p.p1.y.n - y0,
-                                            p.p2.x.n - x0,
-                                            p.p2.y.n - y0))
+            parts.append("_r(%d,%d,%d,%d)"%(p.p1.x - x0,
+                                            p.p1.y - y0,
+                                            p.p2.x - x0,
+                                            p.p2.y - y0))
         elif isinstance(p,Line):
             hasLines = True
             if p.isDiagonal(): noDiagonals = False
             arrows.append(p.arrow)
             solid.append(p.solid)
-            parts.append("_l(%d,%d,%d,%d,%d,%d)"%(p.points[0].x.n - x0,
-                                                  p.points[0].y.n - y0,
-                                                  p.points[1].x.n - x0,
-                                                  p.points[1].y.n - y0,
+            parts.append("_l(%d,%d,%d,%d,%d,%d)"%(p.points[0].x - x0,
+                                                  p.points[0].y - y0,
+                                                  p.points[1].x - x0,
+                                                  p.points[1].y - y0,
                                                   0 if p.solid else 1,
                                                   1 if p.arrow else 0))
     
