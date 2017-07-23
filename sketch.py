@@ -1,6 +1,5 @@
 import re
 import numpy as np
-import cv2
 from utilities import loadImage,showImage
 from subprocess import Popen, PIPE
 import os
