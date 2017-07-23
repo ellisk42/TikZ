@@ -65,7 +65,7 @@ class circle():
         self.x = x
         self.y = y
     def evaluate(self):
-        return Circle(center = AbsolutePoint(self.x,self.y)),
+        return Circle(center = AbsolutePoint(self.x,self.y),
                       radius = 1)
     def reflect(self, x = None,y = None):
         return circle(*reflectPoint(x,y,self.x,self.y))
