@@ -183,7 +183,8 @@ def viewSynthesisResults(arguments):
         parse = getGroundTruthParse(f)
         if parse == None:
             print "No ground truth for %d"%expertIndex
-            continue
+            assert False
+            
         parts = set(map(str,parse.lines))
         result = None
         for r in results:
@@ -201,6 +202,7 @@ def viewSynthesisResults(arguments):
             if arguments.extrapolate: continue
 
         print " [+] %s"%f
+        print "\t(synthesis time: %f)"%(result.time)
         print
 
         if arguments.debug:
@@ -393,8 +395,9 @@ def rankUsingPrograms():
         visualization = 255*visualization
         
         if not oldPredictionCorrect and programPredictionCorrect:
-            print "Great success!"
-            saveMatrixAsImage(visualization,"../TikZpaper/figures/programSuccess%d.png"%j)
+            fp = "../TikZpaper/figures/programSuccess%d.png"%j
+            print "Great success! see %s"%fp
+            saveMatrixAsImage(visualization,fp)
 
             
         if oldPredictionCorrect and not programPredictionCorrect:

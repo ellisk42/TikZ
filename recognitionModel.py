@@ -1144,9 +1144,18 @@ class SearchModel():
             
             startTime = time()
             if self.arguments.LSTM:
-                maximumLength = len(self.recognizer.decoder.targetsOfProgram(targetProgram)) + 2
+                maximumLength = len(self.recognizer.decoder.targetsOfProgram(targetProgram))
+                print "evaluation for"
+                print targetProgram
+                print "has a maximum length:"
+                print maximumLength
+                print 
                 particles = self.recognizer.beam(None,targetImage,arguments.beamWidth,
                                                  maximumLength = maximumLength)
+                print "Most likely particle:"
+                print particles[0][1]
+                print "ll = ",particles[0][0]
+                flushEverything()
                 # particles is now a list of tuples of likelihood and sequences
                 # converted into a list particle objects
                 particles = [Particle(program = program,logLikelihood = ll)
