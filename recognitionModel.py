@@ -1152,9 +1152,10 @@ class SearchModel():
                 print 
                 particles = self.recognizer.beam(None,targetImage,arguments.beamWidth,
                                                  maximumLength = maximumLength)
-                print "Most likely particle:"
-                print particles[0][1]
-                print "ll = ",particles[0][0]
+                print "Most likely particles:"
+                for ll,program in particles[:10]:
+                    print program
+                    print "ll = ",ll
                 flushEverything()
                 # particles is now a list of tuples of likelihood and sequences
                 # converted into a list particle objects
