@@ -1261,6 +1261,31 @@ def handleTest(a):
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
     return gotGroundTruth,particles
+
+def illustrateContinuous(model):
+    global CONTINUOUSROUNDING
+    CONTINUOUSROUNDING = 0.5
+    topK = 5
+    random.seed(42)
+    targetPrograms = [ randomScene(12)() for _ in range(self.arguments.numberOfExamples) ]
+    resultMatrix = []
+    for targetProgram in targetPrograms:
+        targetImage = targetProgram.draw()
+        particles = model.SMC(targetImage,
+                              beamSize = arguments.beamWidth,
+                              beamLength = len(targetProgram) + 1)
+        particles = sorted(particles,
+                           key = lambda p: p.logLikelihood,
+                           reverse = True)[:topK]
+        resultMatrix.append([targetImage] + [p.render() for p in particles ])
+    # Pack it all up into a nice matrix
+    illustration = np.zeros((256*(1 + topK), 256*len(targetPrograms)))
+    for j in range(len(targetPrograms)):
+        for i in len(resultMatrix[j]):
+            resultMatrix[256*i : 256*(i+1), 256*j : 256*(j + 1)] = resultsMatrix[j][i]
+    showImage(image)
+        
+
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'training and evaluation of recognition models')
@@ -1308,7 +1333,11 @@ if __name__ == '__main__':
             gt = Pool(arguments.cores).map(handleTest, [ (f,arguments,model) for f in fs ])
         print "Got a ground truth parse correct %f"%(float(len([None for g,_ in gt if g ]))/float(len(gt)))
         model.pickleSearchResults([ (f,p) for (f,(_,p)) in zip(fs,gt) ])
-    
+    elif arguments.task == 'illustrateContinuous':
+        assert arguments.beam
+        assert arguments.continuous
+        assert not arguments.noisy
+        illustrateContinuous(SearchModel(arguments))
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
     elif arguments.task == 'analyze':
