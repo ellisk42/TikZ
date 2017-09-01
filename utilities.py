@@ -214,3 +214,10 @@ def applyLinearTransformation(t,p):
 def invertTransformation(t):
     return np.linalg.inv(np.concatenate([t.reshape((2,3)),np.array([0,0,1.0]).reshape((1,3))]))[[0,1],:]
     
+def integrateNormalDensity(lb,ub,mu = 0,sigma = 1):
+    from scipy.stats import norm
+    assert not (ub < lb)
+    lessThanUpper = norm.logcdf(ub,loc = mu,scale = sigma)
+    lessThanLower = norm.logcdf(lb,loc = mu,scale = sigma)
+    #print lessThanUpper,lessThanLower,lessThanUpper-lessThanLower,1 - math.exp(lessThanLower - lessThanUpper)
+    return lessThanUpper + np.log1p(-math.exp(lessThanLower - lessThanUpper))

@@ -152,10 +152,30 @@ class StandardPrimitiveDecoder():
                           for traceIndex,(s,trace) in enumerate(traces)
                           for coordinate, coordinateScore in
                           beamMixture(u[traceIndex],v[traceIndex],p[traceIndex],
-                                      np.arange(0,MAXIMUMCOORDINATE-1,CONTINUOUSROUNDING,dtype = 'float'),
+                                      1,MAXIMUMCOORDINATE-1,CONTINUOUSROUNDING,
                                       beamSize)]
             traces = sorted(traces, key = lambda t: -t[0])[:beamSize]
         return traces
+
+    def sampleTrace(self, session, feed):
+        originalFeed = feed
+        # makes a copy of the feed
+        feed = dict([(k,feed[k]) for k in feed])
+
+        # traces is a list of tuples of (log likelihood, sequence of predictions)
+        trace = []
+        for j in range(len(self.outputDimensions)):
+            for k in range(j):
+                feed[self.targetPlaceholder[k]] = np.array([ trace[k] ])
+            for p in originalFeed:
+                feed[p] = np.repeat(originalFeed[p], 1, axis = 0)
+            if self.outputDimensions[j][0] == int:
+                soft = session.run(self.soft[j], feed_dict = feed)
+                trace.append(sampleLogMultinomial(soft[0]))
+            elif self.outputDimensions[j][0] == float:
+                [u,v,p] = session.run(list(self.prediction[j]), feed_dict = feed)
+                trace.append(sampleMixture(u[0],v[0],p[0]))
+        return trace        
 
     def attentionSequence(self, session, feed, l):
         # what is the sequence of attention transformations when decoding line l?
@@ -201,6 +221,13 @@ class CircleDecoder(StandardPrimitiveDecoder):
             return [(s, Circle(AbsolutePoint(x,y),r))
                     for s,[x,y,r] in self.beamTrace(session, feed, beamSize)
                     if x - r > 0 and y - r > 0 and x + r < MAXIMUMCOORDINATE and y + r < MAXIMUMCOORDINATE]
+
+    def sample(self, session, feed):
+        if NIPSPRIMITIVES():
+            r = 1
+            [x,y] = self.sampleTrace(session, feed)
+            return Circle(AbsolutePoint(x,y),r)
+        else: assert False
 
     @staticmethod
     def extractTargets(l):
@@ -259,6 +286,9 @@ class RectangleDecoder(StandardPrimitiveDecoder):
         return [(s, Rectangle.absolute(x1,y1,x2,y2))
                 for s,[x1,y1,x2,y2] in self.beamTrace(session, feed, beamSize)
                 if x1 < x2 and y1 < y2 and x1 > 0 and x2 > 0 and y1 > 0 and y2 > 0 ]
+    def sample(self, session, feed):
+        [x1,y1,x2,y2] = self.sampleTrace(session, feed)
+        return Rectangle.absolute(x1,y1,x2,y2)
 
     @staticmethod
     def extractTargets(l):
@@ -293,6 +323,10 @@ class LineDecoder(StandardPrimitiveDecoder):
         return [(s, Line.absolute(x1,y1,x2,y2,arrow = arrow == 1,solid = solid == 1))
                 for s,[x1,y1,x2,y2,arrow,solid] in self.beamTrace(session, feed, beamSize)
                 if (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2) > 0 and x1 > 0 and y1 > 0 and x2 > 0 and y2 > 0 ]
+    def sample(self, session, feed):
+        [x1,y1,x2,y2,arrow,solid] = self.sampleTrace(session, feed)
+        return Line.absolute(x1,y1,x2,y2,arrow = arrow == 1,solid = solid == 1)
+                
 
     @staticmethod
     def extractTargets(l):
@@ -385,6 +419,20 @@ class PrimitiveDecoder():
         #     print s,p
 #        assert False
         return b
+
+    def sample(self, session, feed, maximumLength = None):
+        assert maximumLength == None
+        feed[self.trainingPredicatePlaceholder] = False
+        [tokenScores,imageRepresentation] = session.run([self.soft,self.imageRepresentation], feed_dict = feed)
+        tokenScores = tokenScores[0]
+        feed[self.imageRepresentation] = imageRepresentation
+
+        whichCommand = sampleLogMultinomial(tokenScores)
+        for d in self.decoders:
+            if d.token == whichCommand:
+                if d.token == STOP: return None
+                return d.sample(session, feed)
+        assert False
 
     def attentionSequence(self, session, feed, l):
         imageRepresentation = session.run(self.imageRepresentation, feed_dict = feed)
@@ -638,6 +686,12 @@ class RecognitionModel():
                     self.goalPlaceholder: np.array([goal])}
         return sorted(self.decoder.beam(self.session, feed, beamSize, maximumLength = maximumLength),
                       reverse = True)
+
+    def sample(self, current, goal):
+        assert not self.arguments.LSTM
+        feed = {self.currentPlaceholder: np.array([current]),
+                self.goalPlaceholder: np.array([goal])}
+        return self.decoder.sample(self.session, feed, maximumLength = None)
     
     def attentionSequence(self, current, goal, l):
         feed = {self.currentPlaceholder: np.array([current]),
@@ -898,6 +952,16 @@ class SearchModel():
             assert self.arguments.noisy
             self.distance.loadCheckpoint()
 
+    def sample(self, targetImage, maximumLength):
+        currentImage = np.zeros(targetImage.shape)
+        currentProgram = []
+
+        for j in range(maximumLength):
+            nextCommand = self.recognizer.sample(currentImage, targetImage)
+            if nextCommand == None or j == maximumLength - 1: return Sequence(currentProgram)
+            currentProgram.append(nextCommand)
+            currentImage = Sequence(currentProgram).draw()
+        
     def SMC(self, targetImage, beamSize = 10, beamLength = 10):
         assert not self.arguments.LSTM
         
@@ -1264,26 +1328,67 @@ def handleTest(a):
 
 def illustrateContinuous(model):
     global CONTINUOUSROUNDING
-    CONTINUOUSROUNDING = 0.5
+    CONTINUOUSROUNDING = 0.25
+
+    def illustrateMatrix(m,f):
+        # Pack it all up into a nice matrix
+        R = len(m)
+        C = len(m[0])
+        
+        illustration = np.zeros((256*R, 256*C))
+        #m = list(reversed(m))
+        for j in range(R):
+            for i in range(len(m[j])):
+                illustration[256*j : 256*(j + 1), 256*i : 256*(i+1)] = m[j][i]
+        for x in range(1,R):
+            illustration[256*x,:] = 1 - illustration[256*x,:]
+        for y in range(1,C):
+            illustration[:,256*y] = 1 - illustration[:,256*y]
+        saveMatrixAsImage(255*(illustration),f)
+        os.system('feh %s'%f)
+
+    # Illustrate continuous parses of hand drawings
+    drawingsMatrix = []
+    for j in range(100):
+        if not os.path.exists('continuousParses/drawings/expert-%d-parses/0.png'%j): continue
+        drawingsMatrix.append([1 - loadImage('continuousParses/drawings/expert-%d.png'%j),
+                               1 - loadImage('continuousParses/drawings/expert-%d-parses/0.png'%j)])
+    drawingsMatrix = map(tuple,drawingsMatrix)
+    print len(drawingsMatrix)
+    m = []
+    while len(drawingsMatrix) > 0:
+        nextRow = drawingsMatrix[:8]
+        drawingsMatrix = drawingsMatrix[8:]
+        m.append([ z for z,_ in nextRow ])
+        m.append([ z for _,z in nextRow ])
+    illustrateMatrix(m, '../TikZpaper/figures/continuousParses.png')
+    assert False
+
+    
     topK = 5
     random.seed(42)
-    targetPrograms = [ randomScene(12)() for _ in range(self.arguments.numberOfExamples) ]
+    targetPrograms = [ randomScene(6)() for _ in range(model.arguments.numberOfExamples) ]
     resultMatrix = []
     for targetProgram in targetPrograms:
-        targetImage = targetProgram.draw()
-        particles = model.SMC(targetImage,
-                              beamSize = arguments.beamWidth,
-                              beamLength = len(targetProgram) + 1)
-        particles = sorted(particles,
-                           key = lambda p: p.logLikelihood,
-                           reverse = True)[:topK]
-        resultMatrix.append([targetImage] + [p.render() for p in particles ])
+        print "Target program: \n",targetProgram
+        if not model.arguments.noisy:
+            targetImage = targetProgram.draw()
+        else:
+            targetImage = 1 - render([targetProgram.noisyTikZ()],yieldsPixels = True)[0]
+        if False:
+            particles = model.SMC(targetImage,
+                                  beamSize = arguments.beamWidth,
+                                  beamLength = len(targetProgram) + 1)
+            particles = sorted(particles,
+                               key = lambda p: p.logLikelihood,
+                               reverse = True)[:topK]
+            particles = [ p.sequence() for p in particles ]
+        else:
+            particles = [ model.sample(targetImage, maximumLength = len(targetProgram) + 1)
+                          for _ in range(topK) ] 
+            resultMatrix.append([1 - targetImage] + [p.draw() for p in particles ])
     # Pack it all up into a nice matrix
-    illustration = np.zeros((256*(1 + topK), 256*len(targetPrograms)))
-    for j in range(len(targetPrograms)):
-        for i in len(resultMatrix[j]):
-            resultMatrix[256*i : 256*(i+1), 256*j : 256*(j + 1)] = resultsMatrix[j][i]
-    showImage(image)
+    illustrateMatrix(resultMatrix,'../TikZpaper/figures/syntheticContinuous.png')
         
 
     
@@ -1336,7 +1441,7 @@ if __name__ == '__main__':
     elif arguments.task == 'illustrateContinuous':
         assert arguments.beam
         assert arguments.continuous
-        assert not arguments.noisy
+        #assert not arguments.noisy
         illustrateContinuous(SearchModel(arguments))
     elif arguments.task == 'visualize':
         RecognitionModel(arguments).visualizeFilters(arguments.checkpoint)
