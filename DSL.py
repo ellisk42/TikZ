@@ -77,6 +77,46 @@ def addFeatures(fs):
             composite[k] = composite.get(k,0) + f[k]
     return composite
 
+class LinearExpression():
+    def __init__(self, m,x,b):
+        self.m = m
+        self.x = x
+        self.b = b
+        if x == None: assert m == 0
+        if m == 0: assert x == None
+    def __str__(self):
+        if self.x == None: return str(self.b)
+        return '(%s*%s + %s)'%(self.m,self.x,self.b)
+    def __eq__(self,o): return self.m == o.m and self.x == o.x and self.b == o.b
+
+class Primitive():
+    def pretty(self):
+        p = '%s(%s)'%(self.k,",".join(map(str,self.arguments)))
+        return p.replace(',arrow',',\narrow')
+    def __init__(self, k, *arguments):
+        self.k = k
+        self.arguments = list(arguments)
+    def __str__(self): return "Primitive(%s)"%(", ".join(map(str,[self.k] + self.arguments)))
+    def hoistReflection(self):
+        return
+        yield
+    def convertToPython(self): return "[%s(%s)]"%(self.k,", ".join(map(str,self.arguments)))
+    def extrapolations(self): yield self
+    def explode(self):
+        return self
+    def features(self):
+        return {'primitives':1,
+                'lines':int('line' in self.k),
+                'rectangle':int('rectangle' in self.k),
+                'circles':int('circle' in self.k)}
+    def rewrites(self):
+        return
+        yield
+
+    def mapExpression(self,l):
+        return Primitive(self.k, *[ (l(a) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
+
+
 class Reflection():
     def pretty(self):
         return "reflect(%s){\n%s\n}"%(self.command,self.body.pretty())
@@ -105,22 +145,14 @@ class Reflection():
                              'reflectionsX':int('x' in self.command),
                              'reflectionsY':int('y' in self.command)},
                             self.body.features()])
-class Primitive():
-    def pretty(self): return self.k.replace(',arrow',',\narrow')
-    def __init__(self, k): self.k = k
-    def __str__(self): return "Primitive(%s)"%self.k
-    def hoistReflection(self):
-        return
-        yield
-    def convertToPython(self): return "[%s]"%self.k
-    def extrapolations(self): yield self
-    def explode(self):
-        return self
-    def features(self):
-        return {'primitives':1,
-                'lines':int('line' in self.k),
-                'rectangle':int('rectangle' in self.k),
-                'circles':int('circle' in self.k)}
+    def rewrites(self):
+        for b in self.body.rewrites():
+            yield Reflection(self.command,b)
+
+    def mapExpression(self,l):
+        return Reflection(self.command, self.body.mapExpression(l))
+
+
 class Loop():
     def pretty(self):
         p = "for (%s < %s){\n"%(self.v,self.bound)
@@ -186,7 +218,37 @@ class Loop():
                              'boundary': int(self.boundary != None),
                              'variableLoopBound': int(f2 == 0 and f3 == 0 and f4 == 0)},
                             self.body.features(),
-                            self.boundary.features() if self.boundary != None else {}])                             
+                            self.boundary.features() if self.boundary != None else {}])
+    def rewrites(self):
+        for b in self.body.rewrites():
+            yield Loop(self.v, self.bound, b, self.boundary, self.lowerBound)
+        if self.boundary != None:
+            for b in self.body.rewrites():
+                yield Loop(self.v, self.bound, self.body, b, self.lowerBound)
+    def mergeWithOtherLoop(self,other):
+        assert self.v == other.v and self.lowerBound == other.lowerBound
+        boundary = self.boundary
+        if other.boundary != None:
+            if boundary == None: boundary = other.boundary
+            else: boundary = Block(self.boundary.items + other.boundary.items)
+        body = Block(self.body.items + other.body.items)
+        return Loop(self.v, self.bound, body, boundary, self.lowerBound)
+    def mergeWithOtherLoopDifferentBounds(self,other):
+        assert self.bound.b == other.bound.b + 1
+        assert self.v == other.v and self.lowerBound == other.lowerBound
+        assert other.boundary == None
+
+        boundary = other.body.mapExpression(lambda l: LinearExpression(l.m,l.x,l.b-l.m) if l.x == self.v else l).items
+        if self.boundary != None: boundary = boundary + self.boundary.items
+
+        return Loop(self.v, self.bound, self.body, Block(boundary), self.lowerBound)
+
+
+    def mapExpression(self,l):
+        return Loop(self.v, l(self.bound), self.body.mapExpression(l),
+                    None if self.boundary == None else self.boundary.mapExpression(l),
+                    self.lowerBound)
+
                 
 class Block():
     def pretty(self): return ";\n".join([x.pretty() for x in self.items ])
@@ -226,6 +288,43 @@ class Block():
         best = min(range(len(distances)),key = lambda k: distances[k])
         if distances[best] == distance: return self
         return candidates[best].fixReflections(target)
+
+    def rewriteUpToDepth(self,d):
+        rewrites = [[self]]
+        for _ in range(d):
+            rewrites.append([ r for b in rewrites[-1]
+                              for r in b.rewrites() ])
+        return [ r for rs in rewrites for r in rs  ]
+
+    def rewrites(self):
+        for j,x in enumerate(self.items):
+            for r in x.rewrites():
+                newItems = list(self.items)
+                newItems[j] = r
+                yield Block(newItems)
+        for j,x in enumerate(self.items):
+            for k,y in enumerate(self.items):
+                if not (j < k): continue
+                if isinstance(x,Loop) and isinstance(y,Loop):
+                    if x.bound == y.bound and x.lowerBound == y.lowerBound:
+                        newLoop = x.mergeWithOtherLoop(y)
+                        newItems = list(self.items)
+                        newItems[j] = newLoop
+                        del newItems[k]
+                        yield Block(newItems)
+                    if x.bound.m == y.bound.m and x.bound.x == y.bound.x and abs(x.bound.b - y.bound.b) == 1:
+                        # make it so that y is the one with fewer iterations
+                        if x.bound.b < y.bound.b: x,y = y,x
+                        if y.boundary != None: continue
+                        newLoop = x.mergeWithOtherLoopDifferentBounds(y)
+                        newItems = list(self.items)
+                        newItems[j] = newLoop
+                        del newItems[k]
+                        yield Block(newItems)
+
+    def mapExpression(self,l):
+        return Block([x.mapExpression(l) for x in self.items ])
+                        
             
 
 # return something that resembles a syntax tree, built using the above classes
@@ -298,7 +397,7 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
         if m:
             x = parseExpression(m.group(1))
             y = parseExpression(m.group(2))
-            commands += [Primitive('circle(%s,%s)'%(x,y))]
+            commands += [Primitive('circle',x,y)]
             j += 1
             continue
 
@@ -309,12 +408,13 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
                 print "Reading line!"
                 print l
                 for index in range(5): print "index",index,"\t",m.group(index),'\t',parseExpression(m.group(index))
-            commands += [Primitive('line(%s,%s,%s,%s,arrow = %s,solid = %s)'%(parseExpression(m.group(1)),
-                                                                              parseExpression(m.group(2)),
-                                                                              parseExpression(m.group(3)),
-                                                                              parseExpression(m.group(4)),
-                                                                              m.group(6) == '1',
-                                                                              m.group(5) == '0'))]
+            commands += [Primitive('line',
+                                   parseExpression(m.group(1)),
+                                   parseExpression(m.group(2)),
+                                   parseExpression(m.group(3)),
+                                   parseExpression(m.group(4)),
+                                   'arrow = %s'%(m.group(6) == '1'),
+                                   'solid = %s'%(m.group(5) == '0'))]         
             j += 1
             continue
         
@@ -323,10 +423,11 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
         m = re.search(pattern,l)
         if m:
             # print m,m.group(1),m.group(2),m.group(3),m.group(4)
-            commands += [Primitive('rectangle(%s,%s,%s,%s)'%(parseExpression(m.group(1)),
-                                                             parseExpression(m.group(2)),
-                                                             parseExpression(m.group(3)),
-                                                             parseExpression(m.group(4))))]
+            commands += [Primitive('rectangle',
+                                   parseExpression(m.group(1)),
+                                   parseExpression(m.group(2)),
+                                   parseExpression(m.group(3)),
+                                   parseExpression(m.group(4)))]
             j += 1
             continue
 
@@ -374,7 +475,7 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
     return Block(commands)
 
 def parseExpression(e):
-    try: return int(e)
+    try: return LinearExpression(0,None,int(e))
     except:
         factor = re.search('([\-0-9]+) * ',e)
         if factor != None: factor = int(factor.group(1))
@@ -390,18 +491,7 @@ def parseExpression(e):
             print e
             assert False
 
-        if factor == 0: return str(offset)
-
-        representation = variable
-        if factor != 1: representation = "%d*%s"%(factor,representation)
-
-        if offset != 0: representation += " + %d"%offset
-
-        return representation
-
-        # return "%s * %s + %s"%(str(factor),
-        #                        str(variable),
-        #                        str(offset))
+        return LinearExpression(factor,variable,offset)
 
 
 def renderEvaluation(s, exportTo = None):
@@ -511,7 +601,158 @@ icingModelOutput = '''void render (int shapeIdentity, int cx, int cy, int lx1, i
   _out = _pac_sc_s15_s17;
   minimize(3 * (loop_body_cost + 1))'''
 
+icingLines = '''
+void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpy5If8l.sk:209*/
+{
+  _out = 0;
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpy5If8l.sk:210"; //Assume at tmpy5If8l.sk:210
+  assume (shapeIdentity != 0): "Assume at tmpy5If8l.sk:211"; //Assume at tmpy5If8l.sk:211
+  assume (shapeIdentity != 2): "Assume at tmpy5If8l.sk:212"; //Assume at tmpy5If8l.sk:212
+  assume (!(dashed)): "Assume at tmpy5If8l.sk:216"; //Assume at tmpy5If8l.sk:216
+  assume (!(arrow)): "Assume at tmpy5If8l.sk:217"; //Assume at tmpy5If8l.sk:217
+  int[2] coefficients1 = {3,4};
+  int[2] coefficients2 = {3,16};
+  int[0] environment = {};
+  int[1] coefficients1_0 = coefficients1[0::1];
+  int[1] coefficients2_0 = coefficients2[0::1];
+  dummyStartLoop();
+  int loop_body_cost = 0;
+  bit _pac_sc_s15_s17 = 0;
+  for(int j = 0; j < 3; j = j + 1)/*Canonical*/
+  {
+    assert (j < 4); //Assert at tmpy5If8l.sk:96 (38)
+    bit _pac_sc_s31 = _pac_sc_s15_s17;
+    if(!(_pac_sc_s15_s17))/*tmpy5If8l.sk:103*/
+    {
+      int[1] _pac_sc_s31_s33 = {0};
+      push(0, environment, j, _pac_sc_s31_s33);
+      dummyStartLoop();
+      int loop_body_cost_0 = 0;
+      bit _pac_sc_s15_s17_0 = 0;
+      for(int j_0 = 0; j_0 < 2; j_0 = j_0 + 1)/*Canonical*/
+      {
+        assert (j_0 < 4); //Assert at tmpy5If8l.sk:96 (46)
+        bit _pac_sc_s31_0 = _pac_sc_s15_s17_0;
+        if(!(_pac_sc_s15_s17_0))/*tmpy5If8l.sk:103*/
+        {
+          int[2] _pac_sc_s31_s33_0 = {0,0};
+          push(1, _pac_sc_s31_s33, j_0, _pac_sc_s31_s33_0);
+          int x_s39 = 0;
+          validateX((coefficients1_0[0]) * (_pac_sc_s31_s33_0[0]), x_s39);
+          int y_s43 = 0;
+          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[1])) + 1, y_s43);
+          int x2_s47 = 0;
+          validateX((coefficients1_0[0]) * (_pac_sc_s31_s33_0[0]), x2_s47);
+          int y2_s51 = 0;
+          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[1])) + 2, y2_s51);
+          assert ((x_s39 == x2_s47) || (y_s43 == y2_s51)); //Assert at tmpy5If8l.sk:137 (234)
+          bit _pac_sc_s31_s35 = 0 || (((((((shapeIdentity == 1) && (x_s39 == lx1)) && (y_s43 == ly1)) && (x2_s47 == lx2)) && (y2_s51 == ly2)) && (0 == dashed)) && (0 == arrow));
+          int x_s39_0 = 0;
+          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[1])) + 1, x_s39_0);
+          int y_s43_0 = 0;
+          validateY((coefficients2_0[0]) * (_pac_sc_s31_s33_0[0]), y_s43_0);
+          int x2_s47_0 = 0;
+          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[1])) + 2, x2_s47_0);
+          int y2_s51_0 = 0;
+          validateY((coefficients2_0[0]) * (_pac_sc_s31_s33_0[0]), y2_s51_0);
+          assert ((x_s39_0 == x2_s47_0) || (y_s43_0 == y2_s51_0)); //Assert at tmpy5If8l.sk:137 (236)
+          loop_body_cost_0 = 2;
+          _pac_sc_s31_s35 = _pac_sc_s31_s35 || (((((((shapeIdentity == 1) && (x_s39_0 == lx1)) && (y_s43_0 == ly1)) && (x2_s47_0 == lx2)) && (y2_s51_0 == ly2)) && (0 == dashed)) && (0 == arrow));
+          _pac_sc_s31_0 = _pac_sc_s31_s35;
+        }
+        _pac_sc_s15_s17_0 = _pac_sc_s31_0;
+      }
+      assert (loop_body_cost_0 != 0); //Assert at tmpy5If8l.sk:105 (30)
+      dummyEndLoop();
+      loop_body_cost = loop_body_cost_0 + 1;
+      _pac_sc_s31 = _pac_sc_s15_s17_0;
+    }
+    _pac_sc_s15_s17 = _pac_sc_s31;
+  }
+  assert (loop_body_cost != 0); //Assert at tmpy5If8l.sk:105 (35)
+  dummyEndLoop();
+  _out = _pac_sc_s15_s17;
+  minimize(3 * (loop_body_cost + 1))
+'''
+icingCircles = '''
+void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpuqIHtn.sk:209*/
+{
+  _out = 0;
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpuqIHtn.sk:210"; //Assume at tmpuqIHtn.sk:210
+  assume (shapeIdentity != 2): "Assume at tmpuqIHtn.sk:212"; //Assume at tmpuqIHtn.sk:212
+  assume (shapeIdentity != 1): "Assume at tmpuqIHtn.sk:213"; //Assume at tmpuqIHtn.sk:213
+  int[2] coefficients1 = {-3,24};
+  int[2] coefficients2 = {-3,16};
+  int[0] environment = {};
+  int[1] coefficients1_0 = coefficients1[0::1];
+  int[1] coefficients2_0 = coefficients2[0::1];
+  dummyStartLoop();
+  int loop_body_cost = 0;
+  bit _pac_sc_s15_s17 = 0;
+  for(int j = 0; j < 3; j = j + 1)/*Canonical*/
+  {
+    assert (j < 4); //Assert at tmpuqIHtn.sk:96 (38)
+    bit _pac_sc_s31 = _pac_sc_s15_s17;
+    if(!(_pac_sc_s15_s17))/*tmpuqIHtn.sk:103*/
+    {
+      int[1] _pac_sc_s31_s33 = {0};
+      push(0, environment, j, _pac_sc_s31_s33);
+      dummyStartLoop();
+      int loop_body_cost_0 = 0;
+      bit _pac_sc_s15_s17_0 = 0;
+      for(int j_0 = 0; j_0 < 3; j_0 = j_0 + 1)/*Canonical*/
+      {
+        assert (j_0 < 4); //Assert at tmpuqIHtn.sk:96 (46)
+        bit _pac_sc_s31_0 = _pac_sc_s15_s17_0;
+        if(!(_pac_sc_s15_s17_0))/*tmpuqIHtn.sk:103*/
+        {
+          int[2] _pac_sc_s31_s33_0 = {0,0};
+          push(1, _pac_sc_s31_s33, j_0, _pac_sc_s31_s33_0);
+          int x_s39 = 0;
+          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[0])) + 7, x_s39);
+          int y_s43 = 0;
+          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[1])) + 7, y_s43);
+          loop_body_cost_0 = 1;
+          _pac_sc_s31_0 = 0 || (((shapeIdentity == 0) && (cx == x_s39)) && (cy == y_s43));
+        }
+        _pac_sc_s15_s17_0 = _pac_sc_s31_0;
+      }
+      assert (loop_body_cost_0 != 0); //Assert at tmpuqIHtn.sk:105 (30)
+      dummyEndLoop();
+      loop_body_cost = loop_body_cost_0 + 1;
+      _pac_sc_s31 = _pac_sc_s15_s17_0;
+    }
+    _pac_sc_s15_s17 = _pac_sc_s31;
+  }
+  assert (loop_body_cost != 0); //Assert at tmpuqIHtn.sk:105 (35)
+  dummyEndLoop();
+  _out = _pac_sc_s15_s17;
+  minimize(3 * (loop_body_cost + 1))
+'''
+
 if __name__ == '__main__':
+    p1 = parseSketchOutput(icingCircles)
+    p2 = parseSketchOutput(icingLines)
+    p3 = Block(p1.items + p2.items)
+    print p3
+    for r in p3.rewrites():
+        print r.pretty()
+        print "CHILDREN:"
+        for c in r.rewrites():
+            print c.pretty()
+            print c
+            print c.convertToPython()
+            showImage(c.convertToSequence().draw())
+        print "ENDOFCHILDREN"
+        
+    assert False
+    start = Block([Loop('j',LinearExpression(0,None,3),
+                        Block([Primitive('x')]),
+                        boundary = Block([Primitive('w', LinearExpression(5,'j',-1))])),
+                   Loop('j',LinearExpression(0,None,2),
+                        Block([Primitive('y',LinearExpression(9,'j',4))]))])
+    for r in start.rewrites():
+        print r
     e = parseSketchOutput(icingModelOutput)
 #    e = [circle(4,10)] + [ _i for i in range(0,3) for _i in ([line(3*i + 1,4,3*i + 1,2,arrow = True,solid = True)] + reflect(y = 6)([circle(3*i + 1,1)] + [line(4,9,3*i + 1,6,arrow = True,solid = True)])) ]
     print e.pretty()

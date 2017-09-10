@@ -55,6 +55,31 @@ class SynthesisJob():
                                source = result[1] if result != None else None,
                                cost = result[0] if result != None else None,
                                usePrior = self.usePrior)
+
+    def executeForEachPrimitive(self):
+        jobs = {}
+        for l in self.parse.lines:
+            if isinstance(l,Circle): jobs['Circle'] = jobs.get('Circle',[]) + [l]
+            elif isinstance(l,Rectangle): jobs['Rectangle'] = jobs.get('Rectangle',[]) + [l]
+            elif isinstance(l,Line):
+                jobs['Line%s%s'%(l.solid,l.arrow)] = jobs.get('Line%s%s'%(l.solid,l.arrow),[]) + [l]
+            else: assert False
+
+        jobResults = {}
+        startTime = time.time()
+        for k in jobs:
+            print "Synthesizing for:\n",Sequence(jobs[k])
+            jobResults[k] = synthesizeProgram(Sequence(jobs[k]),self.usePrior)
+            print jobResults[k][1]
+        elapsedTime = time.time() - startTime
+
+        return SynthesisResult(parse = self.parse,
+                               time = elapsedTime,
+                               originalDrawing = self.originalDrawing,
+                               source = [ s for _,s in jobResults.values() ],
+                               cost = sum([ c for c,_ in jobResults.values() ]),
+                               usePrior = self.usePrior)        
+                
 def invokeExecuteMethod(k):
     try:
         return k.execute()
@@ -441,9 +466,10 @@ if __name__ == '__main__':
             j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'',
                              usePrior = not arguments.noPrior)
             print j
-            s = j.execute()
-            print s
-            print parseSketchOutput(s.source)
+            s = j.executeForEachPrimitive()
+            #print s
+            print "\n".join([ str(parseSketchOutput(o)) for o in s.source ])
+            print s.time
         else:
             j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'',
                              usePrior = not arguments.noPrior)
