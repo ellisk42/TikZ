@@ -19,7 +19,8 @@ import time
 from multiprocessing import Pool
 
 class SynthesisResult():
-    def __init__(self, parse, time = None, source = None, cost = None, originalDrawing = None, usePrior = True):
+    def __init__(self, parse, time = None, source = None, program = None, cost = None, originalDrawing = None, usePrior = True):
+        self.program = program
         self.usePrior = usePrior
         self.originalDrawing = originalDrawing
         self.parse = parse
@@ -67,17 +68,43 @@ class SynthesisJob():
 
         jobResults = {}
         startTime = time.time()
+        xCoefficients = set([])
+        yCoefficients = set([])
+        usedReflections = set([])
         for k in jobs:
             print "Synthesizing for:\n",Sequence(jobs[k])
-            jobResults[k] = synthesizeProgram(Sequence(jobs[k]),self.usePrior)
+            jobResults[k] = synthesizeProgram(Sequence(jobs[k]),
+                                              self.usePrior,
+                                              entireParse = self.parse,
+                                              xCoefficients = xCoefficients,
+                                              yCoefficients = yCoefficients,
+                                              usedReflections = usedReflections)
             print jobResults[k][1]
+            parsedOutput = parseSketchOutput(jobResults[k][1])
+            print parsedOutput.pretty()
+            print parsedOutput.usedCoefficients()[0]
+            print parsedOutput.usedCoefficients()[1]
+            xs,ys = parsedOutput.usedCoefficients()
+            xCoefficients = xCoefficients|xs
+            yCoefficients = yCoefficients|ys
+            xr,yr = parsedOutput.usedReflections()
+            print xr,yr
+            usedReflections = usedReflections|set([(x,0) for x in xr ])
+            usedReflections = usedReflections|set([(0,x) for x in yr ])
         elapsedTime = time.time() - startTime
+
+        print "Optimizing using rewrites..."
+        gluedTogether = Block([ x for _,result in jobResults.values()
+                                for x in parseSketchOutput(result).items ])
+        optimalCost,optimalProgram = gluedTogether.optimizeUsingRewrites()
+        print optimalProgram.pretty()
 
         return SynthesisResult(parse = self.parse,
                                time = elapsedTime,
                                originalDrawing = self.originalDrawing,
                                source = [ s for _,s in jobResults.values() ],
-                               cost = sum([ c for c,_ in jobResults.values() ]),
+                               program = optimalProgram,
+                               cost = optimalCost,
                                usePrior = self.usePrior)        
                 
 def invokeExecuteMethod(k):

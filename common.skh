@@ -23,10 +23,12 @@ int [n + 1] push([int n], int [n] environment, int j) {
 
 int validateY(int x) {
   assert x >= 0 && x <= MAXIMUMYCOORDINATE;
+  assert YVALIDATION ;
   return x;
 }
 int validateX(int x) {
   assert x >= 0 && x <= MAXIMUMXCOORDINATE;
+  assert XVALIDATION ;
   return x;
 }
 
@@ -35,10 +37,16 @@ int validateX(int x) {
 #define _r(x1,y1,x2,y2) (shapeIdentity == RECTANGLE && x1 == rx1 && y1 == ry1 && x2 == rx2 && y2 == ry2)
 
 generator int number() { return {| 0 (+|-) ?? |}; }
-generator int expression([int n,int m], int[n] environment, int[m] coefficients, ref int cost) {
+
+generator int x_expression([int n,int m], int[n] environment, int[m] coefficients, ref int cost) {
   cost = 0;
   if (??) return ??;
-  return {| coefficients[0] | coefficients[1] |} * {| environment[0] | environment[1] |} + number();
+  return {| coefficients[0] | coefficients[1] XCOEFFICIENTS |} * {| environment[0] | environment[1] |} + number();
+}
+generator int y_expression([int n,int m], int[n] environment, int[m] coefficients, ref int cost) {
+  cost = 0;
+  if (??) return ??;
+  return {| coefficients[0] | coefficients[1] YCOEFFICIENTS |} * {| environment[0] | environment[1] |} + number();
 }
 
 generator int bound_expression([int n], int[n] environment, ref int cost) {
@@ -113,16 +121,16 @@ generator bit primitive([int n,int m1,int m2], SHAPEVARIABLES , int[n] environme
   bit hit = 0;
   cost = 1;
   int xc,yc;
-  int x = validateX(expression(environment, coefficients1, xc));
-  int y = validateY(expression(environment, coefficients2, yc));
+  int x = validateX(x_expression(environment, coefficients1, xc));
+  int y = validateY(y_expression(environment, coefficients2, yc));
   cost += (xc + yc);
   if (??) { // draw a circle
     assert HASCIRCLES;
     identity = CIRCLE;
     hit = _c(x,y);
   } else {  // draw a line or rectangle
-    int x2 = validateX(expression(environment, coefficients1, xc));
-    int y2 = validateY(expression(environment, coefficients2, yc));
+    int x2 = validateX(x_expression(environment, coefficients1, xc));
+    int y2 = validateY(y_expression(environment, coefficients2, yc));
     cost += (xc + yc);
     if (??) {
       assert HASLINES;
@@ -201,7 +209,7 @@ generator bit reflection([int n,int m1,int m2], SHAPEVARIABLES , int[n] environm
 
   dummyEndReflection();
 
-  cost = reflection_cost + 1;
+  cost = reflection_cost + (HAVETHISREFLECTIONALREADY ? 0 : 1);
   return hit;
 }
 
@@ -222,11 +230,19 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   int [2] coefficients2 = { {| 0 (+|-) ?? |}, {| 0 (+|-) ?? |} };
   int numberOfCoefficients1 = {| 0 | 1 | 2 |};
   int numberOfCoefficients2 = {| 0 | 1 | 2 |};
+  int coefficientIndex = 0;
+  repeat(2){
+    int c = coefficients1[coefficientIndex];
+    assert COEFFICIENTVALIDATOR1 ;
+    c = coefficients2[coefficientIndex];
+    assert COEFFICIENTVALIDATOR2 ;
+    coefficientIndex += 1;
+  }
   bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost,1);
 #ifdef USEPRIOR
   minimize(3*cost +
-	   (numberOfCoefficients1 == 2 ? 1 : 0) +
-	   (numberOfCoefficients2 == 2 ? 1 : 0));
+	   (numberOfCoefficients1 + PROVIDEDXCOEFFICIENTS > 1 ? numberOfCoefficients1 - 1 : 0) +
+	   (numberOfCoefficients2 + PROVIDEDYCOEFFICIENTS > 1 ? numberOfCoefficients2 - 1 : 0));
 #endif
   return inScene;
 }

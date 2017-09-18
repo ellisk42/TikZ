@@ -1,3 +1,4 @@
+from math import ceil,log
 import re
 import numpy as np
 from utilities import loadImage,showImage
@@ -7,7 +8,10 @@ import tempfile
 
 from language import *
 
-def synthesizeProgram(parse,usePrior = True):
+def synthesizeProgram(parse,usePrior = True,entireParse = None,
+                      xCoefficients = [],
+                      yCoefficients = [],
+                      usedReflections = []):
     parts = []
     hasCircles = False
     hasRectangles = False
@@ -19,17 +23,25 @@ def synthesizeProgram(parse,usePrior = True):
     if parse.lines == []:
         return None
 
+    if entireParse == None: entireParse = parse
+
     # translate drawing the lower left-hand corner
-    x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ])
-    y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ])
-    x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ]) - x0
-    y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ]) - y0
+    x0 = min([x for l in entireParse.lines for x in l.usedXCoordinates()  ])
+    y0 = min([y for l in entireParse.lines for y in l.usedYCoordinates()  ])
+    x1 = max([x for l in entireParse.lines for x in l.usedXCoordinates()  ]) - x0
+    y1 = max([y for l in entireParse.lines for y in l.usedYCoordinates()  ]) - y0
     biggestNumber = -1 #max([x1,y1,4])
+
+    # all of the allowed X and Y coordinates
+    yValidation = []
+    xValidation = []
     
     for p in parse.lines:
         if isinstance(p,Circle):
             parts.append("_c(%d,%d)"%(p.center.x - x0,
                                       p.center.y - y0))
+            xValidation.append(p.center.x - x0)
+            yValidation.append(p.center.y - y0)
             hasCircles = True
         elif isinstance(p,Rectangle):
             hasRectangles = True
@@ -37,6 +49,10 @@ def synthesizeProgram(parse,usePrior = True):
                                             p.p1.y - y0,
                                             p.p2.x - x0,
                                             p.p2.y - y0))
+            xValidation.append(p.p1.x - x0)
+            yValidation.append(p.p1.y - y0)
+            xValidation.append(p.p2.x - x0)
+            yValidation.append(p.p2.y - y0)
         elif isinstance(p,Line):
             hasLines = True
             if p.isDiagonal(): noDiagonals = False
@@ -48,11 +64,48 @@ def synthesizeProgram(parse,usePrior = True):
                                                   p.points[1].y - y0,
                                                   0 if p.solid else 1,
                                                   1 if p.arrow else 0))
+            xValidation.append(p.points[0].x - x0)
+            yValidation.append(p.points[0].y - y0)
+            xValidation.append(p.points[1].x - x0)
+            yValidation.append(p.points[1].y - y0)
+
+    coefficientGenerator1 = ''
+    for c in xCoefficients: coefficientGenerator1 = '| ' + str(c)
+    coefficientGenerator2 = ''
+    for c in yCoefficients: coefficientGenerator2 = '| ' + str(c)
+
+    coefficientValidator1 = set([ a - b
+                                  for a in xValidation
+                                  for b in xValidation
+                                  if a != b])
+    coefficientValidator1 = " || ".join([ "c == %d"%c for c in coefficientValidator1 ])
+    coefficientValidator2 = set([ a - b
+                                  for a in yValidation
+                                  for b in yValidation
+                                  if a != b])
+    coefficientValidator2 = " || ".join([ "c == %d"%c for c in coefficientValidator2 ])
+
+    xValidation = " || ".join([ "x == %d"%x for x in set(xValidation) ])
+    yValidation = " || ".join([ "x == %d"%x for x in set(yValidation) ])
+
+    haveThisReflectionAlready = " || ".join([ "(xr == %d && yr == %d)"%(xr,yr)
+                                              for xr,yr in usedReflections ] + ['0'])
+
+    upperBoundOnLoss = ' --bnd-mbits %d'%(min(5,int(ceil(log(3*len(parse.lines))/log(2)))))
     
     source = '''
-pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d";
+pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d %s";
 
 %s    
+#define HAVETHISREFLECTIONALREADY %s
+#define XCOEFFICIENTS %s
+#define YCOEFFICIENTS %s
+#define PROVIDEDXCOEFFICIENTS %d
+#define PROVIDEDYCOEFFICIENTS %d
+#define XVALIDATION ( %s )
+#define YVALIDATION ( %s )
+#define COEFFICIENTVALIDATOR1 ( %s )
+#define COEFFICIENTVALIDATOR2 ( %s )
 #define MAXIMUMLOOPITERATIONS 4
 #define MAXIMUMXCOORDINATE %d
 #define MAXIMUMYCOORDINATE %d
@@ -79,8 +132,13 @@ bit renderSpecification(SHAPEVARIABLES) {
   }
   return %s;
 }
-'''%(biggestNumber,
+'''%(biggestNumber, upperBoundOnLoss,
      ('#define USEPRIOR' if usePrior else ''),
+     haveThisReflectionAlready,
+     coefficientGenerator1, coefficientGenerator2,
+     len(xCoefficients), len(yCoefficients),
+     xValidation,yValidation,
+     coefficientValidator1,coefficientValidator2,
      x1,y1,
      hasCircles,hasRectangles,hasLines,
      (True in solid),(False in solid),
@@ -88,6 +146,7 @@ bit renderSpecification(SHAPEVARIABLES) {
      int(noDiagonals),
      " || ".join(parts))
 
+    print source
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
     fd.close()

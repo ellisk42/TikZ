@@ -116,6 +116,11 @@ class Primitive():
     def mapExpression(self,l):
         return Primitive(self.k, *[ (l(a) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
 
+    def walk(self):
+        yield self
+
+    def cost(self): return 1
+
 
 class Reflection():
     def pretty(self):
@@ -151,6 +156,14 @@ class Reflection():
 
     def mapExpression(self,l):
         return Reflection(self.command, self.body.mapExpression(l))
+
+    def walk(self):
+        yield self
+        for w in self.body.walk():
+            yield w
+
+    def cost(self):
+        return 1 + self.body.cost()
 
 
 class Loop():
@@ -249,6 +262,19 @@ class Loop():
                     None if self.boundary == None else self.boundary.mapExpression(l),
                     self.lowerBound)
 
+    def walk(self):
+        yield self
+        for x in self.body.walk(): yield x
+        if self.boundary != None:
+            for x in self.boundary.walk(): yield x
+
+    def cost(self):
+        cost = self.body.cost()
+        if self.boundary != None:
+            cost += self.boundary.cost()
+        if self.bound.m == 0 and self.bound.b == 2: cost += 1
+        return cost + 1
+
                 
 class Block():
     def pretty(self): return ";\n".join([x.pretty() for x in self.items ])
@@ -321,9 +347,61 @@ class Block():
                         newItems[j] = newLoop
                         del newItems[k]
                         yield Block(newItems)
+                if isinstance(x,Reflection) and isinstance(y,Reflection):
+                    if x.command == y.command:
+                        newItems = list(self.items)
+                        newItems[j] = Reflection(x.command, Block(x.body.items + y.body.items))
+                        del newItems[k]
+                        yield Block(newItems)
 
     def mapExpression(self,l):
         return Block([x.mapExpression(l) for x in self.items ])
+    def walk(self):
+        yield self
+        for x in self.items:
+            for y in x.walk():
+                yield y
+    def usedCoefficients(self):
+        xs = []
+        ys = []
+        for child in self.walk():
+            if isinstance(child,Primitive):
+                if child.k == 'circle':
+                    xs.append(child.arguments[0].m)
+                    ys.append(child.arguments[1].m)
+                if child.k == 'rectangle' or child.k == 'line':
+                    xs.append(child.arguments[0].m)
+                    ys.append(child.arguments[1].m)
+                    xs.append(child.arguments[2].m)
+                    ys.append(child.arguments[3].m)
+        return set([c for c in xs if c != 0 ]),set([c for c in ys if c != 0 ])
+    def usedReflections(self):
+        xs = []
+        ys = []
+        for child in self.walk():
+            if isinstance(child,Reflection):
+                a = int(''.join([ c for c in child.command if c in map(str,range(10)) ]))
+                if 'x' in child.command:
+                    xs.append(a)
+                else:
+                    ys.append(a)
+        return set(xs),set(ys)
+
+    def cost(self): return sum([x.cost() for x in self.items ])
+
+    def totalCost(self):
+        # cost taking into account the used coefficients
+        c = self.cost()
+        xs,ys = self.usedCoefficients()
+        return 3*c + max(len(xs) - 1, 0) + max(len(ys) - 1, 0)
+
+    def optimizeUsingRewrites(self,d = 4):
+        candidates = self.rewriteUpToDepth(d)
+        scoredCandidates = [ (c.totalCost(),c) for c in candidates ]
+        return min(scoredCandidates)
+    
+        
+    
                         
             
 
@@ -475,10 +553,14 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
     return Block(commands)
 
 def parseExpression(e):
+    #print "parsing expression",e
     try: return LinearExpression(0,None,int(e))
     except:
-        factor = re.search('([\-0-9]+) * ',e)
+        factor = re.search('([\-0-9]+) \* ',e)
         if factor != None: factor = int(factor.group(1))
+        else: # try negative number
+            factor = re.search('\(-\(([0-9]+)\)\) \* ',e)
+            if factor != None: factor = -int(factor.group(1))
         offset = re.search(' \+ ([\-0-9]+)',e)
         if offset != None: offset = int(offset.group(1))
         variable = re.search('\[(\d)\]',e)
@@ -490,7 +572,7 @@ def parseExpression(e):
         if variable == None:
             print e
             assert False
-
+        #print "Parsed into:",LinearExpression(factor,variable,offset)
         return LinearExpression(factor,variable,offset)
 
 
@@ -602,76 +684,72 @@ icingModelOutput = '''void render (int shapeIdentity, int cx, int cy, int lx1, i
   minimize(3 * (loop_body_cost + 1))'''
 
 icingLines = '''
-void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpy5If8l.sk:209*/
+void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int ly2, bit dashed, bit arrow, int rx1, int ry1, int rx2, int ry2, ref bit _out)  implements renderSpecification/*tmpuV7thE.sk:217*/
 {
   _out = 0;
-  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpy5If8l.sk:210"; //Assume at tmpy5If8l.sk:210
-  assume (shapeIdentity != 0): "Assume at tmpy5If8l.sk:211"; //Assume at tmpy5If8l.sk:211
-  assume (shapeIdentity != 2): "Assume at tmpy5If8l.sk:212"; //Assume at tmpy5If8l.sk:212
-  assume (!(dashed)): "Assume at tmpy5If8l.sk:216"; //Assume at tmpy5If8l.sk:216
-  assume (!(arrow)): "Assume at tmpy5If8l.sk:217"; //Assume at tmpy5If8l.sk:217
-  int[2] coefficients1 = {3,4};
-  int[2] coefficients2 = {3,16};
+  assume (((shapeIdentity == 0) || (shapeIdentity == 1)) || (shapeIdentity == 2)): "Assume at tmpuV7thE.sk:218"; //Assume at tmpuV7thE.sk:218
+  assume (shapeIdentity != 0): "Assume at tmpuV7thE.sk:219"; //Assume at tmpuV7thE.sk:219
+  assume (shapeIdentity != 2): "Assume at tmpuV7thE.sk:220"; //Assume at tmpuV7thE.sk:220
+  assume (!(dashed)): "Assume at tmpuV7thE.sk:224"; //Assume at tmpuV7thE.sk:224
+  assume (!(arrow)): "Assume at tmpuV7thE.sk:225"; //Assume at tmpuV7thE.sk:225
   int[0] environment = {};
-  int[1] coefficients1_0 = coefficients1[0::1];
-  int[1] coefficients2_0 = coefficients2[0::1];
   dummyStartLoop();
   int loop_body_cost = 0;
-  bit _pac_sc_s15_s17 = 0;
+  bit _pac_sc_s17_s19 = 0;
   for(int j = 0; j < 3; j = j + 1)/*Canonical*/
   {
-    assert (j < 4); //Assert at tmpy5If8l.sk:96 (38)
-    bit _pac_sc_s31 = _pac_sc_s15_s17;
-    if(!(_pac_sc_s15_s17))/*tmpy5If8l.sk:103*/
+    assert (j < 4); //Assert at tmpuV7thE.sk:104 (38)
+    bit _pac_sc_s33 = _pac_sc_s17_s19;
+    if(!(_pac_sc_s17_s19))/*tmpuV7thE.sk:111*/
     {
-      int[1] _pac_sc_s31_s33 = {0};
-      push(0, environment, j, _pac_sc_s31_s33);
+      int[1] _pac_sc_s33_s35 = {0};
+      push(0, environment, j, _pac_sc_s33_s35);
       dummyStartLoop();
       int loop_body_cost_0 = 0;
-      bit _pac_sc_s15_s17_0 = 0;
+      bit _pac_sc_s17_s19_0 = 0;
       for(int j_0 = 0; j_0 < 2; j_0 = j_0 + 1)/*Canonical*/
       {
-        assert (j_0 < 4); //Assert at tmpy5If8l.sk:96 (46)
-        bit _pac_sc_s31_0 = _pac_sc_s15_s17_0;
-        if(!(_pac_sc_s15_s17_0))/*tmpy5If8l.sk:103*/
+        assert (j_0 < 4); //Assert at tmpuV7thE.sk:104 (46)
+        bit _pac_sc_s33_0 = _pac_sc_s17_s19_0;
+        if(!(_pac_sc_s17_s19_0))/*tmpuV7thE.sk:111*/
         {
-          int[2] _pac_sc_s31_s33_0 = {0,0};
-          push(1, _pac_sc_s31_s33, j_0, _pac_sc_s31_s33_0);
-          int x_s39 = 0;
-          validateX((coefficients1_0[0]) * (_pac_sc_s31_s33_0[0]), x_s39);
-          int y_s43 = 0;
-          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[1])) + 1, y_s43);
-          int x2_s47 = 0;
-          validateX((coefficients1_0[0]) * (_pac_sc_s31_s33_0[0]), x2_s47);
-          int y2_s51 = 0;
-          validateY(((coefficients2_0[0]) * (_pac_sc_s31_s33_0[1])) + 2, y2_s51);
-          assert ((x_s39 == x2_s47) || (y_s43 == y2_s51)); //Assert at tmpy5If8l.sk:137 (234)
-          bit _pac_sc_s31_s35 = 0 || (((((((shapeIdentity == 1) && (x_s39 == lx1)) && (y_s43 == ly1)) && (x2_s47 == lx2)) && (y2_s51 == ly2)) && (0 == dashed)) && (0 == arrow));
-          int x_s39_0 = 0;
-          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[1])) + 1, x_s39_0);
-          int y_s43_0 = 0;
-          validateY((coefficients2_0[0]) * (_pac_sc_s31_s33_0[0]), y_s43_0);
-          int x2_s47_0 = 0;
-          validateX(((coefficients1_0[0]) * (_pac_sc_s31_s33_0[1])) + 2, x2_s47_0);
-          int y2_s51_0 = 0;
-          validateY((coefficients2_0[0]) * (_pac_sc_s31_s33_0[0]), y2_s51_0);
-          assert ((x_s39_0 == x2_s47_0) || (y_s43_0 == y2_s51_0)); //Assert at tmpy5If8l.sk:137 (236)
+          int[2] _pac_sc_s33_s35_0 = {0,0};
+          push(1, _pac_sc_s33_s35, j_0, _pac_sc_s33_s35_0);
+          int x_s41 = 0;
+          validateX(((-(3)) * (_pac_sc_s33_s35_0[1])) + 5, x_s41);
+          int y_s45 = 0;
+          validateY((3 * (_pac_sc_s33_s35_0[0])) + 1, y_s45);
+          int x2_s49 = 0;
+          validateX(((-(3)) * (_pac_sc_s33_s35_0[1])) + 6, x2_s49);
+          int y2_s53 = 0;
+          validateY((3 * (_pac_sc_s33_s35_0[0])) + 1, y2_s53);
+          assert ((x_s41 == x2_s49) || (y_s45 == y2_s53)); //Assert at tmpuV7thE.sk:145 (234)
+          bit _pac_sc_s33_s37 = 0 || (((((((shapeIdentity == 1) && (x_s41 == lx1)) && (y_s45 == ly1)) && (x2_s49 == lx2)) && (y2_s53 == ly2)) && (0 == dashed)) && (0 == arrow));
+          int x_s41_0 = 0;
+          validateX(((-(3)) * (_pac_sc_s33_s35_0[0])) + 7, x_s41_0);
+          int y_s45_0 = 0;
+          validateY((3 * (_pac_sc_s33_s35_0[1])) + 2, y_s45_0);
+          int x2_s49_0 = 0;
+          validateX(((-(3)) * (_pac_sc_s33_s35_0[0])) + 7, x2_s49_0);
+          int y2_s53_0 = 0;
+          validateY((3 * (_pac_sc_s33_s35_0[1])) + 3, y2_s53_0);
+          assert ((x_s41_0 == x2_s49_0) || (y_s45_0 == y2_s53_0)); //Assert at tmpuV7thE.sk:145 (236)
           loop_body_cost_0 = 2;
-          _pac_sc_s31_s35 = _pac_sc_s31_s35 || (((((((shapeIdentity == 1) && (x_s39_0 == lx1)) && (y_s43_0 == ly1)) && (x2_s47_0 == lx2)) && (y2_s51_0 == ly2)) && (0 == dashed)) && (0 == arrow));
-          _pac_sc_s31_0 = _pac_sc_s31_s35;
+          _pac_sc_s33_s37 = _pac_sc_s33_s37 || (((((((shapeIdentity == 1) && (x_s41_0 == lx1)) && (y_s45_0 == ly1)) && (x2_s49_0 == lx2)) && (y2_s53_0 == ly2)) && (0 == dashed)) && (0 == arrow));
+          _pac_sc_s33_0 = _pac_sc_s33_s37;
         }
-        _pac_sc_s15_s17_0 = _pac_sc_s31_0;
+        _pac_sc_s17_s19_0 = _pac_sc_s33_0;
       }
-      assert (loop_body_cost_0 != 0); //Assert at tmpy5If8l.sk:105 (30)
+      assert (loop_body_cost_0 != 0); //Assert at tmpuV7thE.sk:113 (30)
       dummyEndLoop();
       loop_body_cost = loop_body_cost_0 + 1;
-      _pac_sc_s31 = _pac_sc_s15_s17_0;
+      _pac_sc_s33 = _pac_sc_s17_s19_0;
     }
-    _pac_sc_s15_s17 = _pac_sc_s31;
+    _pac_sc_s17_s19 = _pac_sc_s33;
   }
-  assert (loop_body_cost != 0); //Assert at tmpy5If8l.sk:105 (35)
+  assert (loop_body_cost != 0); //Assert at tmpuV7thE.sk:113 (35)
   dummyEndLoop();
-  _out = _pac_sc_s15_s17;
+  _out = _pac_sc_s17_s19;
   minimize(3 * (loop_body_cost + 1))
 '''
 icingCircles = '''
@@ -731,8 +809,10 @@ void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int l
 '''
 
 if __name__ == '__main__':
-    p1 = parseSketchOutput(icingCircles)
     p2 = parseSketchOutput(icingLines)
+    print p2.pretty()
+    assert False
+    p1 = parseSketchOutput(icingCircles)
     p3 = Block(p1.items + p2.items)
     print p3
     for r in p3.rewrites():
