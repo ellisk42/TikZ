@@ -79,16 +79,11 @@ class SynthesisJob():
                                               xCoefficients = xCoefficients,
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections)
-            print jobResults[k][1]
             parsedOutput = parseSketchOutput(jobResults[k][1])
-            print parsedOutput.pretty()
-            print parsedOutput.usedCoefficients()[0]
-            print parsedOutput.usedCoefficients()[1]
             xs,ys = parsedOutput.usedCoefficients()
             xCoefficients = xCoefficients|xs
             yCoefficients = yCoefficients|ys
             xr,yr = parsedOutput.usedReflections()
-            print xr,yr
             usedReflections = usedReflections|set([(x,0) for x in xr ])
             usedReflections = usedReflections|set([(0,x) for x in yr ])
         elapsedTime = time.time() - startTime
@@ -109,7 +104,10 @@ class SynthesisJob():
                 
 def invokeExecuteMethod(k):
     try:
-        return k.execute()
+        if arguments.incremental:
+            return k.executeForEachPrimitive()
+        else:
+            return k.execute()
     except Exception as exception:
         t = traceback.format_exc()
         print "Exception while executing job:\n%s\n%s\n%s\n"%(exception,t,k)
@@ -478,7 +476,7 @@ if __name__ == '__main__':
     parser.add_argument('--resume', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
     parser.add_argument('--learnToRank', default = None, type = int)
-    
+    parser.add_argument('--incremental', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
 
