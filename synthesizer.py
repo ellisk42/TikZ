@@ -79,6 +79,14 @@ class SynthesisJob():
                                               xCoefficients = xCoefficients,
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections)
+            if jobResults[k] == None:
+                return SynthesisResult(parse = self.parse,
+                                       time = elapsedTime,
+                                       originalDrawing = self.originalDrawing,
+                                       source = [ s for _,s in jobResults.values() ],
+                                       program = None,
+                                       cost = None,
+                                       usePrior = self.usePrior)
             parsedOutput = parseSketchOutput(jobResults[k][1])
             xs,ys = parsedOutput.usedCoefficients()
             xCoefficients = xCoefficients|xs

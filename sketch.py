@@ -168,7 +168,7 @@ bit renderSpecification(SHAPEVARIABLES) {
         programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
         if programSize == []:
             print "Synthesis failure!"
-            print output
+            print output + "\n" + source
             return None
         programSize = programSize[-1]
         m = re.match('.*=([0-9]+),',programSize)
