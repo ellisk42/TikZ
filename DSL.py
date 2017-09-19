@@ -4,7 +4,7 @@ from fastRender import fastRender
 from render import render
 
 import re
-
+import itertools as iterationTools
 
 def reflectPoint(rx,ry,px,py):
     if rx != None: return (rx - px,py)
@@ -77,17 +77,57 @@ def addFeatures(fs):
             composite[k] = composite.get(k,0) + f[k]
     return composite
 
+class AbstractionVariable():
+    def __init__(self,v): self.v = v
+    def __eq__(self,o): return self.v == o.v
+    def __str__(self): return "__v__(%d)"%(self.v)
+class Environment():
+    def __init__(self,b = []): self.bindings = b
+    def lookup(x):
+        for k,v in self.bindings:
+            if k == x: return v
+        return None
+    def extend(self,x,y = None):
+        if y == None: x,y = AbstractionVariable(len(self.bindings)),x
+        return Environment(self.bindings + [(x,y)]), x
+    def __str__(self):
+        return "Environment([%s])"%(", ".join([ "%s -> %s"%(k,v) for k,v in self.bindings ]))
+    def makeVariableWithValue(self,z):
+        for k,v in self.bindings:
+            if v == z: return k,self
+        e,v = self.extend(z)
+        return v,e
+class AbstractionFailure(Exception):
+    pass
+
 class LinearExpression():
     def __init__(self, m,x,b):
         self.m = m
         self.x = x
         self.b = b
         if x == None: assert m == 0
-        if m == 0: assert x == None
+        if isinstance(m,int) and m == 0: assert x == None
     def __str__(self):
         if self.x == None: return str(self.b)
         return '(%s*%s + %s)'%(self.m,self.x,self.b)
-    def __eq__(self,o): return self.m == o.m and self.x == o.x and self.b == o.b
+    def __eq__(self,o): return isinstance(o,LinearExpression) and self.m == o.m and self.x == o.x and self.b == o.b
+
+    def abstract(self,other,e):
+        if self.x != other.x: raise AbstractionFailure('')
+        
+        def abstractNumber(n,m,e_):
+            if n == m: return (n,e_)
+            for k,(n_,m_) in e_.bindings:
+                if n_ == n and m_ == m: return (k,e_)
+            e_,newVariable = e_.extend((n,m))
+            return (newVariable,e_)
+        m,e = abstractNumber(self.m,other.m,e)
+        b,e = abstractNumber(self.b,other.b,e)
+        return LinearExpression(m,self.x,b),e
+
+# print LinearExpression(3,'x',3).abstract(LinearExpression(2,'x',2),Environment())[1]
+# assert False
+                
 
 class Primitive():
     def pretty(self):
@@ -121,12 +161,25 @@ class Primitive():
 
     def cost(self): return 1
 
+    def abstract(self,other,e):
+        if isinstance(other,Primitive) and self.k == other.k:
+            arguments = []
+            for p,q in zip(self.arguments, other.arguments):
+                if isinstance(p,LinearExpression):
+                    assert isinstance(q,LinearExpression)
+                    a,e = p.abstract(q,e)
+                    arguments.append(a)
+                else: arguments.append(p)
+            return Primitive(self.k,arguments),e
+        raise AbstractionFailure('different primitives')
+
 
 class Reflection():
     def pretty(self):
-        return "reflect(%s){\n%s\n}"%(self.command,self.body.pretty())
-    def __init__(self, command, body):
-        self.command = command
+        return "reflect(%s = %s){\n%s\n}"%(self.axis,self.coordinate,self.body.pretty())
+    def __init__(self, axis, coordinate, body):
+        self.axis = axis
+        self.coordinate = coordinate
         self.body = body
     def hoistReflection(self):
         for j,p in enumerate(self.body.items):
@@ -134,28 +187,28 @@ class Reflection():
                 newBlock = list(self.body.items)
                 del newBlock[j]
                 newBlock = Block(newBlock)
-                yield Block([p,Reflection(self.command,newBlock)])
+                yield Block([p,Reflection(self.axis,self.coordinate,newBlock)])
                 
     def __str__(self):
-        return "Reflection(%s,%s)"%(self.command,self.body)
+        return "Reflection(%s,%s,%s)"%(self.axis, self.coordinate,self.body)
     def convertToPython(self):
-        return "%s(%s)"%(self.command, self.body.convertToPython())
+        return "reflect(%s = %s)(%s)"%(self.axis, self.coordinate, self.body.convertToPython())
     def extrapolations(self):
         for b in self.body.extrapolations():
-            yield Reflection(self.command, b)
+            yield Reflection(self.axis, self.coordinate, b)
     def explode(self):
-        return Reflection(self.command, self.body.explode())
+        return Reflection(self.axis, self.coordinate, self.body.explode())
     def features(self):
         return addFeatures([{'reflections':1,
-                             'reflectionsX':int('x' in self.command),
-                             'reflectionsY':int('y' in self.command)},
+                             'reflectionsX':int('x' == self.axis),
+                             'reflectionsY':int('y' == self.axis)},
                             self.body.features()])
     def rewrites(self):
         for b in self.body.rewrites():
-            yield Reflection(self.command,b)
+            yield Reflection(self.axis,self.coordinate,b)
 
     def mapExpression(self,l):
-        return Reflection(self.command, self.body.mapExpression(l))
+        return Reflection(self.axis, self.coordinate, self.body.mapExpression(l))
 
     def walk(self):
         yield self
@@ -164,6 +217,15 @@ class Reflection():
 
     def cost(self):
         return 1 + self.body.cost()
+
+    def abstract(self,other,e):
+        if not isinstance(other, Reflection): raise AbstractionFailure('abstracting a reflection with a not reflection')
+        if self.axis == other.axis: axis = self.axis
+        else: axis,e = e.makeVariableWithValue((self.axis,other.axis))
+        if self.coordinate == other.coordinate: coordinate = self.coordinate
+        else: coordinate,e = e.makeVariableWithValue((self.coordinate, other.coordinate))
+        body,e = self.body.abstract(other.body,e)
+        return Reflection(axis, coordinate, body),e
 
 
 class Loop():
@@ -274,6 +336,16 @@ class Loop():
             cost += self.boundary.cost()
         if self.bound.m == 0 and self.bound.b == 2: cost += 1
         return cost + 1
+
+    def abstract(self,other,e):
+        if not isinstance(other,Loop) or self.v != other.v or ((other.boundary == None) != (self.boundary == None)):
+            raise AbstractionFailure('Loop abstraction')
+        assert self.lowerBound == 0 and other.lowerBound == 0
+        bound,e = self.bound.abstract(other.bound,e)
+        body,e = self.body.abstract(other.body,e)
+        if self.boundary == None: boundary = None
+        else: boundary,e = self.boundary.abstract(other.boundary,e)
+        return Loop(self.v,bound, body, boundary),e        
 
                 
 class Block():
@@ -399,9 +471,26 @@ class Block():
         candidates = self.rewriteUpToDepth(d)
         scoredCandidates = [ (c.totalCost(),c) for c in candidates ]
         return min(scoredCandidates)
-    
-        
-    
+
+    def abstract(self,other,e):
+        assert isinstance(other,Block)
+        # We need to try removing stuff from the blocks to make them the same length.
+        # For each way of removing stuff to make than the same length,
+        # we have to consider every permutation of the block elements.
+        # This is only efficient as long as the block bodies are small,
+        # which holds in practice.
+        for l in range(min(len(self.items),len(other.items)),0,-1):
+            for p in iterationTools.combinations(self.items,l):
+                for q in iterationTools.permutations(other.items,l):
+                    try:
+                        e_ = e
+                        items = []
+                        for x,y in zip(p,q):
+                            a,e_ = x.abstract(y)
+                            items.append(a)
+                        return Block(items),e_
+                    except AbstractionFailure: pass
+        raise AbstractionFailure    
                         
             
 
@@ -542,9 +631,9 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
             j = bodyIndex
             x = int(m.group(1))
             y = int(m.group(2))
-            k = 'reflect(%s = %d)'%('x' if y == 0 else 'y',
-                                    max([x,y]))
-            commands += [Reflection(k,
+            axis = 'x' if y == 0 else 'y'
+            coordinate = max([x,y])
+            commands += [Reflection(axis, coordinate,
                                     parseSketchOutput(body, environment, loopDepth, coefficients))]
 
         j += 1

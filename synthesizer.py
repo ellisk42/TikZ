@@ -458,6 +458,29 @@ def rankUsingPrograms():
             
             
     print programAccuracy,"vs",oldAccuracy
+
+def induceAbstractions():
+    results = pickle.load(open(arguments.name,'rb'))
+    print " [+] Loaded %d synthesis results from %s."%(len(results),arguments.name)
+
+    def getProgram(index):
+        for r in results:
+            if r.originalDrawing == 'drawings/expert-%d.png'%index:
+                return parseSketchOutput(r.source)
+        return None
+
+    for i in range(99):
+        p1 = getProgramForParse(i)
+        print "Trying to induce abstractions using:"
+        print p1.pretty()
+        for j in range(i+1,100):
+            p2 = getProgramForParse(j)
+            try:
+                a,_ = p1.abstract(p2,Environment())
+                print "SUCCESS:"
+                print p2.pretty()
+                print a
+            except AbstractionFailure: pass
             
         
                                     
@@ -477,6 +500,7 @@ if __name__ == '__main__':
     parser.add_argument('--similarity', default = False, action = 'store_true')
     parser.add_argument('--learnToRank', default = None, type = int)
     parser.add_argument('--incremental', default = False, action = 'store_true')
+    parser.add_argument('--abstract', default = False, action = 'store_true')
 
     arguments = parser.parse_args()
 
@@ -484,6 +508,8 @@ if __name__ == '__main__':
         viewSynthesisResults(arguments)
     elif arguments.learnToRank != None:
         rankUsingPrograms()
+    elif arguments.abstract:
+        induceAbstractions()
     elif arguments.synthesizeTopK != None:
         synthesizeTopK(arguments.synthesizeTopK)
     elif arguments.file != None:
