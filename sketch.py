@@ -78,12 +78,12 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
                                   for a in xValidation
                                   for b in xValidation
                                   if a != b])
-    coefficientValidator1 = " || ".join([ "c == %d"%c for c in coefficientValidator1 ])
+    coefficientValidator1 = " || ".join([ "c == %d"%c for c in coefficientValidator1 ] + ['1'])
     coefficientValidator2 = set([ a - b
                                   for a in yValidation
                                   for b in yValidation
                                   if a != b])
-    coefficientValidator2 = " || ".join([ "c == %d"%c for c in coefficientValidator2 ])
+    coefficientValidator2 = " || ".join([ "c == %d"%c for c in coefficientValidator2 ] + ['1'])
 
     xValidation = " || ".join([ "x == %d"%x for x in set(xValidation) ])
     yValidation = " || ".join([ "x == %d"%x for x in set(yValidation) ])

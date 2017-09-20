@@ -81,7 +81,7 @@ class SynthesisJob():
                                               usedReflections = usedReflections)
             if jobResults[k] == None:
                 return SynthesisResult(parse = self.parse,
-                                       time = elapsedTime,
+                                       time = time.time() - startTime,
                                        originalDrawing = self.originalDrawing,
                                        source = [ s for _,s in jobResults.values() ],
                                        program = None,
