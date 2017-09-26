@@ -240,6 +240,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   }
   bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost,1);
 #ifdef USEPRIOR
+  assert cost <= COSTUPPERBOUND;
   minimize(3*cost +
 	   (numberOfCoefficients1 + PROVIDEDXCOEFFICIENTS > 1 ? numberOfCoefficients1 - 1 : 0) +
 	   (numberOfCoefficients2 + PROVIDEDYCOEFFICIENTS > 1 ? numberOfCoefficients2 - 1 : 0));

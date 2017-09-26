@@ -119,6 +119,8 @@ pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-in
 #define HASNOARROW %d
 #define NODIAGONALS %d
 
+#define COSTUPPERBOUND %d
+
 #include "common.skh"
 bit renderSpecification(SHAPEVARIABLES) {
   assume shapeIdentity == CIRCLE || shapeIdentity == LINE || shapeIdentity == RECTANGLE;
@@ -145,6 +147,7 @@ bit renderSpecification(SHAPEVARIABLES) {
      (True in solid),(False in solid),
      (True in arrows),(False in arrows),
      int(noDiagonals),
+     len(parse.lines),
      " || ".join(parts))
 
     print source
