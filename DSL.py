@@ -79,7 +79,7 @@ def addFeatures(fs):
 
 class AbstractionVariable():
     def __init__(self,v): self.v = v
-    def __eq__(self,o): return self.v == o.v
+    def __eq__(self,o): return isinstance(o,AbstractionVariable) and self.v == o.v
     def __str__(self): return "__v__(%d)"%(self.v)
 class Environment():
     def __init__(self,b = []): self.bindings = b
@@ -110,6 +110,12 @@ class LinearExpression():
     def __str__(self):
         if self.x == None: return str(self.b)
         return '(%s*%s + %s)'%(self.m,self.x,self.b)
+    def pretty(self):
+        if self.m == 0: return str(self.b)
+        if self.b == 0:
+            return "%s * %s"%(self.m,self.x)
+        else:
+            return "%s * %s + %s"%(self.m,self.x,self.b)
     def __eq__(self,o): return isinstance(o,LinearExpression) and self.m == o.m and self.x == o.x and self.b == o.b
 
     def abstract(self,other,e):
@@ -125,13 +131,12 @@ class LinearExpression():
         b,e = abstractNumber(self.b,other.b,e)
         return LinearExpression(m,self.x,b),e
 
-# print LinearExpression(3,'x',3).abstract(LinearExpression(2,'x',2),Environment())[1]
-# assert False
                 
 
 class Primitive():
     def pretty(self):
-        p = '%s(%s)'%(self.k,",".join(map(str,self.arguments)))
+        p = '%s(%s)'%(self.k,",".join([ (a if isinstance(a,str) else a.pretty())
+                                        for a in self.arguments]))
         return p.replace(',arrow',',\narrow')
     def __init__(self, k, *arguments):
         self.k = k
@@ -170,7 +175,7 @@ class Primitive():
                     a,e = p.abstract(q,e)
                     arguments.append(a)
                 else: arguments.append(p)
-            return Primitive(self.k,arguments),e
+            return Primitive(self.k,*arguments),e
         raise AbstractionFailure('different primitives')
 
 
@@ -486,7 +491,7 @@ class Block():
                         e_ = e
                         items = []
                         for x,y in zip(p,q):
-                            a,e_ = x.abstract(y)
+                            a,e_ = x.abstract(y,e_)
                             items.append(a)
                         return Block(items),e_
                     except AbstractionFailure: pass

@@ -11,7 +11,8 @@ from language import *
 def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       xCoefficients = [],
                       yCoefficients = [],
-                      usedReflections = []):
+                      usedReflections = [],
+                      CPUs = 1):
     parts = []
     hasCircles = False
     hasRectangles = False
@@ -157,7 +158,12 @@ bit renderSpecification(SHAPEVARIABLES) {
     od.close()
     outputFile = od.name
 
-    os.system('sketch --fe-timeout 180 -V 10 %s 2> %s > %s'%(fd.name, outputFile, outputFile))
+    degreeOfParallelism = ''
+    if CPUs != 1:
+        degreeOfParallelism = '--slv-parallel --slv-p-cpus %d'%CPUs
+
+    os.system('sketch %s --fe-timeout 180 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
+                                                                fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
     os.remove(fd.name)

@@ -78,7 +78,8 @@ class SynthesisJob():
                                               entireParse = self.parse,
                                               xCoefficients = xCoefficients,
                                               yCoefficients = yCoefficients,
-                                              usedReflections = usedReflections)
+                                              usedReflections = usedReflections,
+                                              CPUs = arguments.cores)
             if jobResults[k] == None:
                 return SynthesisResult(parse = self.parse,
                                        time = time.time() - startTime,
@@ -474,21 +475,33 @@ def induceAbstractions():
     def getProgram(index):
         for r in results:
             if r.originalDrawing == 'drawings/expert-%d.png'%index:
+                if r.source == None: return None
                 return parseSketchOutput(r.source)
         return None
 
-    for i in range(99):
-        p1 = getProgramForParse(i)
+    abstractions = []
+    for i in range(100):
+        p1 = getProgram(i)
+        if p1 == None:
+            print "No synthesis result for %d"%i
+            continue
+        
         print "Trying to induce abstractions using:"
         print p1.pretty()
         for j in range(i+1,100):
-            p2 = getProgramForParse(j)
+            p2 = getProgram(j)
+            if p2 == None: continue
+            
             try:
                 a,_ = p1.abstract(p2,Environment())
                 print "SUCCESS:"
                 print p2.pretty()
-                print a
+                print a.pretty()
+                abstractions.append(a)
             except AbstractionFailure: pass
+    for a in abstractions:
+        print a.pretty()
+        print 
             
         
                                     
