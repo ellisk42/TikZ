@@ -79,7 +79,7 @@ class SynthesisJob():
                                               xCoefficients = xCoefficients,
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections,
-                                              CPUs = arguments.cores)
+                                              CPUs = arguments.parallelSolving)
             if jobResults[k] == None:
                 return SynthesisResult(parse = self.parse,
                                        time = time.time() - startTime,
@@ -510,6 +510,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
     parser.add_argument('-f', '--file', default = None)
     parser.add_argument('-m', '--cores', default = 1, type = int)
+    parser.add_argument('--parallelSolving', default = 1, type = int)
     parser.add_argument('-n', '--name', default = "groundTruthSynthesisResults.p", type = str)
     parser.add_argument('-v', '--view', default = False, action = 'store_true')
     parser.add_argument('--latex', default = False, action = 'store_true')
