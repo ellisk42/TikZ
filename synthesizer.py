@@ -66,12 +66,16 @@ class SynthesisJob():
                 jobs['Line%s%s'%(l.solid,l.arrow)] = jobs.get('Line%s%s'%(l.solid,l.arrow),[]) + [l]
             else: assert False
 
+        # Heuristic: try to solve the "big enough" problems first
+        # Break ties by absolute size
+        jobOrdering = sorted(jobs.keys(),key = lambda stuff: (len(stuff) < 3,len(stuff)))
+
         jobResults = {}
         startTime = time.time()
         xCoefficients = set([])
         yCoefficients = set([])
         usedReflections = set([])
-        for k in jobs:
+        for k in jobOrdering:
             print "Synthesizing for:\n",Sequence(jobs[k])
             jobResults[k] = synthesizeProgram(Sequence(jobs[k]),
                                               self.usePrior,
