@@ -9,6 +9,9 @@ import tensorflow as tf
 
 def NIPSPRIMITIVES(): return True
 
+def log2(x):
+    return math.log(x)/math.log(2)
+
 def image2array(p):
     p = p.convert('L')
     (w,h) = p.size

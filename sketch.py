@@ -1,3 +1,4 @@
+from utilities import log2
 from math import ceil,log
 import re
 import numpy as np
@@ -7,6 +8,28 @@ import os
 import tempfile
 
 from language import *
+
+def possibleCoefficients(parse):
+    x = []
+    y = []
+    for p in parse.lines[:-1]:
+        for q in parse.lines[1:]:
+            if p == q: continue
+            if isinstance(p,Circle) and isinstance(q,Circle):
+                x.append(p.center.x - q.center.x)
+                y.append(p.center.y - q.center.y)
+            if isinstance(p,Rectangle) and isinstance(q,Rectangle):
+                x.append(p.p1.x - q.p1.x)
+                x.append(p.p2.x - q.p2.x)
+                y.append(p.p1.y - q.p1.y)
+                y.append(p.p2.y - q.p2.y)
+            if isinstance(p,Line) and isinstance(q,Line):
+                if p.solid != q.solid or p.arrow != q.arrow: continue
+                x.append(p.points[0].x - q.points[0].x)
+                x.append(p.points[1].x - q.points[1].x)
+                y.append(p.points[0].y - q.points[0].y)
+                y.append(p.points[1].y - q.points[1].y)
+    return set(x) - set([0]),set(y) - set([0])
 
 def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       xCoefficients = [],
@@ -75,16 +98,11 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
     coefficientGenerator2 = ''
     for c in yCoefficients: coefficientGenerator2 = '| ' + str(c)
 
-    coefficientValidator1 = set([ a - b
-                                  for a in xValidation
-                                  for b in xValidation
-                                  if a != b])
-    coefficientValidator1 = " || ".join([ "c == %d"%c for c in coefficientValidator1 ] + ['1'])
-    coefficientValidator2 = set([ a - b
-                                  for a in yValidation
-                                  for b in yValidation
-                                  if a != b])
-    coefficientValidator2 = " || ".join([ "c == %d"%c for c in coefficientValidator2 ] + ['1'])
+    coefficientValidator1,coefficientValidator2 = possibleCoefficients(parse)
+    coefficientValidator1 = " || ".join([ "c == %d"%c for c in coefficientValidator1 ])
+    if len(coefficientValidator1) == 0: coefficientValidator1 = 'numberOfCoefficients1 == 0'
+    coefficientValidator2 = " || ".join([ "c == %d"%c for c in coefficientValidator2 ])
+    if len(coefficientValidator2) == 0: coefficientValidator2 = 'numberOfCoefficients2 == 0'
 
     xValidation = " || ".join([ "x == %d"%x for x in set(xValidation) ])
     yValidation = " || ".join([ "x == %d"%x for x in set(yValidation) ])
@@ -92,7 +110,8 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
     haveThisReflectionAlready = " || ".join([ "(xr == %d && yr == %d)"%(xr,yr)
                                               for xr,yr in usedReflections ] + ['0'])
 
-    upperBoundOnLoss = ' --bnd-mbits %d'%(min(5,int(ceil(log(3*len(parse.lines))/log(2)))))
+    smallestPossibleLoss = 3*len(parse.lines) + 1
+    upperBoundOnLoss = ' --bnd-mbits %d'%(min(5,int(ceil(log2(smallestPossibleLoss + 1)))))
     
     source = '''
 pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d %s";

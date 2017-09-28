@@ -88,6 +88,7 @@ class SynthesisJob():
                                               CPUs = arguments.parallelSolving)
             if jobResults[k] == None:
                 print " [-] Incremental synthesis failure: %s"%self.originalDrawing
+                del jobResults[k]
                 return SynthesisResult(parse = self.parse,
                                        time = time.time() - startTime,
                                        originalDrawing = self.originalDrawing,
