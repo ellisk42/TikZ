@@ -477,9 +477,9 @@ class Block():
                         del newItems[k]
                         yield Block(newItems)
                 if isinstance(x,Reflection) and isinstance(y,Reflection):
-                    if x.command == y.command:
+                    if (x.axis,x.coordinate) == (y.axis,y.coordinate):
                         newItems = list(self.items)
-                        newItems[j] = Reflection(x.command, Block(x.body.items + y.body.items))
+                        newItems[j] = Reflection(x.axis, x.coordinate, Block(x.body.items + y.body.items))
                         del newItems[k]
                         yield Block(newItems)
 
@@ -509,11 +509,10 @@ class Block():
         ys = []
         for child in self.walk():
             if isinstance(child,Reflection):
-                a = int(''.join([ c for c in child.command if c in map(str,range(10)) ]))
-                if 'x' in child.command:
-                    xs.append(a)
+                if 'x' == child.axis:
+                    xs.append(child.coordinate)
                 else:
-                    ys.append(a)
+                    ys.append(child.coordinate)
         return set(xs),set(ys)
 
     def cost(self): return sum([x.cost() for x in self.items ])

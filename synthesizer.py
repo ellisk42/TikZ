@@ -17,6 +17,8 @@ import argparse
 import pickle
 import time
 from multiprocessing import Pool
+import matplotlib.pyplot as plot
+
 
 class SynthesisResult():
     def __init__(self, parse, time = None, source = None, program = None, cost = None, originalDrawing = None, usePrior = True):
@@ -85,6 +87,7 @@ class SynthesisJob():
                                               usedReflections = usedReflections,
                                               CPUs = arguments.parallelSolving)
             if jobResults[k] == None:
+                print " [-] Incremental synthesis failure: %s"%self.originalDrawing
                 return SynthesisResult(parse = self.parse,
                                        time = time.time() - startTime,
                                        originalDrawing = self.originalDrawing,
@@ -528,7 +531,28 @@ def induceAbstractions():
     saveMatrixAsImage(255*np.concatenate(abstractionMatrix,axis = 0),'abstractions.png')
             
         
-                                    
+def analyzeSynthesisTime():
+    results = pickle.load(open(arguments.name,'rb'))
+    print " [+] Loaded %d synthesis results from %s."%(len(results),arguments.name)
+    times = []
+    traceSizes = []
+    programSizes = []
+    for r in results:
+        if isinstance(r.time,list): times.append(sum(r.time))
+        else: times.append(r.time)
+        traceSizes.append(len(r.parse.lines))
+        programSizes.append(r.cost)
+
+    plot.scatter([c for c,t in zip(programSizes,times) if programSizes ],
+                 [t for c,t in zip(programSizes,times) if programSizes ])
+    plot.xlabel('program cost')
+    plot.ylabel('synthesis time in seconds')
+    plot.show()
+
+    plot.scatter(traceSizes,times)
+    plot.xlabel('# of primitives in image')
+    plot.ylabel('synthesis time in seconds')
+    plot.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Synthesis of high-level code from low-level parses')
@@ -547,11 +571,14 @@ if __name__ == '__main__':
     parser.add_argument('--learnToRank', default = None, type = int)
     parser.add_argument('--incremental', default = False, action = 'store_true')
     parser.add_argument('--abstract', default = False, action = 'store_true')
+    parser.add_argument('--analyzeSynthesisTime', action = 'store_true')
 
     arguments = parser.parse_args()
 
     if arguments.view:
         viewSynthesisResults(arguments)
+    elif arguments.analyzeSynthesisTime:
+        analyzeSynthesisTime()
     elif arguments.learnToRank != None:
         rankUsingPrograms()
     elif arguments.abstract:
