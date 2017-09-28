@@ -493,15 +493,35 @@ def induceAbstractions():
             if p2 == None: continue
             
             try:
-                a,_ = p1.abstract(p2,Environment())
+                a,e = p1.abstract(p2,Environment())
                 print "SUCCESS:"
                 print p2.pretty()
                 print a.pretty()
-                abstractions.append(a)
+                abstractions.append((i,j,a,e))
             except AbstractionFailure: pass
-    for a in abstractions:
-        print a.pretty()
-        print 
+    abstractionMatrix = []
+    for i,j,a,e in abstractions:
+        p = a.pretty()
+        if 'for ' in p:
+            print p,"\n"
+            samples = []
+            desiredNumberOfSamples = 20
+            samplingAttempts = 0
+            while len(samples) < desiredNumberOfSamples and samplingAttempts < 10000:
+                samplingAttempts += 1
+                concrete = a.substitute(e.randomInstantiation()).convertToSequence()
+                if not concrete.hasCollisions() or samplingAttempts > 9000:
+                    (x0,y0,_,_) = concrete.extent()
+                    concrete = concrete.translate(-x0 + 1,-y0 + 1)
+                    try:
+                        samples.append(concrete.draw())
+                    except ZeroDivisionError: pass
+            samples += [np.zeros((256,256)) + 0.5]*(desiredNumberOfSamples - len(samples))
+            samples = [1 - loadExpert(i),1 - loadExpert(j)] + samples
+            #showImage(np.concatenate(samples,axis = 1))
+            abstractionMatrix.append(np.concatenate(samples,axis = 1))
+    #.showImage(np.concatenate(abstractionMatrix,axis = 0),)
+    saveMatrixAsImage(255*np.concatenate(abstractionMatrix,axis = 0),'abstractions.png')
             
         
                                     

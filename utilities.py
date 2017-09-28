@@ -28,6 +28,9 @@ def loadImages(ns): return map(lambda n: loadImage(n),ns)
 
 def cacheImage(n,content): IMAGEBYTES[n] = content
 
+def loadExpert(n):
+    return loadImage("drawings/expert-%d.png"%n)
+
 def showImage(image):
     import matplotlib.pyplot as plot
     if len(image.shape) == 2:

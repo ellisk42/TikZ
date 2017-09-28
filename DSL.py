@@ -5,6 +5,8 @@ from render import render
 
 import re
 import itertools as iterationTools
+import numpy as np
+import random
 
 def reflectPoint(rx,ry,px,py):
     if rx != None: return (rx - px,py)
@@ -83,7 +85,7 @@ class AbstractionVariable():
     def __str__(self): return "__v__(%d)"%(self.v)
 class Environment():
     def __init__(self,b = []): self.bindings = b
-    def lookup(x):
+    def lookup(self,x):
         for k,v in self.bindings:
             if k == x: return v
         return None
@@ -97,6 +99,32 @@ class Environment():
             if v == z: return k,self
         e,v = self.extend(z)
         return v,e
+    def getTypes(self):
+        t = []
+        for _,(x,y) in self.bindings:
+            if isinstance(x,int):
+                assert isinstance(y,int)
+                t.append(int)
+            elif x in ['x','y']:
+                assert y in ['x','y']
+                t.append(str)
+        return t
+    def randomInstantiation(self):
+        b = []
+        for v,(x,y) in self.bindings:
+            if isinstance(x,int):
+                assert isinstance(y,int)
+                average = (x + y)/2.0
+                standardDeviation = (((x - average)**2 + (y - average)**2)/2.0)**(0.5)
+                z = int(np.random.normal(loc = average,
+                                         scale = standardDeviation))
+                if z == 0 and x != 0 and y != 0:
+                    z = random.choice([-1,1])                
+                b.append((v,z))
+            elif x in ['x','y']:
+                assert y in ['x','y']
+                b.append((v,random.choice(['x','y'])))
+        return Environment(b)
 class AbstractionFailure(Exception):
     pass
 
@@ -130,6 +158,13 @@ class LinearExpression():
         m,e = abstractNumber(self.m,other.m,e)
         b,e = abstractNumber(self.b,other.b,e)
         return LinearExpression(m,self.x,b),e
+
+    def substitute(self,e):
+        m = e.lookup(self.m)
+        if m == None: m = self.m
+        b = e.lookup(self.b)
+        if b == None: b = self.b
+        return LinearExpression(m,self.x,b)
 
                 
 
@@ -177,6 +212,9 @@ class Primitive():
                 else: arguments.append(p)
             return Primitive(self.k,*arguments),e
         raise AbstractionFailure('different primitives')
+
+    def substitute(self,e):
+        return Primitive(self.k, *[ (a.substitute(e) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
 
 
 class Reflection():
@@ -231,6 +269,13 @@ class Reflection():
         else: coordinate,e = e.makeVariableWithValue((self.coordinate, other.coordinate))
         body,e = self.body.abstract(other.body,e)
         return Reflection(axis, coordinate, body),e
+
+    def substitute(self,e):
+        axis = e.lookup(self.axis)
+        if axis == None: axis = self.axis
+        coordinate = e.lookup(self.coordinate)
+        if coordinate == None: coordinate = self.coordinate
+        return Reflection(axis, coordinate, self.body.substitute(e))
 
 
 class Loop():
@@ -350,7 +395,14 @@ class Loop():
         body,e = self.body.abstract(other.body,e)
         if self.boundary == None: boundary = None
         else: boundary,e = self.boundary.abstract(other.boundary,e)
-        return Loop(self.v,bound, body, boundary),e        
+        return Loop(self.v,bound, body, boundary),e
+
+    def substitute(self,e):
+        return Loop(self.v,
+                    self.bound.substitute(e),
+                    self.body.substitute(e),
+                    None if self.boundary == None else self.boundary.substitute(e),
+                    self.lowerBound)
 
                 
 class Block():
@@ -495,7 +547,11 @@ class Block():
                             items.append(a)
                         return Block(items),e_
                     except AbstractionFailure: pass
-        raise AbstractionFailure    
+        raise AbstractionFailure
+
+    def substitute(self,e):
+        return Block([x.substitute(e) for x in self.items ])
+            
                         
             
 
