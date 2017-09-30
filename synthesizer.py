@@ -18,7 +18,7 @@ import pickle
 import time
 from multiprocessing import Pool
 import matplotlib.pyplot as plot
-
+import sys
 
 class SynthesisResult():
     def __init__(self, parse, time = None, source = None, program = None, cost = None, originalDrawing = None, usePrior = True):
@@ -30,7 +30,7 @@ class SynthesisResult():
         self.source = source
         self.cost = cost
     def __str__(self):
-        return self.source
+        return "<results for %s>"%(self.originalDrawing)
     def usedPrior(self):
         if hasattr(self,'usePrior'): return self.usePrior
         return True
@@ -106,10 +106,16 @@ class SynthesisJob():
         elapsedTime = time.time() - startTime
 
         print "Optimizing using rewrites..."
-        gluedTogether = Block([ x for _,result in jobResults.values()
-                                for x in parseSketchOutput(result).items ])
-        optimalCost,optimalProgram = gluedTogether.optimizeUsingRewrites()
-        print optimalProgram.pretty()
+        try:
+            gluedTogether = Block([ x for _,result in jobResults.values()
+                                    for x in parseSketchOutput(result).items ])
+            optimalCost,optimalProgram = gluedTogether.optimizeUsingRewrites()
+            print optimalProgram.pretty()
+        except:
+            e = sys.exc_info()[0]
+            print " [-] Problem parsing or optimizing %s: %s"%(self.originalDrawing,e)
+            optimalProgram = None
+            optimalCost = None
 
         return SynthesisResult(parse = self.parse,
                                time = elapsedTime,
@@ -539,20 +545,28 @@ def analyzeSynthesisTime():
     traceSizes = []
     programSizes = []
     for r in results:
+        if not hasattr(r,'time'):
+            print "missing time attribute...",r,r.__class__.__name__
+            continue
+        
         if isinstance(r.time,list): times.append(sum(r.time))
         else: times.append(r.time)
         traceSizes.append(len(r.parse.lines))
         programSizes.append(r.cost)
 
+    plot.subplot(211)
+    plot.title(arguments.name)
     plot.scatter([c for c,t in zip(programSizes,times) if programSizes ],
                  [t for c,t in zip(programSizes,times) if programSizes ])
     plot.xlabel('program cost')
     plot.ylabel('synthesis time in seconds')
-    plot.show()
+    plot.gca().set_yscale('log')
 
+    plot.subplot(212)
     plot.scatter(traceSizes,times)
     plot.xlabel('# of primitives in image')
     plot.ylabel('synthesis time in seconds')
+    plot.gca().set_yscale('log')
     plot.show()
 
 if __name__ == '__main__':
@@ -591,8 +605,11 @@ if __name__ == '__main__':
             j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'',
                              usePrior = not arguments.noPrior)
             print j
-            s = j.executeForEachPrimitive()
-            #print s
+            if arguments.incremental:
+                s = j.executeForEachPrimitive()
+            else:
+                s = j.execute()
+                #print s
             print "\n".join([ str(parseSketchOutput(o)) for o in s.source ])
             print s.time
         else:
