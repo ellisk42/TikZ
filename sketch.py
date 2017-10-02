@@ -35,7 +35,10 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       xCoefficients = [],
                       yCoefficients = [],
                       usedReflections = [],
+                      usedLoops = [],
                       CPUs = 1):
+    ''' usedLoops: [{depth, coefficient, variable, intercept}]'''
+    
     parts = []
     hasCircles = False
     hasRectangles = False
@@ -110,6 +113,16 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
     haveThisReflectionAlready = " || ".join([ "(xr == %d && yr == %d)"%(xr,yr)
                                               for xr,yr in usedReflections ] + ['0'])
 
+    alreadyProvidedBounds = ''
+    for bound in usedLoops:
+        returnValue = str(bound['intercept'])
+        if bound['coefficient'] != None and bound['coefficient'] != 0:
+            returnValue += ' + %s*environment[%d]'%(bound['coefficient'],bound['variable'])
+        alreadyProvidedBounds += ' if (n == %d && ??) { already_have_this_loop = 1; return %s; }'%(bound['depth'],
+                                                                                             returnValue)
+    print "alreadyProvidedBounds:"
+    print alreadyProvidedBounds
+
     smallestPossibleLoss = 3*len(parse.lines) + 1
     upperBoundOnLoss = ' --bnd-mbits %d'%(min(5,int(ceil(log2(smallestPossibleLoss + 1)))))
     
@@ -117,6 +130,7 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
 pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d %s";
 
 %s    
+#define ALREADYPROVIDEDBOUNDS %s
 #define HAVETHISREFLECTIONALREADY %s
 #define XCOEFFICIENTS %s
 #define YCOEFFICIENTS %s
@@ -156,6 +170,7 @@ bit renderSpecification(SHAPEVARIABLES) {
 }
 '''%(biggestNumber, upperBoundOnLoss,
      ('#define USEPRIOR' if usePrior else ''),
+     alreadyProvidedBounds,
      haveThisReflectionAlready,
      coefficientGenerator1, coefficientGenerator2,
      len(xCoefficients), len(yCoefficients),

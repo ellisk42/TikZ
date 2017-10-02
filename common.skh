@@ -49,7 +49,12 @@ generator int y_expression([int n,int m], int[n] environment, int[m] coefficient
   return {| coefficients[0] | coefficients[1] YCOEFFICIENTS |} * {| environment[0] | environment[1] |} + number();
 }
 
-generator int bound_expression([int n], int[n] environment, ref int cost) {
+generator int bound_expression([int n], int[n] environment, ref int cost, ref bit already_have_this_loop) {
+  already_have_this_loop = 0;
+  // Use an already provided bound expression
+#ifdef ALREADYPROVIDEDBOUNDS
+  ALREADYPROVIDEDBOUNDS
+#endif
   cost = 0;
   if (??) {
     int b = ??;
@@ -99,7 +104,8 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
   identity = LOOP;
     
   int loop_bound_cost = 0,loop_body_cost,boundary_cost = 0;
-  int loop_bound = bound_expression(environment, loop_bound_cost);
+  bit already_have_this_loop = 0;
+  int loop_bound = bound_expression(environment, loop_bound_cost, already_have_this_loop);
   for (int j = 0; j < loop_bound; j++) {
     assert j < MAXIMUMLOOPITERATIONS;
     if (j > 0 && ({| environment[0] | 1 |} > 0) && ??){
@@ -111,7 +117,7 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
     hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, loop_body_cost, 1);
   }
   assert loop_body_cost != 0;
-  cost = loop_body_cost + loop_bound_cost + boundary_cost + 1;
+  cost = loop_body_cost + loop_bound_cost + boundary_cost + (already_have_this_loop? 0 : 1);
   return hit;
 }
 

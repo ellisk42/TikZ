@@ -673,6 +673,14 @@ class Sequence(Program):
         return any([ (j > k and l.intersects(lp))
                       for j,l in enumerate(self.lines)
                       for k,lp in enumerate(self.lines) ])
+    def haveUnattachedLines(self):
+        linePoints = set([(p.x,p.y) for l in self.lines
+                      if isinstance(l,Line)
+                      for p in l.points])
+        attachmentPoints = set([(x,y) for l in self.lines
+                            if not isinstance(l,Line)
+                            for (x,y,_) in l.attachmentPoints() ])
+        return len(linePoints - attachmentPoints) > 0
 
     def __hash__(self): return hash(str(self))
     def __len__(self): return len(self.lines)

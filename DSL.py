@@ -99,6 +99,10 @@ class Environment():
             if v == z: return k,self
         e,v = self.extend(z)
         return v,e
+    def abstractConstant(self,n,m):
+        if n == m: return (m,self)
+        return self.makeVariableWithValue((n,m))
+        
     def getTypes(self):
         t = []
         for _,(x,y) in self.bindings:
@@ -125,6 +129,11 @@ class Environment():
                 assert y in ['x','y']
                 b.append((v,random.choice(['x','y'])))
         return Environment(b)
+    def firstInstantiation(self):
+        return Environment([(v,x) for v,(x,y) in self.bindings ])
+    def secondInstantiation(self):
+        return Environment([(v,y) for v,(x,y) in self.bindings ])
+    
 class AbstractionFailure(Exception):
     pass
 
@@ -165,6 +174,28 @@ class LinearExpression():
         b = e.lookup(self.b)
         if b == None: b = self.b
         return LinearExpression(m,self.x,b)
+
+class RelativeExpression():
+    orientations = {'n':'North',
+                    'w':'West',
+                    'e':'East',
+                    's':'South'}
+    def __init__(self, index, orientation):
+        self.index = index
+        assert orientation in RelativeExpression.orientations.keys()
+        self.orientation = orientation
+    def __str__(self):
+        return '%s(%d)'%(RelativeExpression.orientations[self.orientation],self.index)
+    def pretty(self): return str(self)
+    def __eq__(self,o):
+        return isinstance(o,RelativeExpression) and o.index == self.index and o.orientation == self.orientation
+    def abstract(self,other,e):
+        index,e = e.abstractConstant(self.index, other.index)
+        orientation,e = e.abstractConstant(self.orientation, other.orientation)
+        return RelativeExpression(index, orientation),e
+
+    def substitute(self,e):
+        raise Exception('not implemented: relative expression substitution')
 
                 
 
@@ -550,6 +581,14 @@ class Block():
 
     def substitute(self,e):
         return Block([x.substitute(e) for x in self.items ])
+
+    def usedLoops(self):
+        for x in self.walk():
+            if isinstance(x,Loop):
+                yield {'depth': {'i':0,'j':1}[x.v],
+                       'coefficient': x.bound.m,
+                       'variable': {'i':0,'j':1,None:None}[x.bound.x],
+                       'intercept': x.bound.b}
             
                         
             

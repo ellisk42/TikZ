@@ -77,6 +77,7 @@ class SynthesisJob():
         xCoefficients = set([])
         yCoefficients = set([])
         usedReflections = set([])
+        usedLoops = []
         for k in jobOrdering:
             print "Synthesizing for:\n",Sequence(jobs[k])
             jobResults[k] = synthesizeProgram(Sequence(jobs[k]),
@@ -85,6 +86,7 @@ class SynthesisJob():
                                               xCoefficients = xCoefficients,
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections,
+                                              usedLoops = usedLoops,
                                               CPUs = arguments.parallelSolving)
             if jobResults[k] == None:
                 print " [-] Incremental synthesis failure: %s"%self.originalDrawing
@@ -103,6 +105,8 @@ class SynthesisJob():
             xr,yr = parsedOutput.usedReflections()
             usedReflections = usedReflections|set([(x,0) for x in xr ])
             usedReflections = usedReflections|set([(0,x) for x in yr ])
+            usedLoops += list(parsedOutput.usedLoops())
+            usedLoops = removeDuplicateStrings(usedLoops)
         elapsedTime = time.time() - startTime
 
         print "Optimizing using rewrites..."
@@ -518,13 +522,18 @@ def induceAbstractions():
         p = a.pretty()
         if 'for ' in p:
             print p,"\n"
+            firstProgram = a.substitute(e.firstInstantiation()).convertToSequence()
+            secondProgram = a.substitute(e.secondInstantiation()).convertToSequence()
+            allowUnattached = firstProgram.haveUnattachedLines() or secondProgram.haveUnattachedLines()
             samples = []
             desiredNumberOfSamples = 20
             samplingAttempts = 0
             while len(samples) < desiredNumberOfSamples and samplingAttempts < 10000:
                 samplingAttempts += 1
                 concrete = a.substitute(e.randomInstantiation()).convertToSequence()
-                if not concrete.hasCollisions() or samplingAttempts > 9000:
+                if (not concrete.hasCollisions()\
+                    and (allowUnattached or (not concrete.haveUnattachedLines())))\
+                    or samplingAttempts > 90000:
                     (x0,y0,_,_) = concrete.extent()
                     concrete = concrete.translate(-x0 + 1,-y0 + 1)
                     try:
@@ -532,7 +541,13 @@ def induceAbstractions():
                     except ZeroDivisionError: pass
             samples += [np.zeros((256,256)) + 0.5]*(desiredNumberOfSamples - len(samples))
             samples = [1 - loadExpert(i),1 - loadExpert(j)] + samples
-            #showImage(np.concatenate(samples,axis = 1))
+            print firstProgram
+            print firstProgram.haveUnattachedLines()
+            print i
+            print secondProgram
+            print secondProgram.haveUnattachedLines()
+            print j
+            showImage(np.concatenate([firstProgram.draw(),secondProgram.draw()],axis = 1))
             abstractionMatrix.append(np.concatenate(samples,axis = 1))
     #.showImage(np.concatenate(abstractionMatrix,axis = 0),)
     saveMatrixAsImage(255*np.concatenate(abstractionMatrix,axis = 0),'abstractions.png')
@@ -553,6 +568,9 @@ def analyzeSynthesisTime():
         else: times.append(r.time)
         traceSizes.append(len(r.parse.lines))
         programSizes.append(r.cost)
+
+    successfulResults = set([r.originalDrawing for r in results if hasattr(r,'time') ])
+    print set(['drawings/expert-%d.png'%j for j in range(100) ]) - successfulResults
 
     plot.subplot(211)
     plot.title(arguments.name)

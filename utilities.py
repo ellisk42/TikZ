@@ -227,3 +227,8 @@ def integrateNormalDensity(lb,ub,mu = 0,sigma = 1):
     lessThanLower = norm.logcdf(lb,loc = mu,scale = sigma)
     #print lessThanUpper,lessThanLower,lessThanUpper-lessThanLower,1 - math.exp(lessThanLower - lessThanUpper)
     return lessThanUpper + np.log1p(-math.exp(lessThanLower - lessThanUpper))
+
+def removeDuplicateStrings(xs):
+    t = {}
+    for x in xs: t[str(x)] = x
+    return t.values()

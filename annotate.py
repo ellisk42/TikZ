@@ -12,7 +12,6 @@ screen = pygame.display.set_mode((256*FACTOR,256*FACTOR))
 
 
 from utilities import *
-from fastRender import fastRender
 
 import sys
 
@@ -49,7 +48,7 @@ def annotate(f):
 
     mode = 'c'
 
-    output = fastRender(Sequence(program))
+    output = Sequence(program).draw()
 
     while True:
         modified = False
@@ -106,7 +105,7 @@ def annotate(f):
                 if x in range(1,16) and y in range(1,16):
                     if line:
                         if line[0] != x or line[1] != y:
-                            program.append(Line.absoluteNumbered(line[0],line[1],x,y,arrow = True))
+                            program.append(Line.absolute(line[0],line[1],x,y,arrow = True))
                             line = None
                             modified = True
                     else:
@@ -117,7 +116,7 @@ def annotate(f):
                     if line:
                         [(x1,y1),(x2,y2)] = sorted([(x,y),line])
                         if x1 != x2 or y1 != y2:
-                            program.append(Line.absoluteNumbered(x1,y1,x2,y2,solid = False))
+                            program.append(Line.absolute(x1,y1,x2,y2,solid = False))
                             line = None
                             modified = True
                     else:
@@ -127,13 +126,13 @@ def annotate(f):
                 if x in range(1,16) and y in range(1,16):
                     if line:
                         if line[0] != x or line[1] != y:
-                            program.append(Line.absoluteNumbered(line[0],line[1],x,y,solid = False,arrow = True))
+                            program.append(Line.absolute(line[0],line[1],x,y,solid = False,arrow = True))
                             line = None
                             modified = True
                     else:
                         line = (x,y)
         if modified:
-            output = fastRender(Sequence(program))
+            output = Sequence(program).draw()
             print "Current program:"
             print Sequence(program)
             print
