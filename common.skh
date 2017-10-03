@@ -84,6 +84,7 @@ generator bit block([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment,i
   }
   
   if (??) {
+    assert CANLOOP ;
     dummyStartLoop();
     hit = hit || iterator(SHAPEARGUMENTS, environment, coefficients1, coefficients2, d, newCost, newIdentity, can_loop);
     dummyEndLoop();
@@ -91,6 +92,7 @@ generator bit block([int n,int m1,int m2], SHAPEVARIABLES , int[n] environment,i
   }
   
   if (??) {
+    assert CANREFLECT ;
     hit = hit || reflection(SHAPEARGUMENTS, environment, coefficients1, coefficients2,  d, newCost, newIdentity, can_loop);
     cost += newCost;
   }
@@ -244,7 +246,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
     assert COEFFICIENTVALIDATOR2 ;
     coefficientIndex += 1;
   }
-  bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],3,cost,1);
+  bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],MAXIMUMDEPTH,cost,1);
 #ifdef USEPRIOR
   assert cost <= COSTUPPERBOUND;
   int totalCost = 3*cost +

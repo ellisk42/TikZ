@@ -21,45 +21,49 @@ import matplotlib.pyplot as plot
 import sys
 
 class SynthesisResult():
-    def __init__(self, parse, time = None, source = None, program = None, cost = None, originalDrawing = None, usePrior = True):
+    def __init__(self, job, time = None, source = None, program = None, cost = None):
+        self.job = job
         self.program = program
-        self.usePrior = usePrior
-        self.originalDrawing = originalDrawing
-        self.parse = parse
         self.time = time
         self.source = source
         self.cost = cost
     def __str__(self):
-        return "<results for %s>"%(self.originalDrawing)
-    def usedPrior(self):
-        if hasattr(self,'usePrior'): return self.usePrior
-        return True
-
-icingResult = SynthesisResult(getGroundTruthParse('drawings/expert-38.png'),
-                              source = icingModelOutput,
-                              cost = 0,
-                              originalDrawing = 'drawings/expert-38.png')
+        return "SynthesisResult(%s)"%(self.job)
 
 class SynthesisJob():
-    def __init__(self, parse, originalDrawing, usePrior = True):
+    def __init__(self, parse, originalDrawing, usePrior = True, maximumDepth = 3, canLoop = True, canReflect = True, incremental = False):
+        self.incremental = incremental
+        self.maximumDepth = maximumDepth
+        self.canLoop = canLoop
+        self.canReflect = canReflect
+
         self.parse = parse
         self.originalDrawing = originalDrawing
         self.usePrior = usePrior
     def __str__(self):
-        return "SynthesisJob(%s) using the prior? %s:\n%s"%(self.originalDrawing,self.usePrior,str(self.parse))
+        return "SynthesisJob(%s,incremental = %s,maximumD = %s,loops = %s,reflects = %s,prior = %s)"%(self.originalDrawing,
+                                                     self.incremental,
+                                                     self.maximumDepth,
+                                                     self.canLoop,
+                                                     self.canReflect,
+                                                     self.usePrior)
     def execute(self):
+        if self.incremental: return self.executeIncrementally()
+        else: return self.executeJoint()
+    def executeJoint(self):
         startTime = time.time()
-        result = synthesizeProgram(self.parse,self.usePrior)
+        result = synthesizeProgram(self.parse,self.usePrior,
+                                   maximumDepth = self.maximumDepth,
+                                   canLoop = self.canLoop,
+                                   canReflect = self.canReflect)
         elapsedTime = time.time() - startTime
         
-        return SynthesisResult(parse = self.parse,
+        return SynthesisResult(self,
                                time = elapsedTime,
-                               originalDrawing = self.originalDrawing,
                                source = result[1] if result != None else None,
-                               cost = result[0] if result != None else None,
-                               usePrior = self.usePrior)
+                               cost = result[0] if result != None else None)
 
-    def executeForEachPrimitive(self):
+    def executeIncrementally(self):
         jobs = {}
         for l in self.parse.lines:
             if isinstance(l,Circle): jobs['Circle'] = jobs.get('Circle',[]) + [l]
@@ -87,17 +91,18 @@ class SynthesisJob():
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections,
                                               usedLoops = usedLoops,
-                                              CPUs = arguments.parallelSolving)
+                                              CPUs = arguments.parallelSolving,
+                                              maximumDepth = self.maximumDepth,
+                                              canLoop = self.canLoop,
+                                              canReflect = self.canReflect)
             if jobResults[k] == None:
                 print " [-] Incremental synthesis failure: %s"%self.originalDrawing
                 del jobResults[k]
-                return SynthesisResult(parse = self.parse,
+                return SynthesisResult(self,
                                        time = time.time() - startTime,
-                                       originalDrawing = self.originalDrawing,
                                        source = [ s for _,s in jobResults.values() ],
                                        program = None,
-                                       cost = None,
-                                       usePrior = self.usePrior)
+                                       cost = None) 
             parsedOutput = parseSketchOutput(jobResults[k][1])
             xs,ys = parsedOutput.usedCoefficients()
             xCoefficients = xCoefficients|xs
@@ -121,20 +126,15 @@ class SynthesisJob():
             optimalProgram = None
             optimalCost = None
 
-        return SynthesisResult(parse = self.parse,
+        return SynthesisResult(self,
                                time = elapsedTime,
-                               originalDrawing = self.originalDrawing,
                                source = [ s for _,s in jobResults.values() ],
                                program = optimalProgram,
-                               cost = optimalCost,
-                               usePrior = self.usePrior)        
+                               cost = optimalCost)
                 
 def invokeExecuteMethod(k):
     try:
-        if arguments.incremental:
-            return k.executeForEachPrimitive()
-        else:
-            return k.execute()
+        return k.execute()
     except Exception as exception:
         t = traceback.format_exc()
         print "Exception while executing job:\n%s\n%s\n%s\n"%(exception,t,k)
@@ -185,11 +185,6 @@ def synthesizeTopK(k):
         name = 'groundTruthSynthesisResults.p'
     else:
         name = 'top%dSynthesisResults.p'%k
-    if arguments.resume:
-        with open(name,'rb') as handle:
-            results = [ r for r in pickle.load(handle) if r.source != None ]
-        print "Resuming with",len(results),"old results."
-    else: results = []
     
     jobs = expertSynthesisJobs(k) if k > 0 else []
     # synthesized from the ground truth?
@@ -211,6 +206,28 @@ def synthesizeTopK(k):
     with open(name,'wb') as handle:
         pickle.dump(results, handle)
     print "Dumped %d results to %s"%(len(results),name)
+
+def makePolicyTrainingData():
+    jobs = [ SynthesisJob(getGroundTruthParse(f), f,
+                          usePrior = True,
+                          maximumDepth = d,
+                          canLoop = l,
+                          canReflect = r,
+                          incremental = i)
+             for j in range(100)
+             for f in ['drawings/expert-%d.png'%j]
+             for d in [1,2,3]
+             for i in [True,False]
+             for l in [True,False]
+             for r in [True,False] ]
+    print " [+] Constructed %d job objects for the purpose of training a policy"%(len(jobs))
+    results = parallelExecute(jobs)
+    fn = 'policyTrainingData.p'
+    with open(fn,'wb') as handle:
+        pickle.dump(results, handle)
+    print " [+] Dumped results to %s."%fn
+    
+             
         
 
 def viewSynthesisResults(arguments):
@@ -599,17 +616,19 @@ if __name__ == '__main__':
     parser.add_argument('-e','--extrapolate', default = False, action = 'store_true')
     parser.add_argument('--noPrior', default = False, action = 'store_true')
     parser.add_argument('--debug', default = False, action = 'store_true')
-    parser.add_argument('--resume', default = False, action = 'store_true')
     parser.add_argument('--similarity', default = False, action = 'store_true')
     parser.add_argument('--learnToRank', default = None, type = int)
     parser.add_argument('--incremental', default = False, action = 'store_true')
     parser.add_argument('--abstract', default = False, action = 'store_true')
     parser.add_argument('--analyzeSynthesisTime', action = 'store_true')
+    parser.add_argument('--makePolicyTrainingData', action = 'store_true')
 
     arguments = parser.parse_args()
 
     if arguments.view:
         viewSynthesisResults(arguments)
+    elif arguments.makePolicyTrainingData:
+        makePolicyTrainingData()
     elif arguments.analyzeSynthesisTime:
         analyzeSynthesisTime()
     elif arguments.learnToRank != None:
@@ -621,18 +640,16 @@ if __name__ == '__main__':
     elif arguments.file != None:
         if "drawings/expert-%s.png"%(arguments.file) in groundTruthSequence:
             j = SynthesisJob(groundTruthSequence["drawings/expert-%s.png"%(arguments.file)],'',
-                             usePrior = not arguments.noPrior)
+                             usePrior = not arguments.noPrior,
+                             incremental = arguments.incremental)
             print j
-            if arguments.incremental:
-                s = j.executeForEachPrimitive()
-            else:
-                s = j.execute()
-                #print s
+            s = j.execute()
             print "\n".join([ str(parseSketchOutput(o)) for o in s.source ])
             print s.time
         else:
             j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'',
-                             usePrior = not arguments.noPrior)
+                             usePrior = not arguments.noPrior,
+                             incremental = arguments.incremental)
             print j
             print j.execute()
                      

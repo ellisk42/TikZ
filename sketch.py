@@ -36,7 +36,10 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       yCoefficients = [],
                       usedReflections = [],
                       usedLoops = [],
-                      CPUs = 1):
+                      CPUs = 1,
+                      maximumDepth = 3,
+                      canReflect = True,
+                      canLoop = True):
     ''' usedLoops: [{depth, coefficient, variable, intercept}]'''
     
     parts = []
@@ -120,8 +123,8 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
             returnValue += ' + %s*environment[%d]'%(bound['coefficient'],bound['variable'])
         alreadyProvidedBounds += ' if (n == %d && ??) { already_have_this_loop = 1; return %s; }'%(bound['depth'],
                                                                                              returnValue)
-    print "alreadyProvidedBounds:"
-    print alreadyProvidedBounds
+    # print "alreadyProvidedBounds:"
+    # print alreadyProvidedBounds
 
     smallestPossibleLoss = 3*len(parse.lines) + 1
     upperBoundOnLoss = ' --bnd-mbits %d'%(min(5,int(ceil(log2(smallestPossibleLoss + 1)))))
@@ -130,6 +133,9 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
 pragma options "--bnd-unroll-amnt 4 --bnd-arr1d-size 2 --bnd-arr-size 2 --bnd-int-range %d %s";
 
 %s    
+#define MAXIMUMDEPTH %d
+#define CANLOOP %d
+#define CANREFLECT %d
 #define ALREADYPROVIDEDBOUNDS %s
 #define HAVETHISREFLECTIONALREADY %s
 #define XCOEFFICIENTS %s
@@ -170,6 +176,8 @@ bit renderSpecification(SHAPEVARIABLES) {
 }
 '''%(biggestNumber, upperBoundOnLoss,
      ('#define USEPRIOR' if usePrior else ''),
+     maximumDepth,
+     int(canLoop),int(canReflect),
      alreadyProvidedBounds,
      haveThisReflectionAlready,
      coefficientGenerator1, coefficientGenerator2,
@@ -184,7 +192,6 @@ bit renderSpecification(SHAPEVARIABLES) {
      len(parse.lines),
      " || ".join(parts))
 
-    print source
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
     fd.close()
@@ -210,8 +217,8 @@ bit renderSpecification(SHAPEVARIABLES) {
     if usePrior:
         programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
         if programSize == []:
-            print "Synthesis failure!"
-            print output + "\n" + source
+            # print "Synthesis failure!"
+            # print output + "\n" + source
             return None
         programSize = programSize[-1]
         m = re.match('.*=([0-9]+),',programSize)
