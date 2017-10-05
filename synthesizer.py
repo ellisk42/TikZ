@@ -47,6 +47,11 @@ class SynthesisJob():
                                                      self.canLoop,
                                                      self.canReflect,
                                                      self.usePrior)
+
+    def subsumes(self,other):
+        assert self.originalDrawing == other.originalDrawing
+        return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect
+    
     def execute(self):
         if self.incremental: return self.executeIncrementally()
         else: return self.executeJoint()
