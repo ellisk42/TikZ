@@ -4,16 +4,19 @@ from utilities import sampleLogMultinomial
 import numpy as np
 
 
-import torch
-import torch.nn as nn
-import torch.optim as optimization
-import torch.nn.functional as F
-from torch.autograd import Variable
-import torchvision.transforms as T
+import tensorflow as tf
 
 #def torchlse(#stuff):
     
-
+# disgusting
+canonicalJobOrdering = [(i,l,r,d) for i in  [True,False]
+                        for l in  [True,False]
+                        for r in [True,False]
+                        for d in [1,2,3]]
+def canonicalIndex(j): return canonicalJobOrdering.index((j.incremental,
+                                                          j.canLoop,
+                                                          j.canReflect,
+                                                          j.maximumDepth))
 
 class SynthesisPolicy():
     def __init__(self):
@@ -21,37 +24,46 @@ class SynthesisPolicy():
         self.outputDimensionality = 6
         self.B = 100
 
-        self.x = Variable(torch.randn(self.B,self.inputDimensionality))
+        self.features = tf.Placeholder(tf.float32,[None,self.inputDimensionality])
 
-        # Due to torch stupidity, some of these are logits and some of these are not
-        self.incrementalPrediction = nn.Sequential(nn.Linear(self.inputDimensionality, 1), nn.Sigmoid())
-        self.loopPrediction = nn.Sequential(nn.Linear(self.inputDimensionality, 1), nn.Sigmoid())
-        self.reflectPrediction = nn.Sequential(nn.Linear(self.inputDimensionality, 1), nn.Sigmoid())
-        # ATTENTION: this is a logit
-        self.depthPrediction = nn.Sequential(nn.Linear(self.inputDimensionality, 3), nn.LogSoftmax())
+        self.incrementalPrediction = tf.layers.dense(self.features, 1,
+                                                     activation = tf.nn.sigmoid)
+        self.loopPrediction = tf.layers.dense(self.features, 1,
+                                                     activation = tf.nn.sigmoid)
+        self.reflectPrediction = tf.layers.dense(self.features, 1,
+                                                 activation = tf.nn.sigmoid)
+        self.depthPrediction = nn.layers.dense(self.features,3,
+                                               activation = tf.nn.softmax)
+
+        
+        
+
+    def expectedTime(self,results):
+        jobLikelihood = {}
+        for j in results:
+            jobLikelihood[j] = (self.incrementalPrediction if j.incremental else 1 - self.)
+                               
+        
+
+        
 
     @staticmethod
     def featureExtractor(sequence):
         return np.array([len([x for x in sequence.lines if isinstance(x,k) ])
                 for k in [Line,Circle,Rectangle]])
 
-    def rollout(self, sequence, results):
+    def rollout(self, sequence, results, session):
         f = SynthesisPolicy.featureExtractor(sequence)
-        f = f.reshape([1,-1])
-        f = Variable(torch.from_numpy(f).float())
 
-        i = self.incrementalPrediction(f)
-        l = self.loopPrediction(f)
-        r = self.reflectPrediction(f)
-        d = self.depthPrediction(f)
+        [i,l,r,d] = session.run([self.incrementalPrediction,
+                                 self.loopPrediction,
+                                 self.reflectPrediction,
+                                 self.depthPrediction],
+                                feed_dict = {self.features:f.reshape([-1,1])})
 
-        jobLogLikelihood = {}
+        jobLikelihood = {}
         for j,result in results.iteritems():        
-            jobLogLikelihood[j] = \
-                - nn.BCELoss()(i, Variable(torch.from_numpy(np.array([[int(j.incremental)]])).float())) - \
-                nn.BCELoss()(l, Variable(torch.from_numpy(np.array([[int(j.canLoop)]])).float())) - \
-                nn.BCELoss()(r, Variable(torch.from_numpy(np.array([[int(j.canReflect)]])).float())) - \
-                nn.NLLLoss()(d, Variable(torch.from_numpy(np.array([int(j.maximumDepth - 1)]))))
+            jobLikelihood[j] = l[0,int(j.canLoop)]*r[0,int(j.canReflect)]*i[0,int(j.incremental)]*d[0,int(j.maximumDepth - 1)]
 
         history = []
         TIMEOUT = 999
@@ -61,21 +73,17 @@ class SynthesisPolicy():
             assert False
 
         time = 0
-        trajectoryLogProbability = 0
         while True:
             candidates = [ j
                            for j,_ in results.iteritems()
                            if not any([ o.subsumes(j) for o in history ])]
-            job = candidates[sampleLogMultinomial([ jobLogLikelihood[j].data for j in candidates ])]
+            job = candidates[np.random.multinomial(1,[ jobLogLikelihood[j].data for j in candidates ]).tolist.index(1)]
             sample = results[job]
             time += sample.time
+            history.append(job)
             
-            trajectoryLogProbability += jobLogLikelihood[job]
-            Z = torchlse([ jobLogLikelihood[k] for k in candidates ])
-            trajectoryLogProbability -= Z
-
             if sample.cost != None and sample.cost <= minimumCost + 1:
-                return time, trajectoryLogProbability
+                return time
             
                 
             
