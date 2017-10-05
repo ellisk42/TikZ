@@ -4,67 +4,96 @@ from utilities import sampleLogMultinomial
 import numpy as np
 
 
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.optim as optimization
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torchvision.transforms as T
 
 #def torchlse(#stuff):
     
-# disgusting
-canonicalJobOrdering = [(i,l,r,d) for i in  [True,False]
-                        for l in  [True,False]
-                        for r in [True,False]
-                        for d in [1,2,3]]
-def canonicalIndex(j): return canonicalJobOrdering.index((j.incremental,
-                                                          j.canLoop,
-                                                          j.canReflect,
-                                                          j.maximumDepth))
+def binary(x,f):
+    if not f: x = -x
+    return (F.sigmoid(x) + 0.0001).log()
+    
+def lse(xs):
+    largest = xs[0].data[0]
+    for x in xs:
+        if x.data[0] > largest:
+            largest = x.data[0]
+    return largest + sum([ (x - largest).exp() for x in xs ]).log()
 
-class SynthesisPolicy():
+class SynthesisPolicy():#nn.Module):
     def __init__(self):
+        # super(SynthesisPolicy,self).__init__()
+        
         self.inputDimensionality = len(SynthesisPolicy.featureExtractor(Sequence([])))
         self.outputDimensionality = 6
         self.B = 100
 
-        self.features = tf.Placeholder(tf.float32,[None,self.inputDimensionality])
+        self.parameters = Variable(torch.randn(self.outputDimensionality,self.inputDimensionality),
+                                   requires_grad = True)
 
-        self.incrementalPrediction = tf.layers.dense(self.features, 1,
-                                                     activation = tf.nn.sigmoid)
-        self.loopPrediction = tf.layers.dense(self.features, 1,
-                                                     activation = tf.nn.sigmoid)
-        self.reflectPrediction = tf.layers.dense(self.features, 1,
-                                                 activation = tf.nn.sigmoid)
-        self.depthPrediction = nn.layers.dense(self.features,3,
-                                               activation = tf.nn.softmax)
+    def scoreJobs(self,jobs):
+        f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
+        f = Variable(f)
+        y = self.parameters.matmul(f)
+        z = lse([y[3],y[4],y[5]])
+        scores = []
+        for j in jobs:
+            score = binary(y[0], j.incremental) + binary(y[1], j.canLoop) + binary(y[2], j.canReflect)
+            score += y[2 + j.maximumDepth] - z
+            scores.append(score)
+        return scores
 
-        
-        
+    def jobProbabilities(self,jobs):
+        scores = self.scoreJobs(jobs)
+        z = lse(scores)
+        return [ (score - z).exp() for score in scores ]
 
     def expectedTime(self,results):
-        jobLikelihood = {}
-        for j in results:
-            jobLikelihood[j] = (self.incrementalPrediction if j.incremental else 1 - self.)
-                               
-        
+        jobs = results.keys()
+        probabilities = self.jobProbabilities(jobs)
+        t0 = sum([ results[job].time * p for job, p in zip(jobs, probabilities) ])
+        TIMEOUT = 999
+        minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
+        if minimumCost == TIMEOUT:
+            print "TIMEOUT",sequence
+            assert False
+        successes = [ results[j].cost <= minimumCost + 1 for j in jobs ]
+        p0 = sum([ p for success, p in zip(successes, probabilities) if success])
+        return (t0 + 1.0).log() - (p0 + 0.001).log()
 
+    def learn(self,data):
+        data = [results for results in data
+                if any([r.cost != None for r in results.values() ])]
+        o = optimization.Adam([self.parameters],lr = 0.01)
+
+        for s in range(100):
+            loss = sum([self.expectedTime(results) for results in data ])
+            print loss
+            print self.parameters
+            print self.parameters.grad
+            loss.backward()
+            o.step()
         
+            
 
     @staticmethod
     def featureExtractor(sequence):
         return np.array([len([x for x in sequence.lines if isinstance(x,k) ])
-                for k in [Line,Circle,Rectangle]])
+                         for k in [Line,Circle,Rectangle]] + [1])
 
-    def rollout(self, sequence, results, session):
-        f = SynthesisPolicy.featureExtractor(sequence)
 
-        [i,l,r,d] = session.run([self.incrementalPrediction,
-                                 self.loopPrediction,
-                                 self.reflectPrediction,
-                                 self.depthPrediction],
-                                feed_dict = {self.features:f.reshape([-1,1])})
+        
 
-        jobLikelihood = {}
-        for j,result in results.iteritems():        
-            jobLikelihood[j] = l[0,int(j.canLoop)]*r[0,int(j.canReflect)]*i[0,int(j.incremental)]*d[0,int(j.maximumDepth - 1)]
-
+    def rollout(self, results):
+        jobs = results.keys()
+        jobLogLikelihood = {}#dict([ zip(jobs, self.scoreJobs(jobs)) ])
+        for j,s in zip(jobs,self.scoreJobs(jobs)):
+            jobLogLikelihood[j] = s.data[0]
+        
         history = []
         TIMEOUT = 999
         minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
@@ -73,29 +102,26 @@ class SynthesisPolicy():
             assert False
 
         time = 0
+        trajectoryLogProbability = 0
         while True:
             candidates = [ j
                            for j,_ in results.iteritems()
-                           if not any([ o.subsumes(j) for o in history ])]
-            job = candidates[np.random.multinomial(1,[ jobLogLikelihood[j].data for j in candidates ]).tolist.index(1)]
+                           if not any([ str(j) == str(o) #or (results[o].cost != None and o.subsumes(j))
+                                        for o in history ])]
+            if candidates == []:
+                for j,r in results.iteritems():
+                    print j,r.cost,r.time
+                assert False
+            job = candidates[sampleLogMultinomial([ jobLogLikelihood[j] for j in candidates ])]
             sample = results[job]
             time += sample.time
             history.append(job)
-            
-            if sample.cost != None and sample.cost <= minimumCost + 1:
-                return time
-            
-                
-            
-        
 
-        # Sample a job
-        i_ = torch.bernoulli(torch.exp(i.data))
-        l_ = torch.bernoulli(torch.exp(l.data))
-        r_ = torch.bernoulli(torch.exp(r.data))
-        d_ = torch.multinomial(torch.exp(d.data),1) + 1
-        
-        
+            if sample.cost != None and sample.cost <= minimumCost + 1:
+
+                return time
+
+            
 def loadPolicyData():
     with open('policyTrainingData.p','rb') as handle:
         results = pickle.load(handle)
@@ -148,11 +174,13 @@ def incrementalTime(results):
         
 if __name__ == '__main__':
     data = loadPolicyData()
+    data = [results for results in data
+            if any([r.cost != None for r in results.values() ])]
 
-    SynthesisPolicy().rollout(data[38].keys()[0].parse,
-                              data[38])
-
-
+    policy = SynthesisPolicy()
+    policy.learn(data)
+    
+    policy = [policy.rollout(r) for r in data for _ in range(10) ]
     optimistic = map(bestPossibleTime,data)
     exact = map(exactTime,data)
     incremental = map(incrementalTime,data)
@@ -163,16 +191,8 @@ if __name__ == '__main__':
     import numpy as np
     
     bins = np.linspace(0,20,40)
-    for ys,l in [(exact,'exact'),(optimistic,'optimistic'),(incremental,'incremental')] :
+    for ys,l in [(exact,'exact'),(optimistic,'optimistic'),(incremental,'incremental'),(policy,'learned policy')] :
         plot.hist(ys, bins, alpha = 0.3, label = l)
     plot.legend()
     plot.show()
     
-    for j,r in data.iteritems():
-        if r.cost  == None: continue
-
-        print j
-        print r.cost
-        print int(r.time/60.0),'m'
-        print
-    print evaluatePolicy(data, lambda j: int(j.incremental)) #featureExtractor(j.parse))
