@@ -113,6 +113,7 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
     if (j > 0 && ({| environment[0] | 1 |} > 0) && ??){
       dummyStartBoundary();
       hit = hit || block(SHAPEARGUMENTS,push(environment,j),coefficients1,coefficients2,d - 1, boundary_cost, 0);
+      assert boundary_cost > 0;
       dummyEndBoundary();
     }
     
