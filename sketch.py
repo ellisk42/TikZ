@@ -192,6 +192,8 @@ bit renderSpecification(SHAPEVARIABLES) {
      len(parse.lines),
      " || ".join(parts))
 
+    print source
+
     fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.sk',delete = False,dir = '.')
     fd.write(source)
     fd.close()
