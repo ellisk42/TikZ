@@ -232,3 +232,21 @@ def removeDuplicateStrings(xs):
     t = {}
     for x in xs: t[str(x)] = x
     return t.values()
+
+def crossValidate(fullDataSet, folds = 10):
+    n = len(fullDataSet)
+    indices = randomlyPermuteList(range(n))    
+    testSize = int(n/folds)
+
+    for f in range(folds):
+        start = testSize*f
+        end = testSize + start
+        train = indices[:start] + indices[end:]
+        test = indices[start:end]
+        assert len(train) + len(test) == n
+        assert len(set(train)&set(test)) == 0
+        yield ([ fullDataSet[j] for j in train ], [ fullDataSet[j] for j in test ])
+
+if __name__ == "__main__":
+    for train, test in crossValidate(range(10),5):
+        print train, test

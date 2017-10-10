@@ -26,11 +26,8 @@ def lse(xs):
 
 class SynthesisPolicy():#nn.Module):
     def __init__(self):
-        # super(SynthesisPolicy,self).__init__()
-        
         self.inputDimensionality = len(SynthesisPolicy.featureExtractor(Sequence([])))
         self.outputDimensionality = 6
-        self.B = 100
 
         self.parameters = Variable(torch.randn(self.outputDimensionality,self.inputDimensionality),
                                    requires_grad = True)
@@ -246,10 +243,13 @@ if __name__ == '__main__':
             if any([r.cost != None for r in results.values() ]) and not '60' in results.keys()[0].originalDrawing]
     print "Pruned down to %d problems"%len(data)
 
-    policy = SynthesisPolicy()
-    policy.learn(data,L = 'bias')
+    policy = []
+    for train, test in crossValidate(data, 10):
+        model = SynthesisPolicy()
+        model.learn(train,L = 'expected')
+        policy += [ model.rollout(r,L = 'expected') for r in test for _ in  range(10) ]
+        
     
-    policy = [policy.rollout(r,L = 'bias') for r in data for _ in range(10) ]
     optimistic = map(bestPossibleTime, data)*10
     exact = map(exactTime,data)*10
     incremental = map(incrementalTime,data)*10
