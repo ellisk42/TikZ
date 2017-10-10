@@ -379,7 +379,7 @@ class Loop():
         for b in self.body.rewrites():
             yield Loop(self.v, self.bound, b, self.boundary, self.lowerBound)
         if self.boundary != None:
-            for b in self.body.rewrites():
+            for b in self.boundary.rewrites():
                 yield Loop(self.v, self.bound, self.body, b, self.lowerBound)
     def mergeWithOtherLoop(self,other):
         assert self.v == other.v and self.lowerBound == other.lowerBound

@@ -240,11 +240,11 @@ def incrementalTime(results):
 if __name__ == '__main__':
     data = loadPolicyData()
     data = [results for results in data
-            if any([r.cost != None for r in results.values() ]) and not '60' in results.keys()[0].originalDrawing]
+            if any([r.cost != None for r in results.values() ]) and not '60xy' in results.keys()[0].originalDrawing]
     print "Pruned down to %d problems"%len(data)
 
     policy = []
-    for train, test in crossValidate(data, 10):
+    for train, test in crossValidate(data, 2):
         model = SynthesisPolicy()
         model.learn(train,L = 'expected')
         policy += [ model.rollout(r,L = 'expected') for r in test for _ in  range(10) ]
