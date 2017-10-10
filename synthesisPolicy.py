@@ -61,38 +61,74 @@ class SynthesisPolicy():#nn.Module):
         if minimumCost == TIMEOUT:
             print "TIMEOUT",sequence
             assert False
-        successes = [ results[j].cost <= minimumCost + 1 for j in jobs ]
+        successes = [ results[j].cost != None and results[j].cost <= minimumCost + 1 for j in jobs ]
         p0 = sum([ p for success, p in zip(successes, probabilities) if success])
-        return (t0 + 1.0).log() - (p0 + 0.001).log()
+        return (t0 + 1.0).log() - (p0 + 0.001).log() #t0/(p0 + 0.0001)
 
-    def learn(self,data):
-        data = [results for results in data
-                if any([r.cost != None for r in results.values() ])]
+    def biasOptimalTime(self,results):
+        jobs = results.keys()
+        TIMEOUT = 999
+        minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
+        if minimumCost == TIMEOUT:
+            print "TIMEOUT",sequence
+            assert False
+        scores = self.scoreJobs(jobs)
+        z = lse(scores)
+        times = [ math.log(results[j].time) - s + z
+                  for j,s in zip(jobs, scores)
+                  if results[j].cost != None and results[j].cost <= minimumCost + 1 ]
+        bestTime = min(times, key = lambda t: t.data[0])
+        
+        return bestTime.exp()
+
+    def learn(self, data, L = 'expected'):
         o = optimization.Adam([self.parameters],lr = 0.01)
 
         for s in range(100):
-            loss = sum([self.expectedTime(results) for results in data ])
+            if L == 'expected':
+                loss = sum([self.expectedTime(results) for results in data ])
+            elif L == 'bias':
+                loss = sum([self.biasOptimalTime(results) for results in data ])
+            else:
+                print "unknown loss function",L
+                assert False
             print loss
             print self.parameters
             print self.parameters.grad
+            o.zero_grad()
             loss.backward()
             o.step()
+
+    def reinforce(self,data):
+        o = optimization.Adam([self.parameters],lr = 0.001)
+
+        for s in range(100):
+            L = sum([ R*ll for results in data for (R,ll) in [self.rollout(results,True)] ])
+            L = L/len(data)
+            print L
+            print self.parameters
+            print self.parameters.grad
+            o.zero_grad()
+            L.backward()
+            o.step()
+        
         
             
 
     @staticmethod
     def featureExtractor(sequence):
+        #return np.array([len(sequence.lines),1])
         return np.array([len([x for x in sequence.lines if isinstance(x,k) ])
                          for k in [Line,Circle,Rectangle]] + [1])
 
 
         
 
-    def rollout(self, results):
+    def rollout(self, results, returnLogLikelihood = False, L = 'expected'):
         jobs = results.keys()
-        jobLogLikelihood = {}#dict([ zip(jobs, self.scoreJobs(jobs)) ])
+        jobLogLikelihood = {}
         for j,s in zip(jobs,self.scoreJobs(jobs)):
-            jobLogLikelihood[j] = s.data[0]
+            jobLogLikelihood[j] = s
         
         history = []
         TIMEOUT = 999
@@ -101,24 +137,54 @@ class SynthesisPolicy():#nn.Module):
             print "TIMEOUT",sequence
             assert False
 
+        if L == 'bias':
+            finishedJobs = []
+            jobProgress = dict([(j,0.0) for j in jobs ])
+            T = 0.0
+            while True:
+                candidates = [ j for j in jobs if not j in finishedJobs ]
+                z = lse([ jobLogLikelihood[j] for j in candidates ]).data[0]
+                resourceDistribution = [ math.exp(jobLogLikelihood[j].data[0] - z) for j in candidates ]
+                timeToFinishEachCandidate = [ (results[j].time - jobProgress[j])/w
+                                              for w,j in zip(resourceDistribution,candidates) ]
+                (dt,nextResult) = min(zip(timeToFinishEachCandidate, candidates))
+                T += dt
+                if results[nextResult].cost != None and results[nextResult].cost <= minimumCost + 1: return T
+                finishedJobs.append(nextResult)
+                for candidate, weight in zip(candidates,resourceDistribution):
+                    jobProgress[candidate] += weight*dt
+                
+                
+
         time = 0
         trajectoryLogProbability = 0
         while True:
             candidates = [ j
                            for j,_ in results.iteritems()
-                           if not any([ str(j) == str(o) #or (results[o].cost != None and o.subsumes(j))
+                           if not any([ str(j) == str(o) or (results[o].cost != None and o.subsumes(j))
                                         for o in history ])]
             if candidates == []:
+                print "Minimum cost",minimumCost
+                print "All of the results..."
                 for j,r in results.iteritems():
                     print j,r.cost,r.time
+                print "history:"
+                for h in history:
+                    print h
                 assert False
-            job = candidates[sampleLogMultinomial([ jobLogLikelihood[j] for j in candidates ])]
+            job = candidates[sampleLogMultinomial([ jobLogLikelihood[j].data[0] for j in candidates ])]
             sample = results[job]
             time += sample.time
             history.append(job)
 
-            if sample.cost != None and sample.cost <= minimumCost + 1:
+            if returnLogLikelihood:
+                trajectoryLogProbability = jobLogLikelihood[job] + trajectoryLogProbability
+                z = lse([ jobLogLikelihood[k] for k in candidates ])
+                trajectoryLogProbability = trajectoryLogProbability - z
 
+            if sample.cost != None and sample.cost <= minimumCost + 1:
+                if returnLogLikelihood:
+                    return time, trajectoryLogProbability
                 return time
 
             
@@ -161,38 +227,51 @@ def evaluatePolicy(results, policy):
             events.append((T,normalizedCost))
     return events
 
-TIMEOUT = 10*60*60
+TIMEOUT = 10**5
 def bestPossibleTime(results):
     minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
-    return math.log(min([ r.time for r in results.values() if r.cost != None and r.cost <= minimumCost + 1 ] + [TIMEOUT]))
+    return (min([ r.time for r in results.values() if r.cost != None and r.cost <= minimumCost + 1 ] + [TIMEOUT]))
 def exactTime(results):
-    return math.log(min([ r.time for j,r in results.iteritems()
-                          if j.incremental == False and j.canLoop and j.canReflect and j.maximumDepth == 3] + [TIMEOUT]))
+    minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
+    return (min([ r.time for j,r in results.iteritems()
+                          if j.incremental == False and j.canLoop and j.canReflect and j.maximumDepth == 3  and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
 def incrementalTime(results):
-    return math.log(min([ r.time for j,r in results.iteritems()
-                          if j.incremental and j.canLoop and j.canReflect and j.maximumDepth == 3] + [TIMEOUT]))
+    minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
+    return (min([ r.time for j,r in results.iteritems()
+                          if j.incremental and j.canLoop and j.canReflect and j.maximumDepth == 3 and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
         
 if __name__ == '__main__':
     data = loadPolicyData()
     data = [results for results in data
-            if any([r.cost != None for r in results.values() ])]
+            if any([r.cost != None for r in results.values() ]) and not '60' in results.keys()[0].originalDrawing]
+    print "Pruned down to %d problems"%len(data)
 
     policy = SynthesisPolicy()
-    policy.learn(data)
+    policy.learn(data,L = 'bias')
     
-    policy = [policy.rollout(r) for r in data for _ in range(10) ]
-    optimistic = map(bestPossibleTime,data)
-    exact = map(exactTime,data)
-    incremental = map(incrementalTime,data)
+    policy = [policy.rollout(r,L = 'bias') for r in data for _ in range(10) ]
+    optimistic = map(bestPossibleTime, data)*10
+    exact = map(exactTime,data)*10
+    incremental = map(incrementalTime,data)*10
 
-    print exact
-
+   
     import matplotlib.pyplot as plot
     import numpy as np
     
-    bins = np.linspace(0,20,40)
-    for ys,l in [(exact,'exact'),(optimistic,'optimistic'),(incremental,'incremental'),(policy,'learned policy')] :
+    bins = np.logspace(0,5,30)
+    plot.figure()
+    for j,(ys,l) in enumerate([(exact,'exact'),(optimistic,'oracle'),(incremental,'incremental'),(policy,'learned policy')]):
+        plot.subplot(int('22' + str(j + 1)))
         plot.hist(ys, bins, alpha = 0.3, label = l)
-    plot.legend()
+        plot.gca().set_xscale("log")
+        plot.legend()
+        plot.xlabel('time (sec)')
+        plot.ylabel('frequency')
+        # Remove timeouts
+        print l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times"
+        ys = [y for y in ys if y != TIMEOUT ]
+        print l," median",np.median(ys)
+        print l," mean",np.mean(ys)
+
     plot.show()
     
