@@ -240,7 +240,11 @@ bit renderSpecification(SHAPEVARIABLES) {
     if body != None:
         body = "\n".join(body)
     else:
-        print "WARNING: Could not parse body."
+        fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.failure',delete = False,dir = './parsingErrors')
+        fd.write(output)
+        fd.close()
+        print "WARNING: Could not parse body. Leaving the unparsable body in %s"%(fd.name)
+        
         # print body
     # parseSketchOutput(body)
     # assert False
