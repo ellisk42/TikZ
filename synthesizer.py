@@ -651,7 +651,12 @@ if __name__ == '__main__':
             s = j.execute()
             if arguments.incremental:
                 print "Sketch output for each job:"
-                print "\n\n".join([ str(parseSketchOutput(o)) for o in s.source ])
+                for o in s.source:
+                    print o
+                    print str(parseSketchOutput(o))
+                    print 
+                print "Pretty printed merged output:"
+                print s.program.pretty()
             else:
                 print "Parsed sketch output:"
                 print str(parseSketchOutput(s.source))
