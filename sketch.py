@@ -187,7 +187,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     if CPUs != 1:
         degreeOfParallelism = '--slv-parallel --slv-p-cpus %d'%CPUs
 
-    os.system('sketch %s --fe-timeout 180 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
+    os.system('sketch %s --fe-timeout 60 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
                                                                 fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
