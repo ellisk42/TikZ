@@ -213,12 +213,13 @@ bit renderSpecification(SHAPEVARIABLES) {
     os.remove(fd.name)
     os.remove(outputFile)
 
+    if 'Sketch front-end timed out' in output or 'The sketch cannot be resolved' in output:
+        return None
+
     # Recover the program length from the sketch output
     if usePrior:
         programSize = [ l for l in output.split('\n') if "*********INSIDE minimizeHoleValue" in l ] #if () {}
         if programSize == []:
-            # print "Synthesis failure!"
-            # print output + "\n" + source
             return None
         programSize = programSize[-1]
         m = re.match('.*=([0-9]+),',programSize)
