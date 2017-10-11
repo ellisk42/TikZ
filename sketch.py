@@ -10,26 +10,7 @@ import tempfile
 from language import *
 
 def possibleCoefficients(parse):
-    x = []
-    y = []
-    for p in parse.lines[:-1]:
-        for q in parse.lines[1:]:
-            if p == q: continue
-            if isinstance(p,Circle) and isinstance(q,Circle):
-                x.append(p.center.x - q.center.x)
-                y.append(p.center.y - q.center.y)
-            if isinstance(p,Rectangle) and isinstance(q,Rectangle):
-                x.append(p.p1.x - q.p1.x)
-                x.append(p.p2.x - q.p2.x)
-                y.append(p.p1.y - q.p1.y)
-                y.append(p.p2.y - q.p2.y)
-            if isinstance(p,Line) and isinstance(q,Line):
-                if p.solid != q.solid or p.arrow != q.arrow: continue
-                x.append(p.points[0].x - q.points[0].x)
-                x.append(p.points[1].x - q.points[1].x)
-                y.append(p.points[0].y - q.points[0].y)
-                y.append(p.points[1].y - q.points[1].y)
-    return set(x) - set([0]),set(y) - set([0])
+    return parse.usedDisplacements()
 
 def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       xCoefficients = [],
@@ -206,7 +187,7 @@ bit renderSpecification(SHAPEVARIABLES) {
     if CPUs != 1:
         degreeOfParallelism = '--slv-parallel --slv-p-cpus %d'%CPUs
 
-    os.system('sketch %s --fe-timeout 180 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
+    os.system('sketch %s --fe-timeout 60 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
                                                                 fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()

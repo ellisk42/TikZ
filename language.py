@@ -369,6 +369,9 @@ class Line(Program):
         y2 = (1 - e)*p2.y + e*p1.y
 
         return Line.absolute(x1,y1,x2,y2)
+
+    def usedCoordinates(self):
+        return set([self.points[0].x,self.points[1].x]),set([self.points[0].y,self.points[1].y])
                 
 
 class Rectangle(Program):
@@ -510,6 +513,9 @@ class Rectangle(Program):
                 p2 = AbsolutePoint(x2,y2)
                 return Rectangle(p1, p2)
 
+    def usedCoordinates(self):
+        return set([self.p1.x,self.p2.x]),set([self.p1.y,self.p2.y])
+
 class Circle(Program):
     def __init__(self, center, radius):
         self.center = center
@@ -626,6 +632,9 @@ class Circle(Program):
         return [Circle.command(self.center.noisyEvaluate(),
                                 r,
                                 noisy = True)]
+
+    def usedCoordinates(self):
+        return set([self.center.x]),set([self.center.y])
 
 class Sequence(Program):
     def __init__(self, lines): self.lines = lines
@@ -748,6 +757,38 @@ class Sequence(Program):
 
     def round(self,p):
         return Sequence([x.round(p) for x in self.items ])
+
+    def usedCoordinates(self):
+        xs = set([])
+        ys = set([])
+        for x in self.items:
+            a,b = x.usedCoordinates()
+            xs = xs|a
+            ys = ys|b
+        return xs,ys
+
+    def usedDisplacements(self):
+        x = []
+        y = []
+        for p in self.lines[:-1]:
+            for q in self.lines[1:]:
+                if p == q: continue
+                if isinstance(p,Circle) and isinstance(q,Circle):
+                    x.append(p.center.x - q.center.x)
+                    y.append(p.center.y - q.center.y)
+                if isinstance(p,Rectangle) and isinstance(q,Rectangle):
+                    x.append(p.p1.x - q.p1.x)
+                    x.append(p.p2.x - q.p2.x)
+                    y.append(p.p1.y - q.p1.y)
+                    y.append(p.p2.y - q.p2.y)
+                if isinstance(p,Line) and isinstance(q,Line):
+                    if p.solid != q.solid or p.arrow != q.arrow: continue
+                    x.append(p.points[0].x - q.points[0].x)
+                    x.append(p.points[1].x - q.points[1].x)
+                    y.append(p.points[0].y - q.points[0].y)
+                    y.append(p.points[1].y - q.points[1].y)
+        return set(x) - set([0]),set(y) - set([0])
+        
 
 
 def randomLineOfCode():

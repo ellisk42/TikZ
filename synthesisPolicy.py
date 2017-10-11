@@ -224,6 +224,37 @@ def evaluatePolicy(results, policy):
             events.append((T,normalizedCost))
     return events
 
+
+def analyzePossibleFeatures(data):
+    reflectingProblems = []
+    iterativeProblems = []
+    deepProblems = []
+    for results in data:
+        for j in results:
+            r = results[j]
+            if r.cost != None and r.program == None:
+                assert not j.incremental
+                try: r.program = parseSketchOutput(results[j].source)
+                except: r.cost = None
+        successfulJobs = [ j for j in results if results[j].cost != None ]
+        if successfulJobs == []: continue
+
+        bestJob = min(successfulJobs, key = lambda j: results[j].cost)
+        bestProgram = results[bestJob].program
+        best = bestProgram.pretty()
+
+        iterativeProblems.append((bestJob.parse,'for' in best))
+        reflectingProblems.append((bestJob.parse,'reflect' in best))
+        deepProblems.append((bestJob.parse,bestProgram.depth() > 2))
+
+    print "Looping problems:",len(iterativeProblems)
+    print "Reflecting problems:",len(reflectingProblems)
+    print "Deep problems:",len(deepProblems)
+
+    iterativeScores = [ (flag, (len(x) + len(y))/float(len(parse)))
+                        for parse, flag in iterativeProblems
+                        for (x,y) in [parse.usedDisplacements()] ]
+    
 TIMEOUT = 10**5
 def bestPossibleTime(results):
     minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
@@ -241,7 +272,11 @@ if __name__ == '__main__':
     data = loadPolicyData()
     data = [results for results in data
             if any([r.cost != None for r in results.values() ]) and not '60xy' in results.keys()[0].originalDrawing]
+
     print "Pruned down to %d problems"%len(data)
+
+    analyzePossibleFeatures(data)
+        
 
     policy = []
     for train, test in crossValidate(data, 2):
