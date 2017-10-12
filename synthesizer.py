@@ -106,7 +106,7 @@ class SynthesisJob():
                 print " [-] Incremental synthesis failure: %s"%self
                 return SynthesisResult(self,
                                        time = time.time() - startTime,
-                                       source = [ s for _,s in jobResults.values() ],
+                                       source = [ s[1] for s in jobResults.values() if s != None ],
                                        program = None,
                                        cost = None) 
             parsedOutput = parseSketchOutput(jobResults[k][1])
