@@ -1,5 +1,3 @@
-import numpy as np
-from utilities import *
 import tensorflow as tf
 import numpy as np
 

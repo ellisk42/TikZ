@@ -47,6 +47,12 @@ class SynthesisJob():
                                                      self.canLoop,
                                                      self.canReflect,
                                                      self.usePrior)
+
+    def subsumes(self,other):
+        assert self.originalDrawing == other.originalDrawing
+        if str(self) == str(other): return True
+        return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect #and not self.incremental 
+    
     def execute(self):
         if self.incremental: return self.executeIncrementally()
         else: return self.executeJoint()
@@ -61,7 +67,8 @@ class SynthesisJob():
         return SynthesisResult(self,
                                time = elapsedTime,
                                source = result[1] if result != None else None,
-                               cost = result[0] if result != None else None)
+                               cost = result[0] if result != None else None,
+                               program = parseSketchOutput(result[1]) if result != None else None)
 
     def executeIncrementally(self):
         jobs = {}
@@ -96,11 +103,10 @@ class SynthesisJob():
                                               canLoop = self.canLoop,
                                               canReflect = self.canReflect)
             if jobResults[k] == None:
-                print " [-] Incremental synthesis failure: %s"%self.originalDrawing
-                del jobResults[k]
+                print " [-] Incremental synthesis failure: %s"%self
                 return SynthesisResult(self,
                                        time = time.time() - startTime,
-                                       source = [ s for _,s in jobResults.values() ],
+                                       source = [ s[1] for s in jobResults.values() if s != None ],
                                        program = None,
                                        cost = None) 
             parsedOutput = parseSketchOutput(jobResults[k][1])
@@ -644,8 +650,18 @@ if __name__ == '__main__':
                              incremental = arguments.incremental)
             print j
             s = j.execute()
-            print "\n".join([ str(parseSketchOutput(o)) for o in s.source ])
-            print s.time
+            if arguments.incremental:
+                print "Sketch output for each job:"
+                for o in s.source:
+                    print o
+                    print str(parseSketchOutput(o))
+                    print 
+                print "Pretty printed merged output:"
+                print s.program.pretty()
+            else:
+                print "Parsed sketch output:"
+                print str(parseSketchOutput(s.source))
+            print s.time,'sec'
         else:
             j = SynthesisJob(pickle.load(open(arguments.file,'rb')).program,'',
                              usePrior = not arguments.noPrior,

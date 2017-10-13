@@ -247,6 +247,8 @@ class Primitive():
     def substitute(self,e):
         return Primitive(self.k, *[ (a.substitute(e) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
 
+    def depth(self): return 1
+
 
 class Reflection():
     def pretty(self):
@@ -307,6 +309,8 @@ class Reflection():
         coordinate = e.lookup(self.coordinate)
         if coordinate == None: coordinate = self.coordinate
         return Reflection(axis, coordinate, self.body.substitute(e))
+
+    def depth(self): return 1 + self.body.depth()
 
 
 class Loop():
@@ -379,7 +383,7 @@ class Loop():
         for b in self.body.rewrites():
             yield Loop(self.v, self.bound, b, self.boundary, self.lowerBound)
         if self.boundary != None:
-            for b in self.body.rewrites():
+            for b in self.boundary.rewrites():
                 yield Loop(self.v, self.bound, self.body, b, self.lowerBound)
     def mergeWithOtherLoop(self,other):
         assert self.v == other.v and self.lowerBound == other.lowerBound
@@ -434,6 +438,9 @@ class Loop():
                     self.body.substitute(e),
                     None if self.boundary == None else self.boundary.substitute(e),
                     self.lowerBound)
+
+    def depth(self): return 1 + max(self.body.depth(),
+                                    0 if self.boundary == None else self.boundary.depth())
 
                 
 class Block():
@@ -589,6 +596,9 @@ class Block():
                        'coefficient': x.bound.m,
                        'variable': {'i':0,'j':1,None:None}[x.bound.x],
                        'intercept': x.bound.b}
+
+    def depth(self):
+        return max([x.depth() for x in self.items ])
             
                         
             
