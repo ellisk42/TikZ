@@ -126,9 +126,6 @@ for k in groundTruth:
     groundTruthSequence[k] = Sequence([ parseLineOfCode(l) for l in groundTruth[k] ])
 
 def getGroundTruthParse(f):
-    openMindPrefix = '/om/user/ellisk/'
-    if f.startswith(openMindPrefix):
-        f = f[len(openMindPrefix):]
     return groundTruthSequence.get(f,None)
 
 

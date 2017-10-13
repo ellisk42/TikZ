@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     imageNames = ['drawings/expert-%d.png'%j
                   for j in range(100) ]
-    images = [ loadImage('/om/user/ellisk/%s'%n)
+    images = [ loadImage(n)
                for n in imageNames ]
     jobs = [(x,y) for j,x in enumerate(images)
             for k,y in enumerate(images)

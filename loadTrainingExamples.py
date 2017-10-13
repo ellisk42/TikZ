@@ -6,11 +6,7 @@ import io
 import pickle
 import tarfile
 
-def loadTar(f = 'syntheticTrainingData.tar'):
-    if os.path.isfile('/om/user/ellisk/%s'%f):
-        handle = '/om/user/ellisk/%s'%f
-    else:
-        handle = f
+def loadTar(handle = 'syntheticTrainingData.tar'):
     print "Loading data from",handle
     handle = tarfile.open(handle)
     
