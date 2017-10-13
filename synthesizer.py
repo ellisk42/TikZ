@@ -68,7 +68,7 @@ class SynthesisJob():
                                time = elapsedTime,
                                source = result[1] if result != None else None,
                                cost = result[0] if result != None else None,
-                               program = parseSketchOutput(result[1]))
+                               program = parseSketchOutput(result[1]) if result != None else None)
 
     def executeIncrementally(self):
         jobs = {}
