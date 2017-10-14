@@ -1,8 +1,12 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plot
+
 from synthesizer import *
 from utilities import sampleLogMultinomial
 
 import numpy as np
-
+import math
 
 import torch
 import torch.nn as nn
@@ -11,8 +15,6 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torchvision.transforms as T
 
-#def torchlse(#stuff):
-    
 def binary(x,f):
     if not f: x = -x
     return (F.sigmoid(x) + 0.0001).log()
@@ -24,6 +26,18 @@ def lse(xs):
             largest = x.data[0]
     return largest + sum([ (x - largest).exp() for x in xs ]).log()
 
+def softMinimum(xs, inverseTemperature):
+    # returns \sum_x x * \frac{e^{-\beta*x}}{\sum_x' e^{-\beta*x'}}
+    # n.b.:
+    # another alternative to try is :
+    # \log softMinimum = LSE{ \log x - \beta*x - LSE{-\beta*x'}}
+    # This calculates the same thing but does it all in logs
+    scores = [ -x*inverseTemperature for x in xs ]
+    logNormalizer = lse(scores)
+    logProbabilities = [ s - logNormalizer for s in scores ]
+    return sum([ x * l.exp() for x,l in zip(xs,logProbabilities) ])
+
+
 class SynthesisPolicy():#nn.Module):
     def __init__(self):
         self.inputDimensionality = len(SynthesisPolicy.featureExtractor(Sequence([])))
@@ -31,6 +45,9 @@ class SynthesisPolicy():#nn.Module):
 
         self.parameters = Variable(torch.randn(self.outputDimensionality,self.inputDimensionality),
                                    requires_grad = True)
+
+    def zeroParameters(self):
+        self.parameters.data.zero_()
 
     def scoreJobs(self,jobs):
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
@@ -62,7 +79,7 @@ class SynthesisPolicy():#nn.Module):
         p0 = sum([ p for success, p in zip(successes, probabilities) if success])
         return (t0 + 1.0).log() - (p0 + 0.001).log() #t0/(p0 + 0.0001)
 
-    def biasOptimalTime(self,results):
+    def biasOptimalTime(self,results, inverseTemperature = 1):
         jobs = results.keys()
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
@@ -71,27 +88,32 @@ class SynthesisPolicy():#nn.Module):
             assert False
         scores = self.scoreJobs(jobs)
         z = lse(scores)
-        times = [ math.log(results[j].time) - s + z
-                  for j,s in zip(jobs, scores)
-                  if results[j].cost != None and results[j].cost <= minimumCost + 1 ]
-        bestTime = min(times, key = lambda t: t.data[0])
         
-        return bestTime.exp()
+        logTimes = [ math.log(results[j].time) - s + z
+                     for j,s in zip(jobs, scores)
+                     if results[j].cost != None and results[j].cost <= minimumCost + 1 ]
+        #bestTime = min(times, key = lambda t: t.data[0])
+        bestTime = softMinimum(logTimes, inverseTemperature)
+        
+        return bestTime
 
     def learn(self, data, L = 'expected'):
         o = optimization.Adam([self.parameters],lr = 0.01)
 
-        for s in range(100):
+        numberOfIterations = 2000
+        for s in range(numberOfIterations):
             if L == 'expected':
                 loss = sum([self.expectedTime(results) for results in data ])
             elif L == 'bias':
-                loss = sum([self.biasOptimalTime(results) for results in data ])
+                # anneal the inverse temperature linearly toward 2
+                B = 2*float(s)/numberOfIterations
+                loss = sum([self.biasOptimalTime(results, B) for results in data ])
             else:
                 print "unknown loss function",L
                 assert False
-            print loss
-            print self.parameters
-            print self.parameters.grad
+            print loss.data[0]
+            #print self.parameters
+            #print self.parameters.grad
             o.zero_grad()
             loss.backward()
             o.step()
@@ -163,11 +185,11 @@ class SynthesisPolicy():#nn.Module):
             if candidates == []:
                 print "Minimum cost",minimumCost
                 print "All of the results..."
-                for j,r in results.iteritems():
+                for j,r in sorted(results.iteritems(), key = lambda (j,r): str(j)):
                     print j,r.cost,r.time
                 print "history:"
-                for h in history:
-                    print h
+                for h in sorted(history,key = str):
+                    print h,'\t',results[j].cost
                 assert False
             job = candidates[sampleLogMultinomial([ jobLogLikelihood[j].data[0] for j in candidates ])]
             sample = results[job]
@@ -191,10 +213,34 @@ def loadPolicyData():
 
     resultsArray = []
 
+    legacyFixUp = False
+
     for j in range(100):
         drawing = 'drawings/expert-%d.png'%j
         resultsArray.append(dict([ (r.job, r) for r in results if isinstance(r,SynthesisResult) and r.job.originalDrawing == drawing ]))
         print " [+] Got %d results for %s"%(len(resultsArray[-1]), drawing)
+
+        # Removed those cases where we have a cost but no program This
+        # bug has been fixed, but when using old data files we don't
+        # want to include these
+        for job, result in resultsArray[-1].iteritems():
+            if not job.incremental and result.cost != None and result.source == None:
+                result.cost = None
+                legacyFixUp = True
+
+        for job1, result1 in resultsArray[-1].iteritems():
+            for job2, result2 in resultsArray[-1].iteritems():
+                if job1.subsumes(job2): # job1 is more general which implies that either there is no result or it is better than the result for job2
+                    if not (result1.cost == None or result2.cost == None or result1.cost <= result2.cost):
+                        print job1,'\t',result1.cost
+                        print result1.program.pretty()
+                        print job2,'\t',result2.cost
+                        print result2.program.pretty()
+                    assert result1.cost == None or result2.cost == None or result1.cost <= result2.cost
+        
+    if legacyFixUp:
+        print ""
+        print " [?] WARNING: Fixed up legacy file."
 
     return resultsArray
 
@@ -267,39 +313,42 @@ def incrementalTime(results):
     minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
     return (min([ r.time for j,r in results.iteritems()
                           if j.incremental and j.canLoop and j.canReflect and j.maximumDepth == 3 and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
+
+    
         
 if __name__ == '__main__':
     data = loadPolicyData()
     data = [results for results in data
-            if any([r.cost != None for r in results.values() ]) and not '60xy' in results.keys()[0].originalDrawing]
+            if any([r.cost != None for r in results.values() ]) ]
 
     print "Pruned down to %d problems"%len(data)
 
-    analyzePossibleFeatures(data)
+    #analyzePossibleFeatures(data)
         
-
+    mode = ['expected','bias'][1]
     policy = []
-    for train, test in crossValidate(data, 2):
+    for train, test in crossValidate(data, 20):
         model = SynthesisPolicy()
-        model.learn(train,L = 'expected')
-        policy += [ model.rollout(r,L = 'expected') for r in test for _ in  range(10) ]
+        model.learn(train,L = mode)
+        policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
         
     
     optimistic = map(bestPossibleTime, data)*10
     exact = map(exactTime,data)*10
     incremental = map(incrementalTime,data)*10
 
-   
-    import matplotlib.pyplot as plot
-    import numpy as np
+    randomModel = SynthesisPolicy()
+    randomModel.zeroParameters()
+    randomPolicy = [ randomModel.rollout(r,L = mode) for r in data for _ in range(10)  ]
+
     
     bins = np.logspace(0,5,30)
     plot.figure()
-    for j,(ys,l) in enumerate([(exact,'exact'),(optimistic,'oracle'),(incremental,'incremental'),(policy,'learned policy')]):
-        plot.subplot(int('22' + str(j + 1)))
+    for j,(ys,l) in enumerate([(exact,'exact'),(randomPolicy,'random'),(optimistic,'oracle'),(incremental,'incremental'),(policy,'learned policy (%s)'%mode)]):
+        plot.subplot(2,3,1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
         plot.gca().set_xscale("log")
-        plot.legend()
+        plot.legend(fontsize = 9)
         plot.xlabel('time (sec)')
         plot.ylabel('frequency')
         # Remove timeouts
@@ -308,5 +357,7 @@ if __name__ == '__main__':
         print l," median",np.median(ys)
         print l," mean",np.mean(ys)
 
-    plot.show()
+    plot.savefig('policyComparison.png')#,bbox_inches = 'tight')
+    
+    
     
