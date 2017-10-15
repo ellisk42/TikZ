@@ -98,7 +98,7 @@ class SynthesisPolicy():#nn.Module):
         return bestTime
 
     def learn(self, data, L = 'expected'):
-        o = optimization.Adam([self.parameters],lr = 0.01)
+        o = optimization.Adam([self.parameters],lr = 0.1)
 
         numberOfIterations = 2000
         for s in range(numberOfIterations):
@@ -111,7 +111,7 @@ class SynthesisPolicy():#nn.Module):
             else:
                 print "unknown loss function",L
                 assert False
-            print loss.data[0]
+            print "%d/%d : loss = %f"%(s,numberOfIterations,loss.data[0])
             #print self.parameters
             #print self.parameters.grad
             o.zero_grad()
@@ -327,7 +327,10 @@ if __name__ == '__main__':
         
     mode = ['expected','bias'][1]
     policy = []
+    foldCount = 0
     for train, test in crossValidate(data, 20):
+        foldCount += 1
+        print "Training fold %d..."%foldCount
         model = SynthesisPolicy()
         model.learn(train,L = mode)
         policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
