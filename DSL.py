@@ -556,10 +556,13 @@ class Block():
     def cost(self): return sum([x.cost() for x in self.items ])
 
     def totalCost(self):
-        # cost taking into account the used coefficients
+        # cost taking into account the used coefficients & used boundaries
         c = self.cost()
         xs,ys = self.usedCoefficients()
-        return 3*c + max(len(xs) - 1, 0) + max(len(ys) - 1, 0)
+        boundaryCount = 0
+        for x in self.walk():
+            if isinstance(x,Loop) and x.boundary != None: boundaryCount += 1
+        return 3*c + max(len(xs) - 1, 0) + max(len(ys) - 1, 0) + boundaryCount
 
     def optimizeUsingRewrites(self,d = 4):
         candidates = self.rewriteUpToDepth(d)
