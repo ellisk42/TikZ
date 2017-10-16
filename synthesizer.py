@@ -62,7 +62,8 @@ class SynthesisJob():
         result = synthesizeProgram(self.parse,self.usePrior,
                                    maximumDepth = self.maximumDepth,
                                    canLoop = self.canLoop,
-                                   canReflect = self.canReflect)
+                                   canReflect = self.canReflect,
+                                   timeout = arguments.timeout)
         elapsedTime = time.time() - startTime
         
         return SynthesisResult(self,
@@ -102,7 +103,8 @@ class SynthesisJob():
                                               CPUs = arguments.parallelSolving,
                                               maximumDepth = self.maximumDepth,
                                               canLoop = self.canLoop,
-                                              canReflect = self.canReflect)
+                                              canReflect = self.canReflect,
+                                              timeout = arguments.timeout)
             if jobResults[k] == None:
                 print " [-] Incremental synthesis failure: %s"%self
                 return SynthesisResult(self,
@@ -627,6 +629,7 @@ if __name__ == '__main__':
     parser.add_argument('--learnToRank', default = None, type = int)
     parser.add_argument('--incremental', default = False, action = 'store_true')
     parser.add_argument('--abstract', default = False, action = 'store_true')
+    parser.add_argument('--timeout', default = 60, type = int)
     parser.add_argument('--analyzeSynthesisTime', action = 'store_true')
     parser.add_argument('--makePolicyTrainingData', action = 'store_true')
 
