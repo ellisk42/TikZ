@@ -5,6 +5,7 @@ import matplotlib.pyplot as plot
 from synthesizer import *
 from utilities import sampleLogMultinomial
 
+import time
 import numpy as np
 import math
 
@@ -97,21 +98,35 @@ class SynthesisPolicy():#nn.Module):
         
         return bestTime
 
-    def learn(self, data, L = 'expected'):
+    def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = []):
         o = optimization.Adam([self.parameters],lr = 0.1)
 
         numberOfIterations = 2000
-        for s in range(numberOfIterations):
+        startTime = time.time()
+        for s in range(1,numberOfIterations+1):
             if L == 'expected':
                 loss = sum([self.expectedTime(results) for results in data ])
+                testingLoss = sum([self.expectedTime(results) for results in testingData ]).data[0] if testingData != [] else 0.0
             elif L == 'bias':
                 # anneal the inverse temperature linearly toward 2
                 B = 2*float(s)/numberOfIterations
                 loss = sum([self.biasOptimalTime(results, B) for results in data ])
+                testingLoss = sum([self.biasOptimalTime(results, B) for results in testingData ]).data[0] if testingData != [] else 0.0
             else:
                 print "unknown loss function",L
                 assert False
-            print "%d/%d : loss = %f"%(s,numberOfIterations,loss.data[0])
+            o.zero_grad()
+            loss.backward()
+            o.step()
+
+
+            
+            dt = (time.time() - startTime)/(60*60)
+            timePerIteration = dt/s
+            timePerFold = timePerIteration*numberOfIterations
+            ETAthis = timePerIteration * (numberOfIterations - s)
+            ETA = timePerFold * foldsRemaining + ETAthis
+            print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
             #print self.parameters
             #print self.parameters.grad
             o.zero_grad()
@@ -136,7 +151,7 @@ class SynthesisPolicy():#nn.Module):
 
     @staticmethod
     def featureExtractor(sequence):
-        #return np.array([len(sequence.lines),1])
+        #return np.array([len(sequence.lines),math.log(len(sequence.lines) + 1),1])
         return np.array([len([x for x in sequence.lines if isinstance(x,k) ])
                          for k in [Line,Circle,Rectangle]] + [1])
 
@@ -327,12 +342,14 @@ if __name__ == '__main__':
         
     mode = ['expected','bias'][1]
     policy = []
-    foldCount = 0
-    for train, test in crossValidate(data, 20):
-        foldCount += 1
-        print "Training fold %d..."%foldCount
+    numberOfFolds = 1
+    foldCounter = 0
+    for train, test in crossValidate(data, numberOfFolds):
+        foldCounter += 1
+        print "Training fold %d..."%foldCounter
         model = SynthesisPolicy()
-        model.learn(train,L = mode)
+        model.learn(train,L = mode,foldsRemaining = numberOfFolds - foldCounter,testingData = test)
+        foldCounter += 1
         policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
         
     
