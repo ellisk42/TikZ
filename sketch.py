@@ -18,6 +18,7 @@ def synthesizeProgram(parse,usePrior = True,entireParse = None,
                       usedReflections = [],
                       usedLoops = [],
                       CPUs = 1,
+                      timeout = 60,
                       maximumDepth = 3,
                       canReflect = True,
                       canLoop = True):
@@ -187,7 +188,8 @@ bit renderSpecification(SHAPEVARIABLES) {
     if CPUs != 1:
         degreeOfParallelism = '--slv-parallel --slv-p-cpus %d'%CPUs
 
-    os.system('sketch %s --fe-timeout 60 -V 10 %s 2> %s > %s'%(degreeOfParallelism,
+    os.system('sketch %s --fe-timeout %d -V 10 %s 2> %s > %s'%(degreeOfParallelism,
+                                                               timeout,
                                                                 fd.name, outputFile, outputFile))
 
     output = open(outputFile,'r').read()
