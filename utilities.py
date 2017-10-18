@@ -233,6 +233,12 @@ def removeDuplicateStrings(xs):
     for x in xs: t[str(x)] = x
     return t.values()
 
+def frequencyOfMode(l):
+    if l == []: return 0
+    f = {}
+    for x in l: f[x] = 1 + f.get(x,0)
+    return max(f.values())
+
 def crossValidate(fullDataSet, folds = 10):
     if folds == 1:
         print "crossValidate: Not doing cross validation because I only have one fold."

@@ -761,7 +761,7 @@ class Sequence(Program):
     def usedCoordinates(self):
         xs = set([])
         ys = set([])
-        for x in self.items:
+        for x in self.lines:
             a,b = x.usedCoordinates()
             xs = xs|a
             ys = ys|b
@@ -788,6 +788,27 @@ class Sequence(Program):
                     y.append(p.points[0].y - q.points[0].y)
                     y.append(p.points[1].y - q.points[1].y)
         return set(x) - set([0]),set(y) - set([0])
+
+    def usedVectors(self):
+        vectors = []
+        for p in self.lines[:-1]:
+            for q in self.lines[1:]:
+                if p == q: continue
+                if isinstance(p,Circle) and isinstance(q,Circle):
+                    vectors.append((p.center.x - q.center.x,
+                                    p.center.y - q.center.y))
+                if isinstance(p,Rectangle) and isinstance(q,Rectangle):
+                    vectors.append((p.p1.x - q.p1.x,
+                                    p.p1.y - q.p1.y))
+                    vectors.append((p.p2.x - q.p2.x,
+                                    p.p2.y - q.p2.y))
+                if isinstance(p,Line) and isinstance(q,Line):
+                    if p.solid != q.solid or p.arrow != q.arrow: continue
+                    vectors.append((p.points[0].x - q.points[0].x,
+                                    p.points[0].y - q.points[0].y))
+                    vectors.append((p.points[1].x - q.points[1].x,
+                                    p.points[1].y - q.points[1].y))
+        return vectors
         
 
 

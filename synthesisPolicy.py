@@ -4,6 +4,7 @@ import matplotlib.pyplot as plot
 
 from synthesizer import *
 from utilities import sampleLogMultinomial
+from timeshare import *
 
 import time
 import numpy as np
@@ -127,11 +128,6 @@ class SynthesisPolicy():#nn.Module):
             ETAthis = timePerIteration * (numberOfIterations - s)
             ETA = timePerFold * foldsRemaining + ETAthis
             print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
-            #print self.parameters
-            #print self.parameters.grad
-            o.zero_grad()
-            loss.backward()
-            o.step()
 
     def reinforce(self,data):
         o = optimization.Adam([self.parameters],lr = 0.001)
@@ -152,10 +148,14 @@ class SynthesisPolicy():#nn.Module):
     @staticmethod
     def featureExtractor(sequence):
         #return np.array([len(sequence.lines),math.log(len(sequence.lines) + 1),1])
-        return np.array([len([x for x in sequence.lines if isinstance(x,k) ])
-                         for k in [Line,Circle,Rectangle]] + [1])
-
-
+        basicFeatures = [len([x for x in sequence.lines if isinstance(x,k) ])
+                         for k in [Line,Circle,Rectangle]]
+        x,y = sequence.usedDisplacements()
+        v = sequence.usedVectors()
+        fancyFeatures = [len(x) + len(y),
+                         len(sequence.usedCoordinates()),
+                         frequencyOfMode(v)]
+        return np.array(basicFeatures + fancyFeatures + [1])
         
 
     def rollout(self, results, returnLogLikelihood = False, L = 'expected'):
@@ -220,6 +220,26 @@ class SynthesisPolicy():#nn.Module):
                 if returnLogLikelihood:
                     return time, trajectoryLogProbability
                 return time
+
+    def timeshare(self, f):
+        f = 'drawings/expert-%d.png'%f
+        parse = getGroundTruthParse(f)
+        jobs = [ SynthesisJob(parse, f,
+                              usePrior = True,
+                              maximumDepth = d,
+                              canLoop = l,
+                              canReflect = r,
+                              incremental = i)
+             for j in range(100)
+             for d in [1,2,3]
+             for i in [True,False]
+             for l in [True,False]
+             for r in [True,False] ]
+        scores = [ s.data[0] for s in self.scoreJobs() ]
+        tasks = [ TimeshareTask(invokeExecuteMethod, j, s) for j,s in zip(jobs, scores) ]
+        for result in executeTimeshareTasks(tasks):
+            print result
+        for t in tasks: t.cleanup()
 
             
 def loadPolicyData():
@@ -351,6 +371,10 @@ if __name__ == '__main__':
         model.learn(train,L = mode,foldsRemaining = numberOfFolds - foldCounter,testingData = test)
         foldCounter += 1
         policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
+
+    
+    # model.timeshare(38)
+    # assert False
         
     
     optimistic = map(bestPossibleTime, data)*10
@@ -373,9 +397,12 @@ if __name__ == '__main__':
         plot.ylabel('frequency')
         # Remove timeouts
         print l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times"
+        median = np.median(ys)
+        print l," median",median
         ys = [y for y in ys if y != TIMEOUT ]
-        print l," median",np.median(ys)
         print l," mean",np.mean(ys)
+
+        plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
 
     plot.savefig('policyComparison.png')#,bbox_inches = 'tight')
     
