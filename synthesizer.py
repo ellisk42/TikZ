@@ -54,16 +54,17 @@ class SynthesisJob():
         if self.incremental: return False # ??? need to understand this better...
         return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect #and not self.incremental 
     
-    def execute(self):
-        if self.incremental: return self.executeIncrementally()
-        else: return self.executeJoint()
-    def executeJoint(self):
+    def execute(self, timeout = 60, parallelSolving = 1):
+        if self.incremental: return self.executeIncrementally(timeout = timeout, parallelSolving = parallelSolving)
+        else: return self.executeJoint(timeout = timeout, parallelSolving = parallelSolving)
+    def executeJoint(self, timeout = 60, parallelSolving = 1):
         startTime = time.time()
         result = synthesizeProgram(self.parse,self.usePrior,
                                    maximumDepth = self.maximumDepth,
                                    canLoop = self.canLoop,
                                    canReflect = self.canReflect,
-                                   timeout = arguments.timeout)
+                                   CPUs = parallelSolving,
+                                   timeout = timeout)
         elapsedTime = time.time() - startTime
         
         return SynthesisResult(self,
@@ -72,7 +73,7 @@ class SynthesisJob():
                                cost = result[0] if result != None else None,
                                program = parseSketchOutput(result[1]) if result != None else None)
 
-    def executeIncrementally(self):
+    def executeIncrementally(self, timeout = 60, parallelSolving = 1):
         jobs = {}
         for l in self.parse.lines:
             if isinstance(l,Circle): jobs['Circle'] = jobs.get('Circle',[]) + [l]
@@ -100,11 +101,11 @@ class SynthesisJob():
                                               yCoefficients = yCoefficients,
                                               usedReflections = usedReflections,
                                               usedLoops = usedLoops,
-                                              CPUs = arguments.parallelSolving,
+                                              CPUs = parallelSolving,
                                               maximumDepth = self.maximumDepth,
                                               canLoop = self.canLoop,
                                               canReflect = self.canReflect,
-                                              timeout = arguments.timeout)
+                                              timeout = timeout)
             if jobResults[k] == None:
                 print " [-] Incremental synthesis failure: %s"%self
                 return SynthesisResult(self,
@@ -141,9 +142,9 @@ class SynthesisJob():
                                program = optimalProgram,
                                cost = optimalCost)
                 
-def invokeExecuteMethod(k):
+def invokeExecuteMethod(k, timeout = 60, parallelSolving = 1):
     try:
-        return k.execute()
+        return k.execute(timeout = timeout, parallelSolving = parallelSolving)
     except Exception as exception:
         t = traceback.format_exc()
         print "Exception while executing job:\n%s\n%s\n%s\n"%(exception,t,k)
@@ -671,5 +672,5 @@ if __name__ == '__main__':
                              usePrior = not arguments.noPrior,
                              incremental = arguments.incremental)
             print j
-            print j.execute()
+            print j.execute(timeout = timeout,parallelSolving = parallelSolving)
                      

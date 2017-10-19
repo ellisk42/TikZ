@@ -51,6 +51,13 @@ class SynthesisPolicy():#nn.Module):
     def zeroParameters(self):
         self.parameters.data.zero_()
 
+    def save(self,f):
+        print " [+] Saving model to",f
+        torch.save(self.parameters,f)
+    def load(self,f):
+        print " [+] Loading model from",f
+        self.parameters = torch.load(f)
+
     def scoreJobs(self,jobs):
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
         f = Variable(f)
@@ -99,10 +106,9 @@ class SynthesisPolicy():#nn.Module):
         
         return bestTime
 
-    def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = []):
+    def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = [], numberOfIterations = 2000):
         o = optimization.Adam([self.parameters],lr = 0.1)
 
-        numberOfIterations = 2000
         startTime = time.time()
         for s in range(1,numberOfIterations+1):
             if L == 'expected':
@@ -127,6 +133,7 @@ class SynthesisPolicy():#nn.Module):
             timePerFold = timePerIteration*numberOfIterations
             ETAthis = timePerIteration * (numberOfIterations - s)
             ETA = timePerFold * foldsRemaining + ETAthis
+            if testingData != []: testingLoss = testingLoss * len(data) / len(testingData)
             print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
 
     def reinforce(self,data):
@@ -155,7 +162,15 @@ class SynthesisPolicy():#nn.Module):
         fancyFeatures = [len(x) + len(y),
                          len(sequence.usedCoordinates()),
                          frequencyOfMode(v)]
-        return np.array(basicFeatures + fancyFeatures + [1])
+        if arguments.features == 'basic+fancy':
+            return np.array(basicFeatures + fancyFeatures + [1])
+        if arguments.features == 'fancy':
+            return np.array(fancyFeatures + [1])
+        if arguments.features == 'basic':
+            return np.array(basicFeatures + [1])
+        if arguments.features == 'nothing':
+            return np.array([1])
+        assert False
         
 
     def rollout(self, results, returnLogLikelihood = False, L = 'expected'):
@@ -230,13 +245,12 @@ class SynthesisPolicy():#nn.Module):
                               canLoop = l,
                               canReflect = r,
                               incremental = i)
-             for j in range(100)
              for d in [1,2,3]
              for i in [True,False]
              for l in [True,False]
              for r in [True,False] ]
-        scores = [ s.data[0] for s in self.scoreJobs() ]
-        tasks = [ TimeshareTask(invokeExecuteMethod, j, s) for j,s in zip(jobs, scores) ]
+        scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
+        tasks = [ TimeshareTask(invokeExecuteMethod, [j], s) for j,s in zip(jobs, scores) ]
         for result in executeTimeshareTasks(tasks):
             print result
         for t in tasks: t.cleanup()
@@ -352,29 +366,52 @@ def incrementalTime(results):
     
         
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description = 'training and evaluation of synthesis policies')
+    parser.add_argument('-f', '--features',
+                        choices = ['nothing','basic','fancy','basic+fancy'],
+                        default = 'basic+fancy')
+    parser.add_argument('-m', '--mode',
+                        choices = ['expected','bias'],
+                        default = 'bias')
+    parser.add_argument('--folds', default = 10, type = int)
+    parser.add_argument('-s','--steps', default = 2000, type = int)
+    parser.add_argument('--evaluate', default = None, type = int)
+    parser.add_argument('--save', default = None, type = str)
+    parser.add_argument('--load', default = None, type = str)
+    
+    arguments = parser.parse_args()
+        
     data = loadPolicyData()
     data = [results for results in data
             if any([r.cost != None for r in results.values() ]) ]
 
     print "Pruned down to %d problems"%len(data)
-
-    #analyzePossibleFeatures(data)
         
-    mode = ['expected','bias'][1]
+    mode = arguments.mode
     policy = []
-    numberOfFolds = 1
+    numberOfFolds = arguments.folds
     foldCounter = 0
     for train, test in crossValidate(data, numberOfFolds):
         foldCounter += 1
-        print "Training fold %d..."%foldCounter
+        print "Fold %d..."%foldCounter
         model = SynthesisPolicy()
-        model.learn(train,L = mode,foldsRemaining = numberOfFolds - foldCounter,testingData = test)
+        if arguments.load:
+            model.load(arguments.load)
+        else:
+            model.learn(train,L = mode,
+                        foldsRemaining = numberOfFolds - foldCounter,
+                        testingData = test,
+                        numberOfIterations = arguments.steps)
+            if arguments.save:
+                model.save(arguments.save)            
         foldCounter += 1
         policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
 
-    
-    # model.timeshare(38)
-    # assert False
+
+    if arguments.evaluate != None:
+        model.timeshare(arguments.evaluate)
+        assert False
         
     
     optimistic = map(bestPossibleTime, data)*10
@@ -404,7 +441,7 @@ if __name__ == '__main__':
 
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
 
-    plot.savefig('policyComparison.png')#,bbox_inches = 'tight')
+    plot.savefig('policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds))
     
     
     

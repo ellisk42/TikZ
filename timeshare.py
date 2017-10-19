@@ -47,14 +47,28 @@ class TimeshareTask():
             os.killpg(self.process.pid, signal.SIGKILL)
 
 
-def executeTimeshareTasks(tasks, dt = 1):
+def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05):
     while len(tasks) > 0:
+        # Normalize the log scores and don't sign anything to anyone with less than minimum slice time
         bestScore = max([ t.logScore for t in tasks ])
         denominator = sum([ math.exp(t.logScore - bestScore) for t in tasks ])
+        shares = [ dt*math.exp(t.logScore - bestScore)/denominator for t in tasks ]
+        shares = [ int(s > minimumSlice) * s for s in shares ]
+        z = sum(shares)
+        if z < minimumSlice:
+            # failure case: model predicts nothing should be allocated at least minimum slice
+            # allocate equal time to everything which has maximal score
+            shares = [ float(int(t.logScore == bestScore)) for t in tasks ]
+            z = sum(shares)
+        shares = [ dt*s/z for s in shares ]
+        
         finished = []
-        for task in tasks:
-            w = dt*math.exp(t.logScore - bestScore)/denominator
-            result = task.execute(w)
+        print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
+        for share,task in zip(shares,tasks):
+            if share < minimumSlice: continue
+            
+            print "Executing task:",task.arguments[0],"for",share,"sec"
+            result = task.execute(share)
             if result == "still running": continue
             elif result == "finished": assert False
             else:
