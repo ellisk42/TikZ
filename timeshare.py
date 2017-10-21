@@ -62,19 +62,18 @@ def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05):
             z = sum(shares)
         shares = [ dt*s/z for s in shares ]
         
-        finished = []
         print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
         for share,task in zip(shares,tasks):
             if share < minimumSlice: continue
-            
+            # This can happen if the caller decides to explicitly mark something is finished
+            if task.finished: continue
+                        
             print "Executing task:",task.arguments[0],"for",share,"sec"
             result = task.execute(share)
             if result == "still running": continue
             elif result == "finished": assert False
-            else:
-                yield result
-                finished.append(task)
-        tasks = [ t for t in tasks if not t in finished ]
+            else: yield result
+        tasks = [ t for t in tasks if not t.finished ]
     
 if __name__ == "__main__":
     def callback():

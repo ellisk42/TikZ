@@ -1,5 +1,5 @@
 import os
-from random import random,shuffle
+from random import random,shuffle,seed
 import math
 import sys
 import io
@@ -239,13 +239,15 @@ def frequencyOfMode(l):
     for x in l: f[x] = 1 + f.get(x,0)
     return max(f.values())
 
-def crossValidate(fullDataSet, folds = 10):
+def crossValidate(fullDataSet, folds = 10, randomSeed = 0):
     if folds == 1:
         print "crossValidate: Not doing cross validation because I only have one fold."
         yield fullDataSet, fullDataSet
     else:
         n = len(fullDataSet)
-        indices = randomlyPermuteList(range(n))    
+        seed(randomSeed)
+        indices = randomlyPermuteList(range(n))
+        
         testSize = int(n/folds)
 
         for f in range(folds):

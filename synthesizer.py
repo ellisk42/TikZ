@@ -50,7 +50,6 @@ class SynthesisJob():
 
     def subsumes(self,other):
         assert self.originalDrawing == other.originalDrawing
-        if str(self) == str(other): return True
         if self.incremental: return False # ??? need to understand this better...
         return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect #and not self.incremental 
     

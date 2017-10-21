@@ -9,6 +9,7 @@ from timeshare import *
 import time
 import numpy as np
 import math
+import os
 
 import torch
 import torch.nn as nn
@@ -236,7 +237,7 @@ class SynthesisPolicy():#nn.Module):
                     return time, trajectoryLogProbability
                 return time
 
-    def timeshare(self, f):
+    def timeshare(self, f, optimalCost = None):
         f = 'drawings/expert-%d.png'%f
         parse = getGroundTruthParse(f)
         jobs = [ SynthesisJob(parse, f,
@@ -253,6 +254,10 @@ class SynthesisPolicy():#nn.Module):
         tasks = [ TimeshareTask(invokeExecuteMethod, [j], s) for j,s in zip(jobs, scores) ]
         for result in executeTimeshareTasks(tasks):
             print result
+            if result.cost != None:
+                if result.cost <= optimalCost + 1: break
+                for t in tasks:
+                    if result.job.subsumes(t.arguments[0]): t.finished = True            
         for t in tasks: t.cleanup()
 
             
@@ -277,8 +282,9 @@ def loadPolicyData():
                 result.cost = None
                 legacyFixUp = True
 
+        # Check that the subsumption trick can never cause us to not get an optimal program
         for job1, result1 in resultsArray[-1].iteritems():
-            for job2, result2 in resultsArray[-1].iteritems():
+            for job2, result2 in resultsArray[-1].iteritems():            
                 if job1.subsumes(job2): # job1 is more general which implies that either there is no result or it is better than the result for job2
                     if not (result1.cost == None or result2.cost == None or result1.cost <= result2.cost):
                         print job1,'\t',result1.cost
@@ -377,41 +383,48 @@ if __name__ == '__main__':
     parser.add_argument('--folds', default = 10, type = int)
     parser.add_argument('-s','--steps', default = 2000, type = int)
     parser.add_argument('--evaluate', default = None, type = int)
-    parser.add_argument('--save', default = None, type = str)
-    parser.add_argument('--load', default = None, type = str)
-    
+    parser.add_argument('--save', action = 'store_true',default = False)
+    parser.add_argument('--load', action = 'store_true',default = False)
+
     arguments = parser.parse_args()
-        
+
     data = loadPolicyData()
     data = [results for results in data
             if any([r.cost != None for r in results.values() ]) ]
+    totalFailures = 100 - len(data)
 
     print "Pruned down to %d problems"%len(data)
-        
+    print "Features:",arguments.features
     mode = arguments.mode
     policy = []
     numberOfFolds = arguments.folds
     foldCounter = 0
-    for train, test in crossValidate(data, numberOfFolds):
+    for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
+        path = 'checkpoints/policy_%s_%s_%d_%d.pt'%(arguments.features,arguments.mode,foldCounter,arguments.folds)            
         foldCounter += 1
         print "Fold %d..."%foldCounter
         model = SynthesisPolicy()
         if arguments.load:
-            model.load(arguments.load)
+            model.load(path)
         else:
             model.learn(train,L = mode,
                         foldsRemaining = numberOfFolds - foldCounter,
                         testingData = test,
                         numberOfIterations = arguments.steps)
             if arguments.save:
-                model.save(arguments.save)            
+                model.save(path)            
         foldCounter += 1
-        policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10) ]
+        policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
 
 
     if arguments.evaluate != None:
-        model.timeshare(arguments.evaluate)
-        assert False
+        bestCost = min([ r.cost for r in data[arguments.evaluate] if r.cost != None ])
+        startTime = time.time()
+        model.timeshare(arguments.evaluate, bestCost)
+        print "Total time:",time.time() - startTime
+        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
+        os.exit(0)
+        
         
     
     optimistic = map(bestPossibleTime, data)*10
@@ -420,18 +433,24 @@ if __name__ == '__main__':
 
     randomModel = SynthesisPolicy()
     randomModel.zeroParameters()
-    randomPolicy = [ randomModel.rollout(r,L = mode) for r in data for _ in range(10)  ]
+    #randomPolicy = [ randomModel.rollout(r,L = mode) for r in data for _ in range(10)  ]
 
     
     bins = np.logspace(0,5,30)
-    plot.figure()
-    for j,(ys,l) in enumerate([(exact,'exact'),(randomPolicy,'random'),(optimistic,'oracle'),(incremental,'incremental'),(policy,'learned policy (%s)'%mode)]):
-        plot.subplot(2,3,1 + j)
+    figure = plot.figure(figsize = (6,3))
+    for j,(ys,l) in enumerate([(exact,'sketch'),(optimistic,'oracle'),(policy,'learned policy (ours)')]):
+        ys += [10**5]*(totalFailures*len(ys)/(100 - totalFailures))
+        plot.subplot(1,3,1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
+        if j == 1: plot.xlabel('time (sec)')
+        if j == 0: plot.ylabel('frequency')
+
         plot.gca().set_xscale("log")
-        plot.legend(fontsize = 9)
-        plot.xlabel('time (sec)')
-        plot.ylabel('frequency')
+        plot.gca().set_xticks([10**e for e in range(6) ])
+        plot.gca().set_xticklabels([ r"$10^%d$"%e if e < 5 else r"$\infty$" for e in range(6)  ])
+        plot.gca().set_yticklabels([])
+        #plot.legend(fontsize = 9)
+        plot.title(l)
         # Remove timeouts
         print l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times"
         median = np.median(ys)
@@ -441,6 +460,8 @@ if __name__ == '__main__':
 
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
 
+    
+    plot.show()
     plot.savefig('policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds))
     
     
