@@ -8,6 +8,8 @@
 #define LOOP 3
 #define REFLECT 4
 
+#define PENALIZEBOUNDARY 0
+
 void dummyStartLoop() {}
 void dummyEndLoop() {}
 void dummyStartReflection(int x,int y) {}
@@ -127,7 +129,11 @@ generator bit iterator([int n,int m1,int m2], SHAPEVARIABLES , int[n] environmen
   }
   assert loop_body_cost != 0;
   cost = loop_body_cost + loop_bound_cost + boundary_cost + (already_have_this_loop? 0 : 1);
-  boundaryCount = newBoundaryCount + using_boundary;
+  if (PENALIZEBOUNDARY) {
+    boundaryCount = newBoundaryCount + using_boundary;
+  } else{
+    boundaryCount = 0;
+  }
   return hit;
 }
 
@@ -261,7 +267,7 @@ bit render(SHAPEVARIABLES) implements renderSpecification{
   bit inScene = block(SHAPEARGUMENTS,{},coefficients1[0::numberOfCoefficients1],coefficients2[0::numberOfCoefficients2],MAXIMUMDEPTH,cost,boundaryCount,1);
 #ifdef USEPRIOR
   assert cost <= COSTUPPERBOUND;
-  int totalCost = 3*cost + boundaryCount + 
+  int totalCost = 3*cost + (PENALIZEBOUNDARY?boundaryCount:0) + 
     (numberOfCoefficients1 + PROVIDEDXCOEFFICIENTS > 1 ? numberOfCoefficients1 + PROVIDEDXCOEFFICIENTS - 1 : 0) +
     (numberOfCoefficients2 + PROVIDEDYCOEFFICIENTS > 1 ? numberOfCoefficients2 + PROVIDEDYCOEFFICIENTS - 1 : 0);
   minimize(totalCost);

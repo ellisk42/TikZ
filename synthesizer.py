@@ -16,7 +16,7 @@ import os
 import argparse
 import pickle
 import time
-from multiprocessing import Pool
+from pathos.multiprocessing import ProcessingPool as Pool
 import matplotlib.pyplot as plot
 import sys
 
@@ -151,9 +151,9 @@ def invokeExecuteMethod(k, timeout = 60, parallelSolving = 1):
 
 def parallelExecute(jobs):
     if arguments.cores == 1:
-        return map(invokeExecuteMethod,jobs)
+        return map(lambda j: invokeExecuteMethod(j, timeout = arguments.timeout), jobs)
     else:
-        return Pool(arguments.cores).map(invokeExecuteMethod,jobs)
+        return Pool(arguments.cores).map(lambda j: invokeExecuteMethod(j,timeout = arguments.timeout),jobs)
 
 
 # Loads all of the particles in the directory, up to the first 200
@@ -274,12 +274,11 @@ def viewSynthesisResults(arguments):
 
     programFeatures = {}
 
-    for expertIndex in range(100):
-
-        if arguments.extrapolate:
-            if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
-                         for e in interestingExtrapolations ]):
-                continue
+    for expertIndex in [39]:#range(100):
+        # if arguments.extrapolate:
+        #     if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
+        #                  for e in interestingExtrapolations ]):
+        #         continue
             
         
         f = 'drawings/expert-%d.png'%expertIndex
@@ -288,32 +287,27 @@ def viewSynthesisResults(arguments):
             print "No ground truth for %d"%expertIndex
             assert False
             
-        parts = set(map(str,parse.lines))
-        result = None
-        for r in results:
-            if isinstance(r,SynthesisResult) and r.originalDrawing == f:
-                if set(map(str,r.parse.lines)) == parts and r.usedPrior() == (not arguments.noPrior):
-                    result = r
-                    break
-        if expertIndex == 38: result = icingResult
-        if result == None:
+        relevantResults = [ r for r in results if r.job.originalDrawing == f and r.cost != None ]
+        if relevantResults == []:
             print "No synthesis result for %s"%f
-            if arguments.extrapolate: continue
+            result = None
+        else:
+            result = min(relevantResults, key = lambda r: r.cost)
 
-        if result.source == None:
+        if result == None and arguments.extrapolate:
             print "Synthesis failure for %s"%f
-            if arguments.extrapolate: continue
+            continue
 
         print " [+] %s"%f
-        print "\t(synthesis time: %f)"%(result.time)
+        print "\t(synthesis time: %s)"%(result.time if result else None)
         print
 
         if arguments.debug:
             print result.source
 
-        if result != None and result.source != None:
-            syntaxTree = parseSketchOutput(result.source)
-            syntaxTree = syntaxTree.fixReflections(result.parse.canonicalTranslation())
+        if result != None:
+            syntaxTree = result.program
+            syntaxTree = syntaxTree.fixReflections(result.job.parse.canonicalTranslation())
             print syntaxTree
             print syntaxTree.features()
             print syntaxTree.convertToPython()
@@ -326,7 +320,7 @@ def viewSynthesisResults(arguments):
             syntaxTree = syntaxTree.explode()
             trace = syntaxTree.convertToSequence()
             print trace
-            originalHasCollisions = result.parse.hasCollisions()
+            originalHasCollisions = result.job.parse.hasCollisions()
             print "COLLISIONS",originalHasCollisions
 
             framedExtrapolations = []
@@ -337,7 +331,7 @@ def viewSynthesisResults(arguments):
                 if any([t == o for o in extrapolations ]): continue
                 extrapolations.append(t)
 
-                framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.parse)))
+                framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.job.parse)))
 
                 if len(framedExtrapolations) > 20:
                     break
@@ -350,7 +344,7 @@ def viewSynthesisResults(arguments):
                 
                         
                 if arguments.debug:
-                    framedExtrapolations = [loadImage(f), fastRender(syntaxTree.convertToSequence())] + framedExtrapolations
+                    framedExtrapolations = [loadImage(f), syntaxTree.convertToSequence().draw()] + framedExtrapolations
                 else:
                     framedExtrapolations = [frameImageNicely(loadImage(f))] + framedExtrapolations
                 a = np.zeros((256*len(framedExtrapolations),256))
@@ -366,7 +360,9 @@ def viewSynthesisResults(arguments):
                 # to show the first one
                 #a = a[:(256*2),:]
                 extrapolationMatrix.append(a)
+                print "Saving extrapolation column to",'extrapolations/expert-%d-extrapolation.png'%expertIndex
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
+                saveMatrixAsImage(255*(1 - framedExtrapolations[1]),'../TikZpaper/figures/39-extrapolated.png')
 
             
         
@@ -377,10 +373,11 @@ def viewSynthesisResults(arguments):
 %s
         \\end{verbatim}
 \\end{minipage}
-'''%(parseSketchOutput(result.source).pretty() if result != None and result.source != None else "Solver timeout")
+'''%(syntaxTree.pretty() if result != None else "Solver timeout")
         else:
             rightEntryOfTable = ""
-        if extrapolations != [] and arguments.extrapolate:
+        if False and extrapolations != [] and arguments.extrapolate:
+            
             #}make the big matrix
             bigMatrix = np.zeros((max([m.shape[0] for m in extrapolationMatrix ]),256*len(extrapolationMatrix)))
             for j,r in enumerate(extrapolationMatrix):
