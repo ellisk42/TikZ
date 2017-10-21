@@ -566,6 +566,7 @@ class Block():
         boundaryCount = 0
         for x in self.walk():
             if isinstance(x,Loop) and x.boundary != None: boundaryCount += 1
+        boundaryCount = 0
         return 3*c + max(len(xs) - 1, 0) + max(len(ys) - 1, 0) + boundaryCount
 
     def optimizeUsingRewrites(self,d = 4):
