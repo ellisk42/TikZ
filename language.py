@@ -2,7 +2,7 @@ from render import render
 from random import random,choice
 import numpy as np
 
-from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES
+from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES,frameImageNicely
 
 
 import math

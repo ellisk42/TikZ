@@ -155,6 +155,10 @@ class LinearExpression():
             return "%s * %s + %s"%(self.m,self.x,self.b)
     def __eq__(self,o): return isinstance(o,LinearExpression) and self.m == o.m and self.x == o.x and self.b == o.b
 
+    def freeVariables(self):
+        if x == None: return []
+        return [x]
+    
     def abstract(self,other,e):
         if self.x != other.x: raise AbstractionFailure('')
         
