@@ -118,7 +118,7 @@ class SynthesisJob():
             yCoefficients = yCoefficients|ys
             xr,yr = parsedOutput.usedReflections()
             usedReflections = usedReflections|set([(x,0) for x in xr ])
-            usedReflections = usedReflections|set([(0,x) for x in yr ])
+            usedReflections = usedReflections|set([(0,y) for y in yr ])
             usedLoops += list(parsedOutput.usedLoops())
             usedLoops = removeDuplicateStrings(usedLoops)
         elapsedTime = time.time() - startTime

@@ -399,11 +399,13 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
 
     data = loadPolicyData()
-    data = [results for results in data
-            if any([r.cost != None for r in results.values() ]) ]
+    if not arguments.evaluate:
+        data = [results for results in data
+                if any([r.cost != None for r in results.values() ]) ]
+        print "Pruned down to %d problems"%len(data)
     totalFailures = 100 - len(data)
 
-    print "Pruned down to %d problems"%len(data)
+
     print "Features:",arguments.features
     mode = arguments.mode
     policy = []
@@ -434,12 +436,13 @@ if __name__ == '__main__':
 
 
     if arguments.evaluate != None:
-        bestCost = min([ r.cost for r in data[arguments.evaluate] if r.cost != None ])
+        bestCost = min([ r.cost for _,r in data[arguments.evaluate].iteritems() if r.cost != None ])
+        print "Best cost:",bestCost
         startTime = time.time()
         model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)
         print "Total time:",time.time() - startTime
         print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
-        os.exit(0)
+        sys.exit(0)
         
         
     

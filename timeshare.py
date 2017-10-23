@@ -50,7 +50,7 @@ class TimeshareTask():
 def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = None):
     startTime = time.time()
     while len(tasks) > 0:
-        if time.time() - startTime > globalTimeout: break
+        if globalTimeout != None and time.time() - startTime > globalTimeout: break
 
         # Normalize the log scores and don't sign anything to anyone with less than minimum slice time
         bestScore = max([ t.logScore for t in tasks ])
