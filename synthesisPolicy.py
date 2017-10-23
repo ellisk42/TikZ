@@ -429,6 +429,8 @@ if __name__ == '__main__':
         foldCounter += 1
         if not arguments.evaluate:
             policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
+        else:
+            assert arguments.load
 
 
     if arguments.evaluate != None:
