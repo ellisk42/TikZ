@@ -274,7 +274,7 @@ def viewSynthesisResults(arguments):
 
     programFeatures = {}
 
-    for expertIndex in [39]:#range(100):
+    for expertIndex in range(100):
         # if arguments.extrapolate:
         #     if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
         #                  for e in interestingExtrapolations ]):
@@ -362,7 +362,7 @@ def viewSynthesisResults(arguments):
                 extrapolationMatrix.append(a)
                 print "Saving extrapolation column to",'extrapolations/expert-%d-extrapolation.png'%expertIndex
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
-                saveMatrixAsImage(255*(1 - framedExtrapolations[1]),'../TikZpaper/figures/39-extrapolated.png')
+                #saveMatrixAsImage(255*(1 - framedExtrapolations[1]),'../TikZpaper/figures/39-extrapolated.png')
 
             
         

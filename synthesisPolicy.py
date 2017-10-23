@@ -242,7 +242,7 @@ class SynthesisPolicy():#nn.Module):
                     return time, trajectoryLogProbability
                 return time
 
-    def timeshare(self, f, optimalCost = None):
+    def timeshare(self, f, optimalCost = None, globalTimeout = None):
         f = 'drawings/expert-%d.png'%f
         parse = getGroundTruthParse(f)
         jobs = [ SynthesisJob(parse, f,
@@ -257,13 +257,16 @@ class SynthesisPolicy():#nn.Module):
              for r in [True,False] ]
         scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
         tasks = [ TimeshareTask(invokeExecuteMethod, [j], s) for j,s in zip(jobs, scores) ]
-        for result in executeTimeshareTasks(tasks):
-            print result
+        bestResult = None
+        for result in executeTimeshareTasks(tasks, globalTimeout = globalTimeout):
             if result.cost != None:
+                if bestResult == None or bestResult.cost > result.cost:
+                    bestResult = result
                 if result.cost <= optimalCost + 1: break
                 for t in tasks:
                     if result.job.subsumes(t.arguments[0]): t.finished = True            
         for t in tasks: t.cleanup()
+        return bestResult
 
             
 def loadPolicyData():
@@ -391,6 +394,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate', default = None, type = int)
     parser.add_argument('--save', action = 'store_true',default = False)
     parser.add_argument('--load', action = 'store_true',default = False)
+    parser.add_argument('--timeout', default = None, type = int)
 
     arguments = parser.parse_args()
 
@@ -429,7 +433,7 @@ if __name__ == '__main__':
     if arguments.evaluate != None:
         bestCost = min([ r.cost for r in data[arguments.evaluate] if r.cost != None ])
         startTime = time.time()
-        model.timeshare(arguments.evaluate, bestCost)
+        model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)
         print "Total time:",time.time() - startTime
         print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
         os.exit(0)
