@@ -449,7 +449,8 @@ class RecurrentDecoder():
         assert NIPSPRIMITIVES()
 
         RECURRENTDICTIONARYSIZE = 16
-        MAXIMUMRECURRENT = 1 + 12*(7) #  + 1stop symbol, 12 instructions, 6+1 arguments for a line
+        MAXIMUMPRIMITIVES = 36
+        MAXIMUMRECURRENT = 1 + MAXIMUMPRIMITIVES*(7) #  + 1stop symbol, MAXIMUMPRIMITIVES instructions, 6+1 arguments for a line
 
         self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
         self.outputPlaceholder = tf.placeholder(tf.int32, shape = [None,MAXIMUMRECURRENT],
@@ -1195,7 +1196,7 @@ class SearchModel():
         # generate target programs with the same random seed so that
         # we get consistent validation sets across models
         random.seed(42)
-        targetPrograms = [ randomScene(24)() for _ in range(self.arguments.numberOfExamples) ]
+        targetPrograms = [ randomScene(36)() for _ in range(self.arguments.numberOfExamples) ]
         
         for targetProgram in targetPrograms:
             targetImage = targetProgram.draw()

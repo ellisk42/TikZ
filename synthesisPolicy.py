@@ -52,6 +52,9 @@ class SynthesisPolicy():#nn.Module):
     def zeroParameters(self):
         self.parameters.data.zero_()
 
+    def l2parameters(self):
+        return (self.parameters*self.parameters).sum()
+
     def save(self,f):
         print " [+] Saving model to",f
         torch.save(self.parameters,f)
@@ -107,7 +110,7 @@ class SynthesisPolicy():#nn.Module):
         
         return bestTime
 
-    def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = [], numberOfIterations = 2000):
+    def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = [], numberOfIterations = 2000, regularize = 0.0):
         o = optimization.Adam([self.parameters],lr = 0.1)
 
         startTime = time.time()
@@ -123,6 +126,7 @@ class SynthesisPolicy():#nn.Module):
             else:
                 print "unknown loss function",L
                 assert False
+            regularizedLoss = loss + regularize * self.l2parameters()
             o.zero_grad()
             loss.backward()
             o.step()
@@ -135,7 +139,8 @@ class SynthesisPolicy():#nn.Module):
             ETAthis = timePerIteration * (numberOfIterations - s)
             ETA = timePerFold * foldsRemaining + ETAthis
             if testingData != []: testingLoss = testingLoss * len(data) / len(testingData)
-            print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
+            if s%100 == 0:
+                print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
 
     def reinforce(self,data):
         o = optimization.Adam([self.parameters],lr = 0.001)
@@ -381,6 +386,7 @@ if __name__ == '__main__':
                         choices = ['expected','bias'],
                         default = 'bias')
     parser.add_argument('--folds', default = 10, type = int)
+    parser.add_argument('--regularize', default = 0, type = float)
     parser.add_argument('-s','--steps', default = 2000, type = int)
     parser.add_argument('--evaluate', default = None, type = int)
     parser.add_argument('--save', action = 'store_true',default = False)
@@ -400,7 +406,9 @@ if __name__ == '__main__':
     numberOfFolds = arguments.folds
     foldCounter = 0
     for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
-        path = 'checkpoints/policy_%s_%s_%d_%d.pt'%(arguments.features,arguments.mode,foldCounter,arguments.folds)            
+        path = 'checkpoints/policy_%s_%s_%s%d_%d.pt'%(arguments.features,arguments.mode,
+                                                      '' if arguments.regularize == 0 else 'regularize%f_'%arguments.regularize,
+                                                      foldCounter,arguments.folds)            
         foldCounter += 1
         print "Fold %d..."%foldCounter
         model = SynthesisPolicy()
@@ -410,7 +418,8 @@ if __name__ == '__main__':
             model.learn(train,L = mode,
                         foldsRemaining = numberOfFolds - foldCounter,
                         testingData = test,
-                        numberOfIterations = arguments.steps)
+                        numberOfIterations = arguments.steps,
+                        regularize = arguments.regularize)
             if arguments.save:
                 model.save(path)            
         foldCounter += 1
@@ -427,9 +436,9 @@ if __name__ == '__main__':
         
         
     
-    optimistic = map(bestPossibleTime, data)*10
-    exact = map(exactTime,data)*10
-    incremental = map(incrementalTime,data)*10
+    optimistic = map(bestPossibleTime, data)
+    exact = map(exactTime,data)
+    incremental = map(incrementalTime,data)
 
     randomModel = SynthesisPolicy()
     randomModel.zeroParameters()
@@ -437,20 +446,22 @@ if __name__ == '__main__':
 
     
     bins = np.logspace(0,5,30)
-    figure = plot.figure(figsize = (6,3))
+    figure = plot.figure(figsize = (6,2))
     for j,(ys,l) in enumerate([(exact,'sketch'),(optimistic,'oracle'),(policy,'learned policy (ours)')]):
         ys += [10**5]*(totalFailures*len(ys)/(100 - totalFailures))
         plot.subplot(1,3,1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
-        if j == 1: plot.xlabel('time (sec)')
-        if j == 0: plot.ylabel('frequency')
+        if j == 1: plot.gca().set_xlabel('time (sec)',fontsize = 9)
+        if j == 0: plot.ylabel('frequency',fontsize = 9)
 
         plot.gca().set_xscale("log")
         plot.gca().set_xticks([10**e for e in range(6) ])
-        plot.gca().set_xticklabels([ r"$10^%d$"%e if e < 5 else r"$\infty$" for e in range(6)  ])
+        plot.gca().set_xticklabels([ r"$10^%d$"%e if e < 5 else r"$\infty$" for e in range(6)  ],
+                                   fontsize = 9)
         plot.gca().set_yticklabels([])
+        plot.gca().set_yticks([])
         #plot.legend(fontsize = 9)
-        plot.title(l)
+        plot.title(l,fontsize = 9)
         # Remove timeouts
         print l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times"
         median = np.median(ys)
@@ -459,10 +470,17 @@ if __name__ == '__main__':
         print l," mean",np.mean(ys)
 
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
+        plot.text(median * 1.5,
+                  plot.gca().get_ylim()[1]*0.8,
+                  'median: %ds'%(int(median)),
+                  fontsize = 7)#, rotation = 90)
+        
 
-    
-    plot.show()
-    plot.savefig('policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds))
+    plot.tight_layout()
+
+    figureFilename = 'policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds)
+    plot.savefig(figureFilename)
+    os.system('convert -trim %s %s'%(figureFilename,figureFilename))
     
     
     
