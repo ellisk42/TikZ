@@ -427,7 +427,8 @@ if __name__ == '__main__':
             if arguments.save:
                 model.save(path)            
         foldCounter += 1
-        policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
+        if not arguments.evaluate:
+            policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
 
 
     if arguments.evaluate != None:
