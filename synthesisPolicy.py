@@ -197,7 +197,10 @@ class SynthesisPolicy():#nn.Module):
             jobProgress = dict([(j,0.0) for j in jobs ])
             T = 0.0
             while True:
-                candidates = [ j for j in jobs if not j in finishedJobs ]
+                candidates = [ j for j in jobs
+                               if not any([ finished == j or \
+                                            (results[finished].cost != None and finished.subsumes(j))
+                                            for finished in finishedJobs ]) ]
                 z = lse([ jobLogLikelihood[j] for j in candidates ]).data[0]
                 resourceDistribution = [ math.exp(jobLogLikelihood[j].data[0] - z) for j in candidates ]
                 timeToFinishEachCandidate = [ (results[j].time - jobProgress[j])/w
@@ -289,6 +292,16 @@ def loadPolicyData():
             if not job.incremental and result.cost != None and result.source == None:
                 result.cost = None
                 legacyFixUp = True
+
+            if result.cost != None:
+                newProgram = result.program.removeDeadCode()
+                if newProgram.pretty() != result.program.pretty():
+                    print "WARNING: detected dead code in %d"%j
+                    print result.program.pretty()
+                    result.program = newProgram
+                    result.cost = result.program.totalCost()
+
+        
 
         # Check that the subsumption trick can never cause us to not get an optimal program
         for job1, result1 in resultsArray[-1].iteritems():

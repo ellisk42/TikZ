@@ -228,6 +228,8 @@ class Primitive():
         return
         yield
 
+    def removeDeadCode(self): return self
+
     def mapExpression(self,l):
         return Primitive(self.k, *[ (l(a) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
 
@@ -261,6 +263,10 @@ class Reflection():
         self.axis = axis
         self.coordinate = coordinate
         self.body = body
+    def removeDeadCode(self):
+        body = self.body.removeDeadCode()
+        return Reflection(self.axis, self.coordinate, body)
+            
     def hoistReflection(self):
         for j,p in enumerate(self.body.items):
             if isinstance(p,Primitive):
@@ -330,6 +336,10 @@ class Loop():
         self.body = body
         self.boundary = boundary
         self.lowerBound = lowerBound
+    def removeDeadCode(self):
+        body = self.body.removeDeadCode()
+        boundary = self.boundary.removeDeadCode() if self.boundary != None else None
+        return Loop(self.v, self.bound, body, boundary = boundary, lowerBound = self.lowerBound)
     def hoistReflection(self):
         for h in self.body.hoistReflection():
             yield Loop(self.v,self.bound,h,boundary = self.boundary,lowerBound = self.lowerBound)
@@ -485,6 +495,17 @@ class Block():
         best = min(range(len(distances)),key = lambda k: distances[k])
         if distances[best] == distance: return self
         return candidates[best].fixReflections(target)
+
+    def removeDeadCode(self):
+        items = [ x.removeDeadCode() for x in self.items ]
+        keptItems = []
+        for x in items:
+            if isinstance(x,Reflection) and x.body.items != []: keptItems.append(x)
+            elif isinstance(x,Loop) and (x.body.items != [] or (x.boundary != None and x.boundary.items != [])):
+                keptItems.append(x)
+            elif isinstance(x,Primitive):
+                keptItems.append(x)
+        return Block(keptItems)
 
     def rewriteUpToDepth(self,d):
         rewrites = [[self]]
