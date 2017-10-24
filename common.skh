@@ -235,6 +235,7 @@ generator bit reflection([int n,int m1,int m2], SHAPEVARIABLES , int[n] environm
   boundaryCount = newBoundaryCount;
 
   cost = reflection_cost + (HAVETHISREFLECTIONALREADY ? 0 : 1);
+  assert reflection_cost != 0;
   return hit;
 }
 

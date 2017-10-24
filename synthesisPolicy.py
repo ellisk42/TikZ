@@ -2,6 +2,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plot
 
+import torch
+import torch.nn as nn
+import torch.optim as optimization
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torchvision.transforms as T
+
+
 from synthesizer import *
 from utilities import sampleLogMultinomial
 from timeshare import *
@@ -11,12 +19,6 @@ import numpy as np
 import math
 import os
 
-import torch
-import torch.nn as nn
-import torch.optim as optimization
-import torch.nn.functional as F
-from torch.autograd import Variable
-import torchvision.transforms as T
 
 def binary(x,f):
     if not f: x = -x
@@ -197,7 +199,10 @@ class SynthesisPolicy():#nn.Module):
             jobProgress = dict([(j,0.0) for j in jobs ])
             T = 0.0
             while True:
-                candidates = [ j for j in jobs if not j in finishedJobs ]
+                candidates = [ j for j in jobs
+                               if not any([ finished == j or \
+                                            (results[finished].cost != None and finished.subsumes(j))
+                                            for finished in finishedJobs ]) ]
                 z = lse([ jobLogLikelihood[j] for j in candidates ]).data[0]
                 resourceDistribution = [ math.exp(jobLogLikelihood[j].data[0] - z) for j in candidates ]
                 timeToFinishEachCandidate = [ (results[j].time - jobProgress[j])/w
@@ -289,6 +294,16 @@ def loadPolicyData():
             if not job.incremental and result.cost != None and result.source == None:
                 result.cost = None
                 legacyFixUp = True
+
+            if result.cost != None:
+                newProgram = result.program.removeDeadCode()
+                if newProgram.pretty() != result.program.pretty():
+                    print "WARNING: detected dead code in %d"%j
+                    print result.program.pretty()
+                    result.program = newProgram
+                    result.cost = result.program.totalCost()
+
+        
 
         # Check that the subsumption trick can never cause us to not get an optimal program
         for job1, result1 in resultsArray[-1].iteritems():
@@ -399,11 +414,13 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
 
     data = loadPolicyData()
-    data = [results for results in data
-            if any([r.cost != None for r in results.values() ]) ]
+    if not arguments.evaluate:
+        data = [results for results in data
+                if any([r.cost != None for r in results.values() ]) ]
+        print "Pruned down to %d problems"%len(data)
     totalFailures = 100 - len(data)
 
-    print "Pruned down to %d problems"%len(data)
+
     print "Features:",arguments.features
     mode = arguments.mode
     policy = []
@@ -418,6 +435,7 @@ if __name__ == '__main__':
         model = SynthesisPolicy()
         if arguments.load:
             model.load(path)
+            print " [+] Successfully loaded model from %s"%path
         else:
             model.learn(train,L = mode,
                         foldsRemaining = numberOfFolds - foldCounter,
@@ -434,12 +452,13 @@ if __name__ == '__main__':
 
 
     if arguments.evaluate != None:
-        bestCost = min([ r.cost for r in data[arguments.evaluate] if r.cost != None ])
+        bestCost = min([ r.cost for _,r in data[arguments.evaluate].iteritems() if r.cost != None ])
+        print "Best cost:",bestCost
+        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
         startTime = time.time()
         model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)
         print "Total time:",time.time() - startTime
-        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
-        os.exit(0)
+        sys.exit(0)
         
         
     
