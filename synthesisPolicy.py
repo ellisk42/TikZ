@@ -2,6 +2,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plot
 
+import torch
+import torch.nn as nn
+import torch.optim as optimization
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torchvision.transforms as T
+
+
 from synthesizer import *
 from utilities import sampleLogMultinomial
 from timeshare import *
@@ -11,12 +19,6 @@ import numpy as np
 import math
 import os
 
-import torch
-import torch.nn as nn
-import torch.optim as optimization
-import torch.nn.functional as F
-from torch.autograd import Variable
-import torchvision.transforms as T
 
 def binary(x,f):
     if not f: x = -x
@@ -420,6 +422,7 @@ if __name__ == '__main__':
         model = SynthesisPolicy()
         if arguments.load:
             model.load(path)
+            print " [+] Successfully loaded model from %s"%path
         else:
             model.learn(train,L = mode,
                         foldsRemaining = numberOfFolds - foldCounter,
@@ -438,10 +441,10 @@ if __name__ == '__main__':
     if arguments.evaluate != None:
         bestCost = min([ r.cost for _,r in data[arguments.evaluate].iteritems() if r.cost != None ])
         print "Best cost:",bestCost
+        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
         startTime = time.time()
         model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)
         print "Total time:",time.time() - startTime
-        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
         sys.exit(0)
         
         
