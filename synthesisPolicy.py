@@ -456,6 +456,11 @@ if __name__ == '__main__':
     if arguments.evaluate != None:
         bestCost = min([ r.cost for _,r in data[arguments.evaluate].iteritems() if r.cost != None ])
         print "Best cost:",bestCost
+        print "Results:"
+        for j,r in data[arguments.evaluate].iteritems():
+            print j
+            print r.cost,r.time
+            print 
         print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
         startTime = time.time()
         model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)

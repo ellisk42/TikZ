@@ -93,6 +93,12 @@ class SynthesisJob():
         usedLoops = []
         for k in jobOrdering:
             print "Synthesizing for:\n",Sequence(jobs[k])
+            print "xCoefficients",xCoefficients
+            print "yCoefficients",yCoefficients
+            print "usedReflections",usedReflections
+            print "usedLoops",usedLoops
+            print "canLoop",self.canLoop
+            print "canReflect",self.canReflect
             jobResults[k] = synthesizeProgram(Sequence(jobs[k]),
                                               self.usePrior,
                                               entireParse = self.parse,
