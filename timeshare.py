@@ -81,7 +81,7 @@ def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = No
         tasks = [ t for t in tasks if not t.finished ]
 
         sliceTotalTime = time.time() - sliceStartTime
-        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d\%"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime))
         
     
 if __name__ == "__main__":
