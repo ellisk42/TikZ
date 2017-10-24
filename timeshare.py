@@ -67,13 +67,19 @@ def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = No
             z = sum(shares)
         shares = [ dt*s/z for s in shares ]
         
+        numberOfActiveSlices = len([ s for s in shares if s >= minimumSlice ])
+        
         print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
         for share,task in zip(shares,tasks):
             if share < minimumSlice: continue
             # This can happen if the caller decides to explicitly mark something is finished
             if task.finished: continue
-                        
+            
+            # Setting the share to None will cause us to block until the process finishes
+            # This is the same as saying that if we are spending everything on one process that just run it until the end
+            if numberOfActiveSlices == 1: share = None
             print "Executing task:",task.arguments[0],"for",share,"sec"
+            if share == None: print "Blocking until process finishes..."
             result = task.execute(share)
             if result == "still running": continue
             elif result == "finished": assert False

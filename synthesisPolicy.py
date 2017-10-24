@@ -18,6 +18,7 @@ import time
 import numpy as np
 import math
 import os
+from pathos.multiprocessing import ProcessingPool as Pool
 
 
 def binary(x,f):
@@ -328,29 +329,6 @@ def loadPolicyData():
  
             
 
-def evaluatePolicy(results, policy):
-    jobs = results.keys()
-    minimumCost = min([ r.cost for r in results.values() if r.cost != None ])
-    scores = map(policy, jobs)
-    orderedJobs = sorted(zip(scores, jobs), reverse = True)
-    print map(lambda oj: str(snd(oj)),orderedJobs)
-    events = []
-    T = 0.0
-    minimumCostSoFar = float('inf')
-    for j, (score, job) in enumerate(orderedJobs):
-        if any([ o.subsumes(job) for _,o in orderedJobs[:j] ]): continue
-
-        T += results[job].time
-
-        if results[job].cost == None: continue
-        
-        normalizedCost = minimumCost/float(results[job].cost)
-
-        if normalizedCost < minimumCostSoFar:
-            minimumCostSoFar = normalizedCost
-            events.append((T,normalizedCost))
-    return events
-
 
 def analyzePossibleFeatures(data):
     reflectingProblems = []
@@ -454,17 +432,32 @@ if __name__ == '__main__':
 
 
     if arguments.evaluate != None:
-        bestCost = min([ r.cost for _,r in data[arguments.evaluate].iteritems() if r.cost != None ])
-        print "Best cost:",bestCost
-        print "Results:"
-        for j,r in data[arguments.evaluate].iteritems():
-            print j
-            print r.cost,r.time
-            print 
-        print "Theoretical time:",model.rollout(data[arguments.evaluate], L = mode)
-        startTime = time.time()
-        model.timeshare(arguments.evaluate, bestCost, globalTimeout = arguments.timeout)
-        print "Total time:",time.time() - startTime
+        if arguments.evaluate == -1:
+            thingsToEvaluate = list(range(100))
+        else: thingsToEvaluate = [arguments.evaluate]
+        
+        def policyEvaluator(problemIndex):
+            costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
+            if costs == []: return None
+            bestCost = min(costs)
+            print "Best cost:",bestCost
+            print "Results:"
+            for j,r in data[problemIndex].iteritems():
+                print j
+                print r.cost,r.time
+                print 
+            theoretical = model.rollout(data[problemIndex], L = mode)
+            print "Theoretical time:",theoretical
+            startTime = time.time()
+            model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout)
+            actualTime = time.time() - startTime
+            print "Total time:",actualTime
+            return (actualTime,theoretical)
+        
+        discrepancies = Pool(10).map(policyEvaluator,thingsToEvaluate)
+        print "DISCREPANCIES:",discrepancies
+        with open('discrepancies.p','wb') as handle:
+            pickle.dump(discrepancies, handle)
         sys.exit(0)
         
         
