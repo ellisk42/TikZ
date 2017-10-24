@@ -50,6 +50,8 @@ class TimeshareTask():
 def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = None):
     startTime = time.time()
     while len(tasks) > 0:
+        sliceStartTime = time.time()
+        
         if globalTimeout != None and time.time() - startTime > globalTimeout: break
 
         # Normalize the log scores and don't sign anything to anyone with less than minimum slice time
@@ -77,6 +79,10 @@ def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = No
             elif result == "finished": assert False
             else: yield result
         tasks = [ t for t in tasks if not t.finished ]
+
+        sliceTotalTime = time.time() - sliceStartTime
+        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d\%"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        
     
 if __name__ == "__main__":
     def callback():
