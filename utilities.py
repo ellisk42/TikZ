@@ -239,26 +239,36 @@ def frequencyOfMode(l):
     for x in l: f[x] = 1 + f.get(x,0)
     return max(f.values())
 
-def crossValidate(fullDataSet, folds = 10, randomSeed = 0):
+def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False):
     if folds == 1:
         print "crossValidate: Not doing cross validation because I only have one fold."
         yield fullDataSet, fullDataSet
     else:
         n = len(fullDataSet)
         seed(randomSeed)
-        indices = randomlyPermuteList(range(n))
+        if doNotPermute: indices = range(n)
+        else: indices = randomlyPermuteList(range(n))
         
-        testSize = int(n/folds)
+        smallTestSize = int(math.floor(n/float(folds)))
+        bigTestSize = int(math.ceil(n/float(folds)))
+        numberOfBig = n - folds*smallTestSize
 
+        start = 0
+        thingsWeHaveTestedOn = set([])
         for f in range(folds):
-            start = testSize*f
-            end = testSize + start
-            train = indices[:start] + indices[end:]
-            test = indices[start:end]
+            if f < numberOfBig: ending = start + bigTestSize
+            else: ending = start + smallTestSize
+            train = indices[:start] + indices[ending:]
+            test = indices[start:ending]
+            start = ending
             assert len(train) + len(test) == n
             assert len(set(train)&set(test)) == 0
+            assert len(set(test)&thingsWeHaveTestedOn) == 0
+            thingsWeHaveTestedOn = thingsWeHaveTestedOn|set(test)
+            if f == folds - 1:
+                assert len(thingsWeHaveTestedOn) == n
             yield ([ fullDataSet[j] for j in train ], [ fullDataSet[j] for j in test ])
 
 if __name__ == "__main__":
-    for train, test in crossValidate(range(10),5):
+    for train, test in crossValidate(range(98),20,doNotPermute = True):
         print train, test

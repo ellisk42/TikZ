@@ -474,9 +474,9 @@ if __name__ == '__main__':
 
     
     bins = np.logspace(0,5,30)
-    figure = plot.figure(figsize = (6,2))
+    figure = plot.figure(figsize = (6,1.6))
     for j,(ys,l) in enumerate([(exact,'sketch'),(optimistic,'oracle'),(policy,'learned policy (ours)')]):
-        ys += [10**5]*(totalFailures*len(ys)/(100 - totalFailures))
+        ys += [TIMEOUT]*totalFailures
         plot.subplot(1,3,1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
         if j == 1: plot.gca().set_xlabel('time (sec)',fontsize = 9)
@@ -499,7 +499,7 @@ if __name__ == '__main__':
 
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
         plot.text(median * 1.5,
-                  plot.gca().get_ylim()[1]*0.8,
+                  plot.gca().get_ylim()[1]*0.7,
                   'median: %ds'%(int(median)),
                   fontsize = 7)#, rotation = 90)
         
