@@ -263,7 +263,10 @@ class SynthesisPolicy():#nn.Module):
         scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
         tasks = [ TimeshareTask(invokeExecuteMethod, [j], s) for j,s in zip(jobs, scores) ]
         bestResult = None
-        for result in executeTimeshareTasks(tasks, globalTimeout = globalTimeout):
+        for result in executeTimeshareTasks(tasks,
+                                            dt = 5.0, # Share 5s at a time
+                                            minimumSlice = 1.0, # don't let anything run for less than a second
+                                            globalTimeout = globalTimeout):
             if result.cost != None:
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result
@@ -444,7 +447,6 @@ if __name__ == '__main__':
                         regularize = arguments.regularize)
             if arguments.save:
                 model.save(path)            
-        foldCounter += 1
         if not arguments.evaluate:
             policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
         else:
