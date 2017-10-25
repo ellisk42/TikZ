@@ -1321,7 +1321,9 @@ def handleTest(a):
         if not gotGroundTruth:
             print "Did not get ground truth for %s"%f
     else:
-        raise Exception('No ground truth annotated for %s'%f)
+        gotGroundTruth = True
+        if l == 0:
+            raise Exception('No ground truth annotated for %s'%f)
     # place where we will save the parses
     parseDirectory = f[:-4] + "-parses"
     model.saveParticles(particles, parseDirectory, targetImage)
