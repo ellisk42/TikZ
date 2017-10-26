@@ -239,6 +239,14 @@ def frequencyOfMode(l):
     for x in l: f[x] = 1 + f.get(x,0)
     return max(f.values())
 
+def interleaveGenerators(generators):
+    while generators != []:
+        try:
+            yield next(generators[0])
+            generators = generators[1:] + [generators[0]]
+        except StopIteration:
+            generators = generators[1:]
+
 def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False):
     if folds == 1:
         print "crossValidate: Not doing cross validation because I only have one fold."
@@ -270,5 +278,8 @@ def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False)
             yield ([ fullDataSet[j] for j in train ], [ fullDataSet[j] for j in test ])
 
 if __name__ == "__main__":
+    for x in interleaveGenerators([iter(range(9)),iter(xrange(3))]):
+        print x
+    assert False
     for train, test in crossValidate(range(98),20,doNotPermute = True):
         print train, test

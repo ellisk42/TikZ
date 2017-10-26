@@ -369,7 +369,7 @@ class Loop():
     def extrapolations(self):
         for b in self.body.extrapolations():
             for boundary in ([None] if self.boundary == None else self.boundary.extrapolations()):
-                for ub,lb in [(1,1),(1,0),(0,1),(0,0)]:
+                for ub,lb in [(1,0),(0,1),(1,1),(0,0)]:
                     yield Loop(self.v, '%s + %d'%(self.bound,ub), b,
                                lowerBound = self.lowerBound - lb,
                                boundary = boundary)
