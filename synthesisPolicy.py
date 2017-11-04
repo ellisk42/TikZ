@@ -497,6 +497,8 @@ if __name__ == '__main__':
         ys = [y for y in ys if y != TIMEOUT ]
         print l," mean",np.mean(ys)
 
+        print l," : solved within a minute:",len([y for y in ys if y <= 60.0 ])
+
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
         plot.text(median * 1.5,
                   plot.gca().get_ylim()[1]*0.7,
