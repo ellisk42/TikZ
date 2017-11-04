@@ -130,7 +130,7 @@ class SynthesisPolicy():#nn.Module):
                 assert False
             regularizedLoss = loss + regularize * self.l2parameters()
             o.zero_grad()
-            loss.backward()
+            regularizedLoss.backward()
             o.step()
 
 
