@@ -233,6 +233,11 @@ def removeDuplicateStrings(xs):
     for x in xs: t[str(x)] = x
     return t.values()
 
+def reflectPoint(a,r,px,py):
+    if a == 'x': return (r - px,py)
+    if a == 'y': return (px,r - py)
+    assert False
+
 def frequencyOfMode(l):
     if l == []: return 0
     f = {}

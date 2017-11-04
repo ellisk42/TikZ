@@ -8,6 +8,7 @@ import itertools as iterationTools
 import numpy as np
 import random
 
+
 def reflectPoint(rx,ry,px,py):
     if rx != None: return (rx - px,py)
     if ry != None: return (px,ry - py)
@@ -133,6 +134,18 @@ class Environment():
         return Environment([(v,x) for v,(x,y) in self.bindings ])
     def secondInstantiation(self):
         return Environment([(v,y) for v,(x,y) in self.bindings ])
+class EnumerationEnvironment():
+    def __init__(self, goal, progress, variableRanges):
+        self.variableRanges = variableRanges
+        self.goal = goal
+        self.progress = progress
+        self.difference = goal - progress
+
+    def introduceFreeVariable(self,fv):
+        e = dict(self.variableRanges)
+        e[fv] = None
+        return EnumerationEnvironment(self.goal, self.progress, e)
+        
     
 class AbstractionFailure(Exception):
     pass
@@ -154,10 +167,25 @@ class LinearExpression():
         else:
             return "%s * %s + %s"%(self.m,self.x,self.b)
     def __eq__(self,o): return isinstance(o,LinearExpression) and self.m == o.m and self.x == o.x and self.b == o.b
+    def __ne__(self,o): return not (self == o)
+    def evaluate(self,e):
+        if self.x == None: return self.b
+        return self.m*e.lookup(self.x) + self.b
 
     def freeVariables(self):
         if x == None: return []
         return [x]
+
+    def canonicalKey(self): return (self.m,self.x,self.b)
+    def canonical(self): return self
+
+    @staticmethod
+    def enumerate(freeVariables = [], maximumIntercept = 15, maximumSlope = 5):
+        for b in range(maximumIntercept):
+            yield LinearExpression(0,None,b)
+            for v in freeVariables:
+                for m in range(-maximumSlope,maximumSlope + 1):
+                    if m != 0: yield LinearExpression(m,v,b)
     
     def abstract(self,other,e):
         if self.x != other.x: raise AbstractionFailure('')
@@ -216,6 +244,25 @@ class Primitive():
         return
         yield
     def convertToPython(self): return "[%s(%s)]"%(self.k,", ".join(map(str,self.arguments)))
+    def evaluate(self,e): return set([self.evaluate_(e)])
+    def evaluate_(self,e):
+        if self.k == 'circle':
+            return Circle.absolute(self.arguments[0].evaluate(e),
+                                   self.arguments[1].evaluate(e))
+        if self.k == 'rectangle':
+            return Rectangle.absolute(self.arguments[0].evaluate(e),
+                                      self.arguments[1].evaluate(e),
+                                      self.arguments[2].evaluate(e),
+                                      self.arguments[3].evaluate(e))
+        if self.k == 'line':
+            return Line.absolute(self.arguments[0].evaluate(e),
+                                 self.arguments[1].evaluate(e),
+                                 self.arguments[2].evaluate(e),
+                                 self.arguments[3].evaluate(e),
+                                 arrow = 'True' in self.arguments[4],
+                                 dashed = 'True' in self.arguments[5])
+        raise Exception('unknown primitives when evaluating')
+    
     def extrapolations(self): yield self
     def explode(self):
         return self
@@ -230,8 +277,21 @@ class Primitive():
 
     def removeDeadCode(self): return self
 
+    def canonicalKey(self): return tuple([self.k] + [ a if isinstance(a,str) else a.canonicalKey() for a in self.arguments ])
+    def canonical(self): return self
+
     def mapExpression(self,l):
         return Primitive(self.k, *[ (l(a) if isinstance(a,LinearExpression) else a) for a in self.arguments ])
+
+    @staticmethod
+    def enumerate(environment):
+        if any([isinstance(x,Circle) for x in environment.difference ]):
+            for x in LinearExpression.enumerate(environment.variableRanges.keys()):
+                for y in LinearExpression.enumerate(environment.variableRanges.keys()):
+                    yield Primitive("circle",x,y)
+    def enumerateNeighbors(self,e):
+        return
+        yield 
 
     def walk(self):
         yield self
@@ -266,6 +326,19 @@ class Reflection():
     def removeDeadCode(self):
         body = self.body.removeDeadCode()
         return Reflection(self.axis, self.coordinate, body)
+
+    def evaluate(self,environment):
+        body = self.body.evaluate(environment)
+        return body | set([ x.reflect(self.axis,self.coordinate) for x in body ])
+
+    @staticmethod
+    def enumerate(environment, maximumCoordinate = 16):
+        for c in range(maximumCoordinate):
+            yield Reflection('x', c, Block([]))
+            yield Reflection('y', c, Block([]))
+    def enumerateNeighbors(self,environment):
+        for n in self.body.enumerateNeighbors(environment):
+            yield Reflection(self.axis,self.coordinate,n)
             
     def hoistReflection(self):
         for j,p in enumerate(self.body.items):
@@ -274,6 +347,11 @@ class Reflection():
                 del newBlock[j]
                 newBlock = Block(newBlock)
                 yield Block([p,Reflection(self.axis,self.coordinate,newBlock)])
+
+    def canonicalKey(self):
+        return (self.axis,self.coordinate,self.body.canonicalKey())
+    def canonical(self):
+        return Reflection(self.axis, self.coordinate, self.body.canonical())
                 
     def __str__(self):
         return "Reflection(%s,%s,%s)"%(self.axis, self.coordinate,self.body)
@@ -336,10 +414,30 @@ class Loop():
         self.body = body
         self.boundary = boundary
         self.lowerBound = lowerBound
+    def evaluate(self,environment):
+        accumulator = set([])
+        for j in range(self.bound.evaluate(environment)):
+            environmentp = environment.extend(self.v,j)[0]
+            if j > self.lowerBound and self.boundary != None:
+                accumulator|= self.boundary.evaluate(environmentp)
+            accumulator|= self.body.evaluate(environmentp)
+        return accumulator
+    
     def removeDeadCode(self):
         body = self.body.removeDeadCode()
         boundary = self.boundary.removeDeadCode() if self.boundary != None else None
+        if boundary != None and boundary.items == []: boundary = None
         return Loop(self.v, self.bound, body, boundary = boundary, lowerBound = self.lowerBound)
+    def canonicalKey(self):
+        return (self.v,
+                self.bound.canonicalKey(),
+                self.body.canonicalKey(),
+                self.boundary.canonicalKey() if self.boundary else None,
+                self.lowerBound)
+    def canonical(self):
+        return Loop(self.v,self.bound.canonical(),self.body.canonical(),
+                    self.boundary and self.boundary.canonical(),
+                    self.lowerBound)
     def hoistReflection(self):
         for h in self.body.hoistReflection():
             yield Loop(self.v,self.bound,h,boundary = self.boundary,lowerBound = self.lowerBound)
@@ -456,16 +554,46 @@ class Loop():
     def depth(self): return 1 + max(self.body.depth(),
                                     0 if self.boundary == None else self.boundary.depth())
 
-                
+    @staticmethod
+    def enumerate(environment):
+        vs = ['i','j']
+        if len(environment.variableRanges) < 2:
+            v = vs[len(environment.variableRanges)]
+            for bound in LinearExpression.enumerate(environment.variableRanges.keys(),
+                                                    maximumIntercept = 4,
+                                                    maximumSlope = 2):
+                if bound.m == 0 and bound.b < 2: continue
+                yield Loop(v, bound, Block([]), boundary = None)#Block([]))
+
+    def enumerateNeighbors(self,environment):
+        environment = environment.introduceFreeVariable(self.v)
+        for body in self.body.enumerateNeighbors(environment):
+            yield Loop(self.v,self.bound,body,boundary = self.boundary)
+        if self.boundary != None:
+            for boundary in self.boundary.enumerateNeighbors(environment):
+                yield Loop(self.v,self.bound,self.body,boundary = boundary)
+        else:
+            yield Loop(self.v,self.bound,self.body,boundary = Block([]))
+        
 class Block():
     def pretty(self): return ";\n".join([x.pretty() for x in self.items ])
     def convertToSequence(self):
+        e = Environment([])
+        return Sequence([x for p in self.items for x in p.evaluate(e)  ])
         return Sequence([ p.evaluate() for p in eval(self.convertToPython()) ])
     def __init__(self, items): self.items = items
     def __str__(self): return "Block([%s])"%(", ".join(map(str,self.items)))
+    def evaluate(self,environment):
+        accumulator = set([])
+        for x in self.items: accumulator|= x.evaluate(environment)
+        return accumulator
     def convertToPython(self):
         if self.items == []: return "[]"
         return " + ".join([ x.convertToPython() for x in self.items ])
+    def canonicalKey(self): return tuple([ x.canonicalKey() for x in self.items ])
+    def canonical(self):
+        return Block(list(sorted((x.canonical() for x in self.items),
+                                 key = lambda y: y.canonicalKey())))
     def extrapolations(self):
         if self.items == []: yield self
         else:
@@ -628,6 +756,19 @@ class Block():
 
     def depth(self):
         return max([x.depth() for x in self.items ])
+
+    def enumerateNeighbors(self, environment):
+        # todo: canonical form: [primitives, reflections, loops]
+        for l in Loop.enumerate(environment):
+            yield Block([l] + self.items)
+        for r in Reflection.enumerate(environment):
+            yield Block([r] + self.items)
+        for p in Primitive.enumerate(environment):
+            yield Block([p] + self.items)
+        for j,x in enumerate(self.items):
+            for n in x.enumerateNeighbors(environment):
+                yield Block(self.items[:j] + [n] + self.items[j+1:])
+            
             
                         
             

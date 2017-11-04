@@ -2,7 +2,7 @@ from render import render
 from random import random,choice
 import numpy as np
 
-from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES,frameImageNicely
+from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES,frameImageNicely,reflectPoint
 
 
 import math
@@ -68,6 +68,8 @@ class Program():
     def noisyTikZ(self):
         return "\n".join(self.noisyEvaluate())
     def __eq__(self,o): return str(self) == str(o)
+    def __hash__(self): return hash(str(self))
+    def __repr__(self): return str(self)
     def __ne__(self,o): return str(self) != str(o)
 
 class Expression():
@@ -197,6 +199,19 @@ class Line(Program):
         if self.length() == 0.0:
             # craise Exception('Attempt to create line with zero length')
             pass
+
+    def reflect(self,a,c):
+        (x1,y1) = reflectPoint(a,c,self.points[0].x,self.points[0].y)
+        (x2,y2) = reflectPoint(a,c,self.points[1].x,self.points[1].y)
+        if self.arrow:
+            return Line.absolute(x1,y1,x2,y2,arrow = True,solid = self.solid)
+        else:
+            (a,b) = min((x1,y1),(x2,y2))
+            (c,d) = max((x1,y1),(x2,y2))
+            return Line.absolute(a,b,c,d,
+                                 arrow = False,
+                                 solid = self.solid)
+
 
     def round(self, p):
         return Line([q.round(p) for q in self.points ],
@@ -383,6 +398,14 @@ class Rectangle(Program):
         self.p1 = p1
         self.p2 = p2
 
+    def reflect(self,a,c):
+        (x1,y1) = reflectPoint(a,c,self.p1.x,self.p1.y)
+        (x2,y2) = reflectPoint(a,c,self.p1.x,self.p2.y)
+        return Rectangle.absolute(min(x1,x2),
+                                  min(y1,y2),
+                                  max(x1,x2),
+                                  max(y1,y2))
+
     def round(self,p):
         return Rectangle(self.p1.round(p),self.p2.round(p))
         
@@ -528,6 +551,10 @@ class Circle(Program):
     def round(self,p):
         return Circle(self.center.round(p),
                       round(self.radius/p)*p)
+
+    def reflect(self,a,c):
+        x,y = reflectPoint(a,c,self.center.x,self.center.y)
+        return Circle(AbsolutePoint(x,y),self.radius)
 
     def draw(self,context):
         context.set_line_width(STROKESIZE)
@@ -741,17 +768,20 @@ class Sequence(Program):
             return Sequence([ (l if l != r else l.mutate()) for l in self.lines ])
     def extent(self):
         parse = self
-        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ]) - 1
-        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ]) - 1
-        x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ]) + 1
-        y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ]) + 1
-
-        x0 = min([x0,0])
-        y0 = min([y0,0])
-        x1 = max([x1,MAXIMUMCOORDINATE])
-        y1 = max([y1,MAXIMUMCOORDINATE])
+        x0 = min([x for l in parse.lines for x in l.usedXCoordinates()  ] + [1]) - 1
+        y0 = min([y for l in parse.lines for y in l.usedYCoordinates()  ] + [1]) - 1
+        x1 = max([x for l in parse.lines for x in l.usedXCoordinates()  ] + [MAXIMUMCOORDINATE - 1]) + 1
+        y1 = max([y for l in parse.lines for y in l.usedYCoordinates()  ] + [MAXIMUMCOORDINATE - 1]) + 1
 
         return (x0,y0,x1,y1)
+
+    def extentInWindow(self):
+        X,Y = self.usedCoordinates()
+        for c in X|Y:
+            if c < 0 or c > MAXIMUMCOORDINATE:
+                return False
+        return True
+    
     def framedRendering(self, reference = None):
         (x0,y0,x1,y1) = self.extent()
         return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
