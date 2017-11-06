@@ -11,6 +11,14 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 import torch.optim as optimization
 
+class LineDecoder(nn.Module):
+    def __init__(self, lexicon, embeddingSize = 30):
+        super(self.__class__,self).__init__()
+        self.lexicon = lexicon
+        self.model = nn.LSTM
+
+    def sample():
+
 class DataEncoder(nn.Module):
     """
     A network that takes something like circle(9,2) and produces an embedding
@@ -22,6 +30,90 @@ class DataEncoder(nn.Module):
 
     def forward(self, x):
         return self.linear1(x).clamp(min = 0)
+
+class ExpressionEncoder(nn.Module):
+    """
+    Converts m*x+b to a vector
+    """
+    def __init__(self, embeddingSize, H = 20):
+        super(ExpressionEncoder,self).__init__()
+        self.linear1 = nn.Linear(3, H)
+        self.linear2 = nn.Linear(H, embeddingSize)
+
+    def forward(self, x):
+        return self.linear2(self.linear1(x).clamp(min = 0)).clamp(min = 0)
+
+    def variableOfExpression(self, e):
+        v = 0
+        if e.v != None:
+            v = ord(e.v) - ord('i') + 1
+        return Variable(torch.from_numpy(np.array([e.m, v, e.b]).astype(np.float32)))
+
+class ReflectionEncoder(nn.Module):
+    """
+    Converts reflect([x|y] = c) to a vector
+    """
+    def __init__(self, embeddingSize, H = 20):
+        super(ReflectionEncoder,self).__init__()
+        self.linear1 = nn.Linear(3, H)
+        self.linear2 = nn.Linear(H, embeddingSize)
+
+    def forward(self, x):
+        return self.linear2(self.linear1(x).clamp(min = 0)).clamp(min = 0)
+
+    def variableOfReflection(self, e):
+        return Variable(torch.from_numpy(np.array([int(e.axis == 'x'), e.coordinate]).astype(np.float32)))
+
+   
+class LoopEncoder(nn.Module):
+    def __init__(self, embeddingSize, H = 20):
+        super(self.__class__,self).__init__()
+        self.linear1 = nn.Linear(embeddingSize, H)
+        self.linear2 = nn.Linear(H, embeddingSize)
+
+    def forward(self, x):
+        """
+        x: embedding of the loop iteration expression
+        """
+        return self.linear2(self.linear1(x).clamp(min = 0)).clamp(min = 0)
+
+class ReflectionDecoder(nn.Module):
+    """
+    Converts and embedding to a distribution over things like reflect([x|y] = c)
+    """
+    def __init__(self, coordinateRange, embeddingSize, H = 20):
+        super(self.__class__,self).__init__()
+        self.linear1 = nn.Linear(embeddingSize, H)
+        self.axis = nn.Linear(embeddingSize, 2)
+        self.coordinate = nn.Linear(embeddingSize, len(coordinateRange))
+
+        self.coordinateRange = coordinateRange
+        self.coordinate2target = dict(zip(coordinateRange,range(100)))
+
+    def forward(self, x):
+        h = self.linear1(x).clamp(min = 0)
+        return F.log_softmax(self.axis(h)), F.log_softmax(self.coordinate(h))
+
+    def crossEntropyLoss(self, x, a,c):
+        a_,c_ = self.forward(x)
+        return  - (a_.dot(a) + c_.dot(c))
+
+    def targetsOfReflection(self, r):
+        at = torch.zeros(2)
+        if r.axis == 'x': at[0] = 1.0
+        else: at[1] = 1.0
+        ct = torch.zeros(len(self.coordinateRange))
+        ct[self.coordinate2target[r.coordinate]] = 1.0
+        return Variable(at),Variable(ct)
+
+    def beam(self, e):
+        a,c = self.forward(e)
+        return sorted(( (a.data[slopeIndex] + c.data[interceptIndex],
+                         Reflection(axis, coordinate)) \
+                         for axisIndex, axis in enumerate(['x','y']) \
+                         for coordinateIndex, coordinate in enumerate(self.coordinateRange)), \
+                       reverse = True)
+
 
 class ExpressionDecoder(nn.Module):
     """
@@ -63,7 +155,17 @@ class ExpressionDecoder(nn.Module):
                          for interceptIndex, intercept in enumerate(self.interceptRange)), \
                        reverse = True)
         
+class ContextDecider(nn.Module):
+    """Scores how good it is to add a line of code to a given context"""
+    def __init__(self, embeddingSize, H = 10):
+        super(self.__class__,self).__init__()
 
+        self.linear1 = nn.Linear(embeddingSize*2,H)
+        self.linear2 = nn.Linear(H,1)
+
+    def forward(self, problem, context):
+        h = self.linear1(torch.cat([problem, context])).clamp(min = 0)
+        return self.linear2(h)
 
 class SearchPolicy(nn.Module):
     def __init__(self):
@@ -74,8 +176,17 @@ class SearchPolicy(nn.Module):
         self.circleEncoder = DataEncoder(2, observationEmbeddingSize)
         self.rectangleEncoder = DataEncoder(4, observationEmbeddingSize)
 
+        self.loopEncoder = LoopEncoder(observationEmbeddingSize)
+        self.reflectionEncoder = ReflectionEncoder(observationEmbeddingSize)
+
         self.x1decoder = ExpressionDecoder(range(-4,5), range(0,17), observationEmbeddingSize)
         self.y1decoder = ExpressionDecoder(range(-4,5), range(0,17), observationEmbeddingSize)
+
+        self.contextDecider = ContextDecider(observationEmbeddingSize)
+
+    def contextVector(self, context):
+        if isinstance(context,list): return sum(self.contextVector(p) for p in context )
+        if isinstance(context,Loop): return self.loopEncoder(self)
 
     def encodeObservation(self, o):
         if isinstance(o,Circle):
@@ -88,8 +199,11 @@ class SearchPolicy(nn.Module):
     def encodeScene(self, scene):
         return sum(self.encodeObservation(o) for o in scene )
 
-    def crossEntropyLoss(self, scene, target):
+    def crossEntropyLoss(self, scene, target, targetContext, otherContexts):
         embedding = self.encodeScene(scene)
+
+        self.contextDecider()
+        
         if isinstance(target,Primitive) and target.k == 'circle':
             l = self.x1decoder.crossEntropyLoss(embedding,
                                                 *self.x1decoder.targetsOfExpression(target.arguments[0]))
