@@ -45,7 +45,8 @@ def showImage(image):
 def saveMatrixAsImage(m,f):
     Image.fromarray(m).convert('RGB').save(f)
 
-
+def indent(s):
+    return "\n".join("  "+x for x in s.splitlines())
 
 def crossEntropyWithMask(labels, masks, predictions):
     crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = labels,logits = predictions)

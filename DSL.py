@@ -318,7 +318,8 @@ class Primitive():
 
 class Reflection():
     def pretty(self):
-        return "reflect(%s = %s){\n%s\n}"%(self.axis,self.coordinate,self.body.pretty())
+        return "reflect(%s = %s)\n%s"%(self.axis,self.coordinate,
+                                       indent(self.body.pretty()))
     def __init__(self, axis, coordinate, body):
         self.axis = axis
         self.coordinate = coordinate
@@ -403,10 +404,10 @@ class Reflection():
 
 class Loop():
     def pretty(self):
-        p = "for (%s < %s){\n"%(self.v,self.bound)
+        p = "for (%s < %s)\n"%(self.v,self.bound)
         if self.boundary != None:
-            p += "if (%s > 0){\n%s\n}\n"%(self.v,self.boundary.pretty())
-        p += "%s\n}"%(self.body.pretty())
+            p += indent("if (%s > 0)\n%s\n\n"%(self.v,indent(self.boundary.pretty())))
+        p += "%s"%(indent(self.body.pretty()))
         return p
     def __init__(self, v, bound, body, boundary = None, lowerBound = 0):
         self.v = v
@@ -576,13 +577,14 @@ class Loop():
             yield Loop(self.v,self.bound,self.body,boundary = Block([]))
         
 class Block():
-    def pretty(self): return ";\n".join([x.pretty() for x in self.items ])
+    def pretty(self): return "\n".join([x.pretty() for x in self.items ])
     def convertToSequence(self):
         e = Environment([])
         return Sequence([x for p in self.items for x in p.evaluate(e)  ])
         return Sequence([ p.evaluate() for p in eval(self.convertToPython()) ])
     def __init__(self, items): self.items = items
     def __str__(self): return "Block([%s])"%(", ".join(map(str,self.items)))
+    def __repr__(self): return str(self)
     def evaluate(self,environment):
         accumulator = set([])
         for x in self.items: accumulator|= x.evaluate(environment)

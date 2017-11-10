@@ -127,13 +127,13 @@ class DataEncoder(nn.Module):
 
 class SearchPolicy(nn.Module):
     def __init__(self, lexicon):
-        super(self.__class__,self).__init__()
+        super(SearchPolicy, self).__init__()
 
         H = 32
         self.lineDecoder = LineDecoder(lexicon,
                                        # The line decoder needs to take both environment and problem
                                        H = 2*H)
-        self.lineEncoder = LineEncoder([l for l in lexicon if not (l in ['START','END']) ],
+        self.lineEncoder = LineEncoder(lexicon,
                                        H = H)
         self.circleEncoder = DataEncoder(2, H)
 
@@ -147,7 +147,7 @@ class SearchPolicy(nn.Module):
                 for c in s)
 
     def encodeEnvironment(self, environment, seed):
-        return self.lineEncoder.encoding(environment, seed)
+        return self.lineEncoder.encoding(["START"] + environment, seed)
 
     def environmentLogLikelihoods(self, environments, problem):
         environmentEncodings = [ self.encodeEnvironment(e, problem)
@@ -156,18 +156,27 @@ class SearchPolicy(nn.Module):
                               for e in environmentEncodings ]
         return torch.nn.functional.log_softmax(torch.cat(environmentScores).view(-1))
 
-    def loss(self, s,
-             target, # the target line of code: should be a list of tokens
-             environments, # the target environment (first) and the alternatives (following)
-             criteria):
-        problem = self.encodeProblem(s).view(1,-1)
+    def loss(self, example, criteria):
+        problem = self.encodeProblem(example.problem).view(1,-1)
 
-        environmentLoss =  - self.environmentLogLikelihoods(environments, problem)[0]
+        environmentLoss =  - self.environmentLogLikelihoods(example.environments, problem)[0]
 
-        e = self.encodeEnvironment(environments[0], problem)
+        e = self.encodeEnvironment(example.environments[0], problem)
         seed = torch.cat([problem, e],dim = 1)
         
-        return self.lineDecoder.loss(target, seed, criteria) + environmentLoss
+        return self.lineDecoder.loss(example.target + ["END"], seed, criteria) + environmentLoss
+
+    def makeOracleExamples(self, program, problem):
+        examples = []
+        for intermediateProgram, environment, target in self.Oracle(program):
+            intermediateProblem = self.residual(problem, self.evaluate(intermediateProgram))
+            environments = self.candidateEnvironments(intermediateProgram)
+            environments.remove(environment)
+            environments = [environment] + environments
+            ex = PolicyTrainingExample(problem, target, environments)
+            examples.append(ex)
+            
+        return examples
 
     def sampleLine(self, s, e, T = 1):
         problem = self.encodeProblem(s).view(1,-1)
@@ -184,37 +193,200 @@ class SearchPolicy(nn.Module):
         e = self.sampleEnvironment(s, environments, T = T)
         l = self.sampleLine(s, e, T = T)
         return e,l
-        
+
+    def sampleOneStep(self, problem, initialProgram):
+        environments = self.candidateEnvironments(initialProgram)
+        e,l = self.sample(problem, environments)
+        try:
+            return self.applyChange(initialProgram, e, l)
+        except: return initialProgram
         
 
+class PolicyTrainingExample():
+    def __init__(self, problem, target, environments):
+        self.problem, self.target, self.environments = problem, target, environments
+    def __str__(self):
+        return "PolicyTrainingExample(problem = %s, target = %s, environments = %s)"%(self.problem, self.target, self.environments)
+
+class GraphicsSearchPolicy(SearchPolicy):
+    def __init__(self):
+        LEXICON = ["START","END",
+                   "circle",
+                   "rectangle",
+                   "line","arrow = True","arrow = False","solid = True","solid = False",
+                   "for",
+                   "reflect","x","y",
+                   "i","j","None"] + map(str,range(-5,20))
+        super(GraphicsSearchPolicy,self).__init__(LEXICON)
+
+    def candidateEnvironments(self, program):
+        return list(e for e in candidateEnvironments(program))
+
+    def applyChange(self, program, environment, line):
+        if isinstance(program, Loop):
+            return Loop(body = self.applyChange(program.body, environment, line),
+                        v = program.v,
+                        bound = program.bound)
+        if isinstance(program, Reflection):
+            return Reflection(body = self.applyChange(program.body, environment, line),
+                              axis = program.axis,
+                              coordinate = program.coordinate)
+
+        assert isinstance(program, Block)
+        
+        if environment == []:
+            return Block([self.parseLine(line)] + program.items)
+        # Figure out what it is that's being indexed into
+        for j,l in enumerate(program.items):
+            s = serializeLine(l)
+            if s == environment[:len(s)]:
+                lp = self.applyChange(l, environment[len(s):], line)
+                newItems = list(program.items)
+                newItems[j] = lp
+                return Block(newItems)
+        raise Exception('Environment indexes nonexistent context')
+    
+    def Oracle(self, program): return list(Oracle(program))
+
+    def evaluate(self, program): return program.evaluate(Environment([]))
+    def residual(self, goal, current):
+        assert len(current - goal) == 0
+        return goal - current
+
+    def parseLine(self, l):
+        def get(l):
+            n = l[0]
+            del l[0]
+            return n
+        def finish(l):
+            if l != []: raise Exception('Extra symbols in line')
+        def parseLinear(l):
+            b = int(get(l))
+            x = get(l)
+            m = int(get(l))
+            if x == 'None': x = None
+            return LinearExpression(m,x,b)
+        k = get(l)
+        if k == 'circle':
+            x = parseLinear(l)
+            y = parseLinear(l)
+            finish(l)
+            return Primitive(k,x,y)
+        if k == 'for':
+            v = get(l)
+            b = parseLinear(l)
+            finish(l)
+            return Loop(v = v, bound = b, body = Block([]))
+        if k == 'reflect':
+            a = get(l)
+            c = int(get(l))
+            finish(l)
+            return Reflection(body = Block([]), axis = a, coordinate = c)
+        raise Exception('parsing line '+k)
+            
+
+    
+        
+        
+@dispatch(Block)
+def Oracle(b):
+    for j,x in enumerate(b.items):
+        serialized = serializeLine(x)
+        yield Block(b.items[:j]), [], serialized
+        for program, environment, line in Oracle(x):
+            yield Block(b.items[:j] + [program]), serialized + environment, line
+@dispatch(Primitive)
+def Oracle(p):
+    return
+    yield
+@dispatch(Loop)
+def Oracle(l):
+    for program, environment, line in Oracle(l.body):
+        yield Loop(v = l.v, bound = l.bound, body = program), environment, line
+@dispatch(Reflection)
+def Oracle(l):
+    for program, environment, line in Oracle(l.body):
+        yield Reflection(axis = l.axis, coordinate = l.coordinate, body = program), environment, line
+    
+
+
+@dispatch(Loop)
+def serializeLine(l):
+    return ["for",l.v] + serializeLine(l.bound)
+@dispatch(Reflection)
+def serializeLine(r):
+    return ["reflect",r.axis,str(r.coordinate)]
+@dispatch(LinearExpression)
+def serializeLine(e):
+    return [str(e.b),str(e.x),str(e.m)]
+@dispatch(Primitive)
+def serializeLine(p):
+    s = [p.k]
+    for a in p.arguments[:4]:
+        s += serializeLine(a)
+    if p.k == 'line':
+        s += ["arrow = True" if "True" in p.arguments[4] else "arrow = False" ]
+        s += ["solid = True" if "True" in p.arguments[5] else "solid = False"]
+    return s
+
+@dispatch(Circle)
+def serializeObservation(c):
+    return ["circle",str(c.center.x),str(c.center.y)]
+@dispatch(Rectangle)
+def serializeObservation(c):
+    return ["rectangle",str(c.p1.x),str(c.p1.y),str(c.p2.x),str(c.p2.y)]
+
+@dispatch(Block)
+def candidateEnvironments(b):
+    yield []
+    for x in b.items:
+        for e in candidateEnvironments(x):
+            yield e
+@dispatch(Primitive)
+def candidateEnvironments(_):
+    return
+    yield 
+@dispatch(Loop)
+def candidateEnvironments(l):
+    this = serializeLine(l)
+    for e in candidateEnvironments(l.body):
+        yield this + e
+@dispatch(Reflection)
+def candidateEnvironments(r):
+    this = serializeLine(l)
+    for e in candidateEnvironments(l.body):
+        yield this + e
+
+
 if __name__ == "__main__":
-    lexicon = ["START","END","CIRCLE","for","x","y","reflect"] + map(str,range(1,16))
-    p = SearchPolicy(lexicon)
+    p = GraphicsSearchPolicy()
+
     o = optimization.Adam(p.parameters(), lr = 0.001)
     criteria = nn.CrossEntropyLoss()
     
     for step in range(10000):
         x = random.choice(range(1,4))
         y = random.choice(range(1,4))
-        scene = [Circle.absolute(x,y)]
-        target = ["CIRCLE",str(x),str(y),"END"]
+        scene = {Circle.absolute(x,y)}
+        program = Block([Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))])
 
-        desiredEnvironment = ["reflect","x","1"]
-        alternativeEnvironment = ["for","x","2"]
-        environments = [desiredEnvironment,alternativeEnvironment]
+        examples = p.makeOracleExamples(program, scene)
+        
 
-        l = p.lineEncoder.tensorOfSymbols(target[:-1])
-        h = p.encodeProblem(scene).view(1,-1)
-
-        o.zero_grad()
-        loss = p.loss(scene, target, environments, criteria)
-        loss.backward()
-        o.step()
+        for example in examples:
+            o.zero_grad()
+            loss = p.loss(example, criteria)
+            loss.backward()
+            o.step()
 
         if step%100 == 0:
             print step,'\t',loss.data[0]
-            print scene[0]
-            print p.sample(scene, environments)
+            print scene
+            p0 = Block([])
+            print p.sampleOneStep(scene, p0)
+            e = p.sampleEnvironment(scene, p.candidateEnvironments(p0))
+            print e
+            print p.sampleLine(scene, e)
             #print p.sample(scene, T = 1)
 #            print p.beam(p.encodeScene(scene))[0][1],scene[0]
 
