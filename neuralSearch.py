@@ -10,6 +10,9 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Variable
 import torch.optim as optimization
+import torch.cuda as cuda
+
+GPU = cuda.is_available()
 
 class LineDecoder(nn.Module):
     def __init__(self, lexicon, H = 32, layers = 1, seedDimensionality = None):
@@ -45,6 +48,7 @@ class LineDecoder(nn.Module):
         t = torch.LongTensor(B,len(symbols))
         for j,s in enumerate(symbols):
             t[0,j] = self.lexicon.index(s)
+        if GPU: t = t.cuda()
         return Variable(t)
         
 
@@ -107,6 +111,7 @@ class LineEncoder(nn.Module):
         t = torch.LongTensor(B,len(symbols))
         for j,s in enumerate(symbols):
             t[0,j] = self.lexicon.index(s)
+        if GPU: t = t.cuda()
         return Variable(t)
 
     def encoding(self, symbols, seed):
@@ -129,12 +134,17 @@ class SearchPolicy(nn.Module):
     def __init__(self, lexicon):
         super(SearchPolicy, self).__init__()
 
-        H = 32
+        H = 64
+        layers = 1
         self.lineDecoder = LineDecoder(lexicon,
+                                       layers = 1,
                                        # The line decoder needs to take both environment and problem
-                                       H = 2*H)
+                                       H = 2*H,
+                                       seedDimensionality = layers*H*2)
         self.lineEncoder = LineEncoder(lexicon,
-                                       H = H)
+                                       layers = 1,
+                                       H = H,
+                                       seedDimensionality = H)
         self.circleEncoder = DataEncoder(2, H)
 
         self.environmentScore = nn.Linear(H,1)
@@ -143,8 +153,9 @@ class SearchPolicy(nn.Module):
 
     def encodeProblem(self, s):
         return sum(\
-                self.circleEncoder(Variable(torch.from_numpy(np.array([c.center.x, c.center.y])).float())) \
-                for c in s)
+                self.circleEncoder(Variable(t.cuda() if GPU else t)) \
+                   for c in s\
+                   for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()])
 
     def encodeEnvironment(self, environment, seed):
         return self.lineEncoder.encoding(["START"] + environment, seed)
@@ -195,6 +206,7 @@ class SearchPolicy(nn.Module):
         return e,l
 
     def sampleOneStep(self, problem, initialProgram):
+        problem = self.residual(problem, self.evaluate(initialProgram))
         environments = self.candidateEnvironments(initialProgram)
         e,l = self.sample(problem, environments)
         try:
@@ -250,7 +262,7 @@ class GraphicsSearchPolicy(SearchPolicy):
 
     def evaluate(self, program): return program.evaluate(Environment([]))
     def residual(self, goal, current):
-        assert len(current - goal) == 0
+        #assert len(current - goal) == 0
         return goal - current
 
     def parseLine(self, l):
@@ -357,39 +369,68 @@ def candidateEnvironments(r):
     for e in candidateEnvironments(l.body):
         yield this + e
 
+def simpleSceneSample():
+    def isolatedCircle():
+        x = random.choice(range(1,16))
+        y = random.choice(range(1,16))
+        return Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))
 
+    primitives = [isolatedCircle() for _ in range(random.choice(range(2))) ]
+    loopIterations = random.choice([3,4])
+
+    while True:
+        bx = random.choice(range(1,16))
+        mx = random.choice(range(-5,6))
+        if all([x > 0 and x < 16 for j in range(loopIterations) for x in [mx*j + bx] ]): break
+    while True:
+        by = random.choice(range(1,16))
+        my = random.choice(range(-5,6))
+        if my == 0 and mx == 0: continue
+        
+        if all([y > 0 and y < 16 for j in range(loopIterations) for y in [my*j + by] ]): break
+
+
+
+    l = Loop(v = 'j',bound = LinearExpression(0,None,loopIterations),
+             body = Block([Primitive('circle',
+                                     LinearExpression(mx,'j' if mx else None,bx),
+                                     LinearExpression(my,'j' if my else None,by))]))
+    return Block([l] + primitives)
+    
+    
 if __name__ == "__main__":
     p = GraphicsSearchPolicy()
+    if GPU: p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
     criteria = nn.CrossEntropyLoss()
     
-    for step in range(10000):
-        x = random.choice(range(1,4))
-        y = random.choice(range(1,4))
-        scene = {Circle.absolute(x,y)}
-        program = Block([Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))])
+    step = 0
+    while True:
+        step += 1
+
+        
+        program = simpleSceneSample()
+        scene = set(program.convertToSequence().lines)
 
         examples = p.makeOracleExamples(program, scene)
         
 
+        losses = []
         for example in examples:
             o.zero_grad()
             loss = p.loss(example, criteria)
             loss.backward()
             o.step()
+            losses.append(loss.data[0])
 
         if step%100 == 0:
-            print step,'\t',loss.data[0]
+            torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
+            print step,'\t',sum(losses)/len(losses)
+            losses = []
             print scene
+            print program.pretty()
             p0 = Block([])
-            print p.sampleOneStep(scene, p0)
-            e = p.sampleEnvironment(scene, p.candidateEnvironments(p0))
-            print e
-            print p.sampleLine(scene, e)
-            #print p.sample(scene, T = 1)
-#            print p.beam(p.encodeScene(scene))[0][1],scene[0]
-
-    
-        
-        
+            for _ in range(5):
+                p0 = p.sampleOneStep(scene, p0)
+                print p0
