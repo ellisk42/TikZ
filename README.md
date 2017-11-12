@@ -17,6 +17,12 @@ To run the neural network on all of the images in a directory called `drawings/`
 python recognitionModel.py test  -t drawings -b  1000 -l 0 --proposalCoefficient 1 --parentCoefficient --distanceCoefficient 5 --distance --mistakePenalty 10 --attention 16 --noisy --quiet
 ```
 
+To use the program synthesizer you will need `sketch`:
+```
+https://people.csail.mit.edu/asolar/
+```
+I used sketch 1.7.5.
+
 To run the program synthesizer on the 38th drawing (found in `drawings/expert-38.png`), do:
 ```
 python synthesizer.py -f 38 # to pass the entire problem all at once the sketch
