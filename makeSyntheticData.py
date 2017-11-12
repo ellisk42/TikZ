@@ -232,7 +232,8 @@ def handleGeneration(arguments):
     print "Generated %d training sequences into %s/%d"%(k,outputName,startingPoint)
     
 if __name__ == '__main__':
-    loadCharacters()
+    if not NIPSPRIMITIVES():
+        loadCharacters()
 
     if 'continuous' in sys.argv:
         setSnapToGrid(False)
