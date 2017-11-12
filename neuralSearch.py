@@ -434,3 +434,7 @@ if __name__ == "__main__":
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
                 print p0
+                if len(goal - p.evaluate(p0)) == 0:
+                    print "Nothing left to explain."
+                    break
+                
