@@ -436,7 +436,12 @@ if __name__ == "__main__":
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
                 print p0
-                if len(scene - p.evaluate(p0)) == 0:
+                try:
+                    denotation = p.evaluate(p0)
+                except EvaluationError:
+                    print "Error evaluating that program"
+                    break
+                if len(scene - denotation) == 0:
                     print "Nothing left to explain."
                     break
                 

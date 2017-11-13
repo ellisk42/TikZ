@@ -8,6 +8,8 @@ import itertools as iterationTools
 import numpy as np
 import random
 
+class EvaluationError(Exception):
+    pass
 
 def reflectPoint(rx,ry,px,py):
     if rx != None: return (rx - px,py)
@@ -170,7 +172,9 @@ class LinearExpression():
     def __ne__(self,o): return not (self == o)
     def evaluate(self,e):
         if self.x == None: return self.b
-        return self.m*e.lookup(self.x) + self.b
+        value = e.lookup(self.x)
+        if value == None: raise EvaluationError('Unbound variable')
+        return self.m*value + self.b
 
     def freeVariables(self):
         if x == None: return []
