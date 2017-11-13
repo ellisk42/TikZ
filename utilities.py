@@ -5,7 +5,7 @@ import sys
 import io
 import numpy as np
 from PIL import Image
-import tensorflow as tf
+
 
 def NIPSPRIMITIVES(): return True
 
@@ -49,6 +49,7 @@ def indent(s):
     return "\n".join("  "+x for x in s.splitlines())
 
 def crossEntropyWithMask(labels, masks, predictions):
+    import tensorflow as tf
     crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = labels,logits = predictions)
     print "crossEntropy = ",crossEntropy
     # zero out anything that is not in the mask
@@ -207,6 +208,7 @@ def fst(x): return x[0]
 def snd(x): return x[1]
 
 def flattenImageOutput(c1):
+    import tensorflow as tf
     c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
     print "fully connected input dimensionality:",c1d
 
