@@ -400,7 +400,9 @@ def simpleSceneSample():
     
 if __name__ == "__main__":
     p = GraphicsSearchPolicy()
-    if GPU: p.cuda()
+    if GPU:
+        print "Using the GPU"
+        p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
     criteria = nn.CrossEntropyLoss()
@@ -434,7 +436,7 @@ if __name__ == "__main__":
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
                 print p0
-                if len(goal - p.evaluate(p0)) == 0:
+                if len(scene - p.evaluate(p0)) == 0:
                     print "Nothing left to explain."
                     break
                 
