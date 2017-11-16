@@ -72,7 +72,9 @@ class LineDecoder(nn.Module):
         for _ in range(maximumLength):
             i = self.targetsOfSymbols([accumulator[-1]])[:,0]
             output, h = self(i,h)
-            distribution = (output.data.view(-1)/T).exp()
+            distribution = output.data.view(-1)/T
+            distribution = F.log_softmax(distribution).data
+            distribution = distribution.exp()
 
             c = torch.multinomial(distribution,1)[0]
             if self.lexicon[c] == "END": break
@@ -80,6 +82,35 @@ class LineDecoder(nn.Module):
             accumulator.append(self.lexicon[c])
             
         return accumulator[1:]
+
+    def beam(self, seed, maximumLength, beamSize):
+        h = self.h0(seed).view(self.layers, 1, self.H)
+
+        B = [(0.0,["START"],h)]
+        
+        for _ in range(maximumLength):
+            expanded = False
+            new = []
+            for ll,sequence,h in B:
+                if sequence[-1] == "END":
+                    new.append((ll,sequence,None))
+                    continue
+                expanded = True
+                i = self.targetsOfSymbols([sequence[-1]])[:,0]
+                output, h = self(i,h)
+                distribution = F.log_softmax(output.data.view(-1)).data
+                best = sorted(zip(distribution,self.lexicon),reverse = True)[:beamSize]
+                for _ll,c in best:
+                    new.append((ll + _ll,
+                                sequence + [c],
+                                h))
+            if not expanded: break
+            B = sorted(new,reverse = True)[:beamSize]
+
+        B = [ (ll,sequence[1:-1]) for ll,sequence,h in sorted(B,reverse = True)[:beamSize]
+              if sequence[-1] == "END"]
+        return B
+        
 
 class LineEncoder(nn.Module):
     def __init__(self, lexicon, H = 32, layers = 1, seedDimensionality = 32):
@@ -165,7 +196,7 @@ class SearchPolicy(nn.Module):
                                  for e in environments ] 
         environmentScores = [ self.environmentScore(e)
                               for e in environmentEncodings ]
-        return torch.nn.functional.log_softmax(torch.cat(environmentScores).view(-1))
+        return F.log_softmax(torch.cat(environmentScores).view(-1))
 
     def loss(self, example, criteria):
         problem = self.encodeProblem(example.problem).view(1,-1)
@@ -189,11 +220,20 @@ class SearchPolicy(nn.Module):
             
         return examples
 
+    def mayBeAppliedChange(self, initialProgram, environment, line):
+        try: return self.applyChange(initialProgram, environment, line)
+        except: return None
+
     def sampleLine(self, s, e, T = 1):
         problem = self.encodeProblem(s).view(1,-1)
         e = self.encodeEnvironment(e, problem)
         seed = torch.cat([problem, e], dim = 1)
         return self.lineDecoder.sample(seed, 10, T = T)
+    def beamLine(self, problem, environment, beamSize):
+        problem = self.encodeProblem(problem).view(1,-1)
+        e = self.encodeEnvironment(environment, problem)
+        seed = torch.cat([problem, e], dim = 1)
+        return self.lineDecoder.beam(seed, 20, beamSize)
     def sampleEnvironment(self, s, environments, T = 1):
         problem = self.encodeProblem(s).view(1,-1)
         environmentScores = self.environmentLogLikelihoods(environments, problem)
@@ -204,6 +244,17 @@ class SearchPolicy(nn.Module):
         e = self.sampleEnvironment(s, environments, T = T)
         l = self.sampleLine(s, e, T = T)
         return e,l
+    def beam(self, problem, initialProgram, size):
+        environments = self.candidateEnvironments(initialProgram)
+        environmentScores = self.environmentLogLikelihoods(environments,
+                                                           self.encodeProblem(problem).view(1,-1)).data
+        candidates = [ (environmentScore + lineScore,
+                        self.mayBeAppliedChange(initialProgram, environment, line))
+            for environment, environmentScore in zip(environments, environmentScores)
+            for lineScore, line in self.beamLine(problem, environment, size)  ]
+        candidates = [ (score, candidate) for (score, candidate) in candidates if candidate != None ]
+        candidates = list(sorted(candidates, reverse = True)[:size])
+        return candidates
 
     def sampleOneStep(self, problem, initialProgram):
         problem = self.residual(problem, self.evaluate(initialProgram))
@@ -433,6 +484,7 @@ if __name__ == "__main__":
             print scene
             print program.pretty()
             p0 = Block([])
+            print p.beam(scene, p0, 5)
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
                 print p0
