@@ -256,6 +256,38 @@ class SearchPolicy(nn.Module):
         candidates = list(sorted(candidates, reverse = True)[:size])
         return candidates
 
+    def beamSearchGraph(self, problem, initialProgram, size, steps):
+        frontier = [initialProgram]
+
+        for step in range(steps):
+            newFrontier = []
+            for f in frontier:
+                for _,candidate in self.beam(self.residual(problem, self.evaluate(f)),
+                                             f, size):
+                    print "STEP = %s; PARENT = %s; CHILD = %s;"%(step,f,candidate)
+                    newFrontier.append(candidate)
+            #newFrontier = removeDuplicateStrings(newFrontier)
+            newFrontier = [(self.value(problem,f),f) for f in newFrontier ]
+            newFrontier.sort(reverse = True)
+            print "New frontier:"
+            for v,f in newFrontier: print "V = ",v,"\t",f
+            if self.solvesTask(problem, f):
+                print "SOLVED TASK!"
+                return 
+            print "(end of new frontier)"
+            print 
+            # import pdb
+            # pdb.set_trace()
+            
+            frontier = [ f for v,f in newFrontier[:size] ]
+
+
+            print "Step %d of graph search:"%step
+            for f in frontier: print f
+            print "(end of step)"
+            print 
+        
+
     def sampleOneStep(self, problem, initialProgram):
         problem = self.residual(problem, self.evaluate(initialProgram))
         environments = self.candidateEnvironments(initialProgram)
@@ -312,9 +344,17 @@ class GraphicsSearchPolicy(SearchPolicy):
     def Oracle(self, program): return list(Oracle(program))
 
     def evaluate(self, program): return program.evaluate(Environment([]))
+    def solvesTask(self, goal, program):
+        return goal == self.evaluate(program)
     def residual(self, goal, current):
         #assert len(current - goal) == 0
         return goal - current
+    def value(self, goal, program):
+        try:
+            output = self.evaluate(program)
+        except EvaluationError: return -1.0
+        if len(output - goal) > 0: return 0.0
+        else: return 1.0/program.cost()
 
     def parseLine(self, l):
         def get(l):
@@ -426,7 +466,7 @@ def simpleSceneSample():
         y = random.choice(range(1,16))
         return Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))
 
-    primitives = [isolatedCircle() for _ in range(random.choice(range(2))) ]
+    primitives = [isolatedCircle() for _ in range(random.choice(range(2,6))) ]
     loopIterations = random.choice([3,4])
 
     while True:
@@ -477,14 +517,15 @@ if __name__ == "__main__":
             o.step()
             losses.append(loss.data[0])
 
-        if step%100 == 0:
+        if step%5000 == 0:
             torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
             print step,'\t',sum(losses)/len(losses)
             losses = []
             print scene
             print program.pretty()
             p0 = Block([])
-            print p.beam(scene, p0, 5)
+            p.beamSearchGraph(scene, p0, 10, program.cost() + 2)
+            continue
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
                 print p0
