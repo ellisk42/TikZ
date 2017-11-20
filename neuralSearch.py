@@ -149,17 +149,17 @@ class LineEncoder(nn.Module):
         return self(self.tensorOfSymbols(symbols), seed)
             
 
-class DataEncoder(nn.Module):
-    """
-    A network that takes something like circle(9,2) and produces an embedding
-    """
-    def __init__(self, numberOfInputs, embeddingSize):
-        super(DataEncoder,self).__init__()
+# class DataEncoder(nn.Module):
+#     """
+#     A network that takes something like circle(9,2) and produces an embedding
+#     """
+#     def __init__(self, numberOfInputs, embeddingSize):
+#         super(DataEncoder,self).__init__()
 
-        self.linear1 = nn.Linear(numberOfInputs, embeddingSize)
+#         self.linear1 = nn.Linear(numberOfInputs, embeddingSize)
 
-    def forward(self, x):
-        return self.linear1(x).clamp(min = 0)
+#     def forward(self, x):
+#         return self.linear1(x).clamp(min = 0)
 
 class SearchPolicy(nn.Module):
     def __init__(self, lexicon):
@@ -176,17 +176,12 @@ class SearchPolicy(nn.Module):
                                        layers = 1,
                                        H = H,
                                        seedDimensionality = H)
-        self.circleEncoder = DataEncoder(2, H)
 
         self.environmentScore = nn.Linear(H,1)
-        
-        
 
-    def encodeProblem(self, s):
-        return sum(\
-                self.circleEncoder(Variable(t.cuda() if GPU else t)) \
-                   for c in s\
-                   for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()])
+        self.H = H
+        
+        
 
     def encodeEnvironment(self, environment, seed):
         return self.lineEncoder.encoding(["START"] + environment, seed)
@@ -313,6 +308,21 @@ class GraphicsSearchPolicy(SearchPolicy):
                    "reflect","x","y",
                    "i","j","None"] + map(str,range(-5,20))
         super(GraphicsSearchPolicy,self).__init__(LEXICON)
+
+        self.circleEncoder = nn.Linear(2, self.H)
+        self.interactionEncoder1 = nn.Linear(self.H*2,self.H)
+        self.interactionEncoder2 = nn.Linear(self.H,self.H)
+
+    def encodeProblem(self, s):
+        encodings = [ self.circleEncoder(Variable(t.cuda() if GPU else t)).clamp(min = 0) \
+                      for c in s\
+                      for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()] ]
+        interactions = [self.interactionEncoder1(torch.cat([x,y],dim = 0)).clamp(min = 0)
+                        for i,x in enumerate(encodings)
+                        for j,y in enumerate(encodings)]
+        interactions = [self.interactionEncoder2(interaction).clamp(min = 0)
+                        for interaction in interactions ]
+        return sum(interactions)
 
     def candidateEnvironments(self, program):
         return list(e for e in candidateEnvironments(program))
