@@ -527,10 +527,11 @@ if __name__ == "__main__":
             o.step()
             losses.append(loss.data[0])
 
-        if step%5000 == 0:
-            torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
+        if step%100 == 0:
             print step,'\t',sum(losses)/len(losses)
             losses = []
+        if step%5000 == 0:
+            torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
             print scene
             print program.pretty()
             p0 = Block([])
