@@ -509,6 +509,7 @@ if __name__ == "__main__":
     criteria = nn.CrossEntropyLoss()
     
     step = 0
+    losses = []
     while True:
         step += 1
 
@@ -519,7 +520,6 @@ if __name__ == "__main__":
         examples = p.makeOracleExamples(program, scene)
         
 
-        losses = []
         for example in examples:
             o.zero_grad()
             loss = p.loss(example, criteria)
