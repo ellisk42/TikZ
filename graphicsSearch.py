@@ -199,8 +199,10 @@ def simpleSceneSample():
         y = random.choice(range(1,16))
         return Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))
 
-    primitives = [isolatedCircle() for _ in range(random.choice(range(2,6))) ]
-    loopIterations = random.choice([3,4])
+    MINIMUMATOMS = 1
+    MAXIMUMATOMS = 1
+    primitives = [isolatedCircle() for _ in range(random.choice(range(MINIMUMATOMS,MAXIMUMATOMS+1))) ]
+    loopIterations = random.choice([4])
 
     while True:
         bx = random.choice(range(1,16))
@@ -229,7 +231,6 @@ if __name__ == "__main__":
         p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
-    criteria = nn.CrossEntropyLoss()
     
     step = 0
     losses = []
@@ -242,10 +243,9 @@ if __name__ == "__main__":
 
         examples = p.makeOracleExamples(program, scene)
         
-
         for example in examples:
             o.zero_grad()
-            loss = p.loss(example, criteria)
+            loss = p.loss(example)
             loss.backward()
             o.step()
             losses.append(loss.data[0])
@@ -257,8 +257,9 @@ if __name__ == "__main__":
             torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
             print scene
             print program.pretty()
+            print p.Oracle(program)
             p0 = Block([])
-            p.beamSearchGraph(scene, p0, 10, program.cost() + 2)
+            p.beamSearchGraph(scene, p0, 30, 3)
             continue
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)

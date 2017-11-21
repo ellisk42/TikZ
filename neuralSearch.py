@@ -48,7 +48,7 @@ class LineDecoder(nn.Module):
         return Variable(t)
         
 
-    def loss(self, target, seed, criteria):
+    def loss(self, target, seed):
         numberOfTargets = len(target)
         i = self.targetsOfSymbols(["START"] + target[:-1])
         target = self.targetsOfSymbols(target)
@@ -58,7 +58,8 @@ class LineDecoder(nn.Module):
         L = 0
         for j in range(numberOfTargets):
             output, h = self(i[:,j],h)
-            L += criteria(output.view(B, -1), target[:,j])
+            # cross_entropy is actually negative cross entropy
+            L += F.cross_entropy(output.view(B, -1), target[:,j])
         return L
 
     def sample(self, seed, maximumLength, T = 1):
@@ -150,14 +151,15 @@ class SearchPolicy(nn.Module):
         super(SearchPolicy, self).__init__()
 
         H = 64
-        layers = 1
+        encodeLayers = 1
+        decodeLayers = 2
         self.lineDecoder = LineDecoder(lexicon,
-                                       layers = 1,
+                                       layers = decodeLayers,
                                        # The line decoder needs to take both environment and problem
                                        H = 2*H,
-                                       seedDimensionality = layers*H*2)
+                                       seedDimensionality = encodeLayers*H*2)
         self.lineEncoder = LineEncoder(lexicon,
-                                       layers = 1,
+                                       layers = encodeLayers,
                                        H = H,
                                        seedDimensionality = H)
 
@@ -177,15 +179,20 @@ class SearchPolicy(nn.Module):
                               for e in environmentEncodings ]
         return F.log_softmax(torch.cat(environmentScores).view(-1))
 
-    def loss(self, example, criteria):
+    def makeSeed(self, _ = None,problem = None,environment = None):
+        assert problem is not None
+        assert environment is not None
+        return torch.cat([problem,environment],dim = 1)
+
+    def loss(self, example):
         problem = self.encodeProblem(example.problem).view(1,-1)
 
         environmentLoss =  - self.environmentLogLikelihoods(example.environments, problem)[0]
 
         e = self.encodeEnvironment(example.environments[0], problem)
-        seed = torch.cat([problem, e],dim = 1)
+        seed = self.makeSeed(problem = problem, environment = e)
         
-        return self.lineDecoder.loss(example.target + ["END"], seed, criteria) + environmentLoss
+        return self.lineDecoder.loss(example.target + ["END"], seed) + environmentLoss
 
     def makeOracleExamples(self, program, problem):
         examples = []
@@ -206,12 +213,12 @@ class SearchPolicy(nn.Module):
     def sampleLine(self, s, e, T = 1):
         problem = self.encodeProblem(s).view(1,-1)
         e = self.encodeEnvironment(e, problem)
-        seed = torch.cat([problem, e], dim = 1)
+        seed = self.makeSeed(problem = problem, environment = e)
         return self.lineDecoder.sample(seed, 10, T = T)
     def beamLine(self, problem, environment, beamSize):
         problem = self.encodeProblem(problem).view(1,-1)
         e = self.encodeEnvironment(environment, problem)
-        seed = torch.cat([problem, e], dim = 1)
+        seed = self.makeSeed(problem = problem, environment = e)
         return self.lineDecoder.beam(seed, 20, beamSize)
     def sampleEnvironment(self, s, environments, T = 1):
         problem = self.encodeProblem(s).view(1,-1)
@@ -229,8 +236,8 @@ class SearchPolicy(nn.Module):
                                                            self.encodeProblem(problem).view(1,-1)).data
         candidates = [ (environmentScore + lineScore,
                         self.mayBeAppliedChange(initialProgram, environment, line))
-            for environment, environmentScore in zip(environments, environmentScores)
-            for lineScore, line in self.beamLine(problem, environment, size)  ]
+                       for environment, environmentScore in zip(environments, environmentScores)
+                       for lineScore, line in self.beamLine(problem, environment, size)  ]
         candidates = [ (score, candidate) for (score, candidate) in candidates if candidate != None ]
         candidates = list(sorted(candidates, reverse = True)[:size])
         return candidates
@@ -281,4 +288,5 @@ class PolicyTrainingExample():
         self.problem, self.target, self.environments = problem, target, environments
     def __str__(self):
         return "PolicyTrainingExample(problem = %s, target = %s, environments = %s)"%(self.problem, self.target, self.environments)
+    def __repr__(self): return str(self)
 
