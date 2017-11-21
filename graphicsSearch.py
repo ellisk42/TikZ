@@ -76,7 +76,9 @@ class GraphicsSearchPolicy(SearchPolicy):
     
     def Oracle(self, program): return list(Oracle(program))
 
-    def evaluate(self, program): return program.evaluate(Environment([]))
+    def evaluate(self, program):
+        try: return program.evaluate(Environment([]))
+        except EvaluationError: return None
     def solvesTask(self, goal, program):
         return goal == self.evaluate(program)
     def residual(self, goal, current):
