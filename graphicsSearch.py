@@ -88,6 +88,7 @@ class GraphicsSearchPolicy(SearchPolicy):
         try:
             output = self.evaluate(program)
         except EvaluationError: return -1.0
+        if output == None: return -1.0
         if len(output - goal) > 0: return 0.0
         else: return 1.0/program.cost()
 
