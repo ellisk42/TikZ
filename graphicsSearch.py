@@ -232,6 +232,11 @@ def simpleSceneSample():
     
 if __name__ == "__main__":
     p = GraphicsSearchPolicy()
+
+    if os.path.isfile('checkpoints/neuralSearch.p'):
+        p.load_state_dict(torch.load('checkpoints/neuralSearch.p'))
+        print "Resuming state from",'checkpoints/neuralSearch.p'
+        
     if GPU:
         print "Using the GPU"
         p.cuda()
