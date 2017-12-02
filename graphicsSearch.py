@@ -37,6 +37,9 @@ class GraphicsSearchPolicy(SearchPolicy):
         self.interactionEncoder2 = nn.Linear(self.H,self.H)
 
     def encodeProblem(self, s):
+        if s == []:
+            t = torch.from_numpy(np.zeros((self.H,1))).float()
+            return Variable(t.cuda() if GPU else t)
         encodings = [ self.circleEncoder(Variable(t.cuda() if GPU else t)).clamp(min = 0) \
                       for c in s\
                       for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()] ]

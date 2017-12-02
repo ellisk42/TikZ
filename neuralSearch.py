@@ -250,13 +250,14 @@ class SearchPolicy(nn.Module):
             for f in frontier:
                 for _,candidate in self.beam(self.residual(problem, self.evaluate(f)),
                                              f, size):
-                    print "STEP = %s; PARENT = %s; CHILD = %s;"%(step,f,candidate)
+                    #print "STEP = %s; PARENT = %s; CHILD = %s;"%(step,f,candidate)
                     newFrontier.append(candidate)
             #newFrontier = removeDuplicateStrings(newFrontier)
             newFrontier = [(self.value(problem,f),f) for f in newFrontier ]
             newFrontier.sort(reverse = True)
-            print "New frontier:"
-            for v,f in newFrontier: print "V = ",v,"\t",f
+            print "New frontier ( > 0):"
+            for v,f in newFrontier:
+                if v > 0.0: print "V = ",v,"\t",f
             if self.solvesTask(problem, f):
                 print "SOLVED TASK!"
                 return 
