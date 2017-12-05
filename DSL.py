@@ -20,61 +20,6 @@ def reflect(x = None,y = None):
         return stuff + [ o.reflect(x = x,y = y) for o in stuff ]
     return reflector
     
-class line():
-    def __init__(self, x1, y1, x2, y2, arrow = None, solid = None):
-        self.arrow = arrow
-        self.solid = solid
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
-    def evaluate(self):
-        return Line.absolute(self.x1,
-                             self.y1,
-                             self.x2,
-                             self.y2,
-                             arrow = self.arrow,
-                             solid = self.solid)
-    def reflect(self, x = None,y = None):
-        (x1,y1) = reflectPoint(x,y,self.x1,self.y1)
-        (x2,y2) = reflectPoint(x,y,self.x2,self.y2)
-        if self.arrow:
-            return line(x1,y1,x2,y2,arrow = True,solid = self.solid)
-        else:
-            (a,b) = min((x1,y1),(x2,y2))
-            (c,d) = max((x1,y1),(x2,y2))
-            return line(a,b,c,d,
-                        arrow = False,
-                        solid = self.solid)
-        
-
-class rectangle():
-    def __init__(self, x1, y1, x2, y2):
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
-    def evaluate(self):
-        return Rectangle.absolute(self.x1,self.y1,self.x2,self.y2)
-    
-    def reflect(self, x = None,y = None):
-        (x1,y1) = reflectPoint(x,y,self.x1,self.y1)
-        (x2,y2) = reflectPoint(x,y,self.x2,self.y2)
-        return rectangle(min(x1,x2),
-                         min(y1,y2),
-                         max(x1,x2),
-                         max(y1,y2))
-
-class circle():
-    def __init__(self,x,y):
-        self.x = x
-        self.y = y
-    def evaluate(self):
-        return Circle(center = AbsolutePoint(self.x,self.y),
-                      radius = 1)
-    def reflect(self, x = None,y = None):
-        return circle(*reflectPoint(x,y,self.x,self.y))
-
 def addFeatures(fs):
     composite = {}
     for f in fs:
@@ -237,8 +182,11 @@ class RelativeExpression():
 
 class Primitive():
     def pretty(self):
+        arguments = self.arguments
+        if self.k == 'line':
+            arguments = arguments[:4] + ["arrow = %s"%arguments[4],"solid = %s"%arguments[5]]
         p = '%s(%s)'%(self.k,",".join([ (a if isinstance(a,str) else a.pretty())
-                                        for a in self.arguments]))
+                                        for a in arguments]))
         return p.replace(',arrow',',\narrow')
     def __init__(self, k, *arguments):
         self.k = k
@@ -247,7 +195,6 @@ class Primitive():
     def hoistReflection(self):
         return
         yield
-    def convertToPython(self): return "[%s(%s)]"%(self.k,", ".join(map(str,self.arguments)))
     def evaluate(self,e): return set([self.evaluate_(e)])
     def evaluate_(self,e):
         if self.k == 'circle':
@@ -263,8 +210,8 @@ class Primitive():
                                  self.arguments[1].evaluate(e),
                                  self.arguments[2].evaluate(e),
                                  self.arguments[3].evaluate(e),
-                                 arrow = 'True' in self.arguments[4],
-                                 dashed = 'True' in self.arguments[5])
+                                 arrow = self.arguments[4],
+                                 solid = self.arguments[5])
         raise Exception('unknown primitives when evaluating')
     
     def extrapolations(self): yield self
@@ -281,7 +228,7 @@ class Primitive():
 
     def removeDeadCode(self): return self
 
-    def canonicalKey(self): return tuple([self.k] + [ a if isinstance(a,str) else a.canonicalKey() for a in self.arguments ])
+    def canonicalKey(self): return tuple([self.k] + [ a if isinstance(a,(str,bool)) else a.canonicalKey() for a in self.arguments ])
     def canonical(self): return self
 
     def mapExpression(self,l):
@@ -360,8 +307,6 @@ class Reflection():
                 
     def __str__(self):
         return "Reflection(%s,%s,%s)"%(self.axis, self.coordinate,self.body)
-    def convertToPython(self):
-        return "reflect(%s = %s)(%s)"%(self.axis, self.coordinate, self.body.convertToPython())
     def extrapolations(self):
         for b in self.body.extrapolations():
             yield Reflection(self.axis, self.coordinate, b)
@@ -454,20 +399,6 @@ class Loop():
         if self.boundary != None:
             return "Loop(%s, %s, %s, %s, boundary = %s)"%(self.v,self.lowerBound, self.bound,self.body,self.boundary)
         return "Loop(%s, %s, %s, %s)"%(self.v,self.lowerBound, self.bound,self.body)
-    def convertToPython(self):
-        body = self.body.convertToPython()
-        if self.boundary != None:
-            body += " + ((%s) if %s > %s else %s)"%(self.boundary.convertToPython(),
-                                                    self.v,
-                                                    self.lowerBound,
-                                                    '[]')
-            
-        return "[ _%s for %s in range(%s,%s) for _%s in (%s) ]"%(self.v,
-                                                               self.v,
-                                                               self.lowerBound,
-                                                               self.bound,
-                                                               self.v,
-                                                               body)
         
     def extrapolations(self):
         for b in self.body.extrapolations():
@@ -585,7 +516,6 @@ class Block():
     def convertToSequence(self):
         e = Environment([])
         return Sequence([x for p in self.items for x in p.evaluate(e)  ])
-        return Sequence([ p.evaluate() for p in eval(self.convertToPython()) ])
     def __init__(self, items): self.items = items
     def __str__(self): return "Block([%s])"%(", ".join(map(str,self.items)))
     def __repr__(self): return str(self)
@@ -593,9 +523,6 @@ class Block():
         accumulator = set([])
         for x in self.items: accumulator|= x.evaluate(environment)
         return accumulator
-    def convertToPython(self):
-        if self.items == []: return "[]"
-        return " + ".join([ x.convertToPython() for x in self.items ])
     def canonicalKey(self): return tuple([ x.canonicalKey() for x in self.items ])
     def canonical(self):
         return Block(list(sorted((x.canonical() for x in self.items),
@@ -1195,7 +1122,6 @@ if __name__ == '__main__':
         for c in r.rewrites():
             print c.pretty()
             print c
-            print c.convertToPython()
             showImage(c.convertToSequence().draw())
         print "ENDOFCHILDREN"
         

@@ -42,9 +42,19 @@ def sampleRectangle(e):
         x2,y2 = samplePoint(e)
         if x1 != x2 and y1 != y2:
             return Primitive('rectangle',x1,y1,x2,y2)
+def sampleLine(e):
+    while True:
+        x1,y1 = samplePoint(e)
+        x2,y2 = samplePoint(e)
+        if x1 != x2 or y1 != y2:
+            return Primitive('line',x1,y1,x2,y2,
+                             random.random() > 0.5,
+                             random.random() > 0.5)
 
 def samplePrimitive(e):
-    if random.random() < 0.25: return sampleCircle(e)
+    q = random.random()
+    if q < 0.33: return sampleCircle(e)
+    elif q < 0.66: return sampleLine(e)
     else: return sampleRectangle(e)
 
 def sampleLoop(e):
@@ -87,21 +97,39 @@ def mutateProgram(e,p):
     return Reflection(p.axis,p.coordinate,mutateProgram(e,p.body))
 
 
-if __name__ == "__main__":
+def randomPrograms(mutations = 500):
+    ps = []
     p = Block([])
     e = SampleEnvironment([])
-    for _ in range(500):
+    for _ in range(mutations):
         oldEnvironment = e.deepCopy()
         oldProgram = p
         p = mutateProgram(e,p)
         output = p.convertToSequence()
         if output.extentInWindow() and not output.hasCollisions():
-            #showImage(p.convertToSequence().draw())
-            pass
+            ps.append(p.removeDeadCode().optimizeUsingRewrites()[1].canonical())
         else:
             p = oldProgram
             e = oldEnvironment
-    p = p.removeDeadCode().canonical()
-    print p.pretty()
-    showImage(p.convertToSequence().draw())
-    
+    return ps
+
+def sampleManyPrograms(timeout = 1):
+    from time import time
+    start = time()
+    ps = []
+    while time() - start < timeout*60*60:
+        ps += randomPrograms()
+    return ps
+
+
+if __name__ == "__main__":
+    from multiprocessing import Pool
+    C = 30
+    T = 4
+    results = Pool(C).map(sampleManyPrograms, [T]*C)
+    ps = []
+    for r in results: ps += r
+
+    import pickle
+    with open('randomlyGeneratedPrograms.p','wb') as handle:
+        pickle.dump(ps, handle)

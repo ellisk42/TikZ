@@ -339,7 +339,6 @@ def viewSynthesisResults(arguments):
             syntaxTree = syntaxTree.fixReflections(result.job.parse.canonicalTranslation())
             print syntaxTree
             print syntaxTree.features()
-            print syntaxTree.convertToPython()
             print syntaxTree.convertToSequence()
             #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
             programFeatures[f] = syntaxTree.features()
