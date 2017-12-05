@@ -9,7 +9,11 @@ def processHalfpage(x, index):
     x = x.transpose(Image.FLIP_LEFT_RIGHT)
     
     a = image2array(x)
-    a[a < 0.05] = 0.0
+    T = 0.05
+    if index == 101:
+        T = 0.3
+        a = a[10:,10:]
+    a[a < T] = 0.0
     # locate the diagnostic dot: upper right-hand corner should have it
     scanThreshold = 7
     if index == 93: scanThreshold = 4 # very light here
@@ -30,7 +34,12 @@ def processHalfpage(x, index):
     a[m[0],:] = 1.0
     a[:,m[1]] = 1.0
 
-    
+
+    if index == 101: # different scanner - screws everything up
+        gridSize = 37.5
+        m += np.array([9,9])
+
+        
     x = x.crop((m[1],m[0],
                 m[1] + gridSize*16,
                 m[0] + gridSize*16))
@@ -42,9 +51,15 @@ def processHalfpage(x, index):
     # remove the . and rescale the colors
     a = image2array(x)
     a[0:10,0:10] = 0.0
-    a = a*3
+    FACTOR = 3
+    if index == 101:
+        FACTOR = 2
+    a = a*FACTOR
     a[a > 1] = 1.0
-    a[a < 0.1] = 0.0
+    T = 0.1
+    if index == 101:
+        T = 0.4
+    a[a < T] = 0.0
 
     if index == 54:
         a[:30,:30] = 0
@@ -55,6 +70,8 @@ def processHalfpage(x, index):
             a[(256/16)*j,:] = 0.5
     else:
         a = 1.0 - a
+
+#    showImage(a)
         
     return Image.fromarray(255*a).convert('L')
 
@@ -183,5 +200,10 @@ def processDrawing(name, export = False):
     return x
 
 if __name__ == '__main__':
-    processExpert(sys.argv[1])
+    x = Image.open('drawings/finalExpert.png').convert('L')
+    w,h = x.size
+    bottom = x.crop((0,h/2,w,h)).transpose(Image.FLIP_TOP_BOTTOM)
+    x = processHalfpage(bottom,101)
+    x.save('drawings/expert-101.png')
+#    processExpert(sys.argv[1])
 #    processHandout(sys.argv[1])

@@ -5,7 +5,7 @@ import sys
 import io
 import numpy as np
 from PIL import Image
-import tensorflow as tf
+
 
 def NIPSPRIMITIVES(): return True
 
@@ -45,9 +45,11 @@ def showImage(image):
 def saveMatrixAsImage(m,f):
     Image.fromarray(m).convert('RGB').save(f)
 
-
+def indent(s):
+    return "\n".join("  "+x for x in s.splitlines())
 
 def crossEntropyWithMask(labels, masks, predictions):
+    import tensorflow as tf
     crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = labels,logits = predictions)
     print "crossEntropy = ",crossEntropy
     # zero out anything that is not in the mask
@@ -206,6 +208,7 @@ def fst(x): return x[0]
 def snd(x): return x[1]
 
 def flattenImageOutput(c1):
+    import tensorflow as tf
     c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
     print "fully connected input dimensionality:",c1d
 
@@ -233,32 +236,58 @@ def removeDuplicateStrings(xs):
     for x in xs: t[str(x)] = x
     return t.values()
 
+def reflectPoint(a,r,px,py):
+    if a == 'x': return (r - px,py)
+    if a == 'y': return (px,r - py)
+    assert False
+
 def frequencyOfMode(l):
     if l == []: return 0
     f = {}
     for x in l: f[x] = 1 + f.get(x,0)
     return max(f.values())
 
-def crossValidate(fullDataSet, folds = 10, randomSeed = 0):
+def interleaveGenerators(generators):
+    while generators != []:
+        try:
+            yield next(generators[0])
+            generators = generators[1:] + [generators[0]]
+        except StopIteration:
+            generators = generators[1:]
+
+def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False):
     if folds == 1:
         print "crossValidate: Not doing cross validation because I only have one fold."
         yield fullDataSet, fullDataSet
     else:
         n = len(fullDataSet)
         seed(randomSeed)
-        indices = randomlyPermuteList(range(n))
+        if doNotPermute: indices = range(n)
+        else: indices = randomlyPermuteList(range(n))
         
-        testSize = int(n/folds)
+        smallTestSize = int(math.floor(n/float(folds)))
+        bigTestSize = int(math.ceil(n/float(folds)))
+        numberOfBig = n - folds*smallTestSize
 
+        start = 0
+        thingsWeHaveTestedOn = set([])
         for f in range(folds):
-            start = testSize*f
-            end = testSize + start
-            train = indices[:start] + indices[end:]
-            test = indices[start:end]
+            if f < numberOfBig: ending = start + bigTestSize
+            else: ending = start + smallTestSize
+            train = indices[:start] + indices[ending:]
+            test = indices[start:ending]
+            start = ending
             assert len(train) + len(test) == n
             assert len(set(train)&set(test)) == 0
+            assert len(set(test)&thingsWeHaveTestedOn) == 0
+            thingsWeHaveTestedOn = thingsWeHaveTestedOn|set(test)
+            if f == folds - 1:
+                assert len(thingsWeHaveTestedOn) == n
             yield ([ fullDataSet[j] for j in train ], [ fullDataSet[j] for j in test ])
 
 if __name__ == "__main__":
-    for train, test in crossValidate(range(10),5):
+    for x in interleaveGenerators([iter(range(9)),iter(xrange(3))]):
+        print x
+    assert False
+    for train, test in crossValidate(range(98),20,doNotPermute = True):
         print train, test

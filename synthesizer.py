@@ -262,17 +262,40 @@ def viewSynthesisResults(arguments):
                                  88,
                                  #99]
                                  ]
-    interestingExtrapolations = [(14,0),
-                                 (23,0),
-                                 (31,12),
-                                 (35,0),
-                                 (38,0),
-                                 (39,10),
-                                 (58,11),
-                                 (75,0),
-                                 (93,0),
-                                  (99,0)]
-    interestingExtrapolations = list(range(100))
+    interestingExtrapolations = [(16,12),#*
+                                 #(17,0),
+                                 (18,0),#*
+                                 #(22,0),
+                                 #(23,0),
+                                 #(29,12),
+                                 #(31,27),
+                                 (34,0),#*
+                                 #(36,0),
+                                 #(38,12),
+                                 (39,0),#*
+                                 #(41,1),
+                                 #(51,1),
+                                 #(52,12),
+                                 #(57,0),
+                                 #(58,0),
+                                 (60,0),#*
+                                 #(63,0),
+                                 (66,2),#*
+                                 (71,1),#*
+                                 #(72,0),
+        #(73,0),
+                                 #(74,10),
+                                 #(75,5),
+                                 #(79,0),
+                                 #(85,1),
+                                 (86,0),#*
+                                 #(88,0),
+                                 (90,2),#*
+                                 #(92,0),
+                                 #(95,8)
+    ]
+    
+    #interestingExtrapolations = list(range(100))
                                  
 
     latex = []
@@ -280,11 +303,11 @@ def viewSynthesisResults(arguments):
 
     programFeatures = {}
 
-    for expertIndex in range(100):
-        # if arguments.extrapolate:
-        #     if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
-        #                  for e in interestingExtrapolations ]):
-        #         continue
+    for expertIndex in list(range(100)):# + [101]:
+        if arguments.extrapolate:
+            if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
+                         for e in interestingExtrapolations ]):
+                continue
             
         
         f = 'drawings/expert-%d.png'%expertIndex
@@ -299,6 +322,12 @@ def viewSynthesisResults(arguments):
             result = None
         else:
             result = min(relevantResults, key = lambda r: r.cost)
+            equallyGoodResults = [ r for r in relevantResults if r.cost <= result.cost + 1 ]
+            if len(equallyGoodResults) > 1:
+                print "Got %d results for %d"%(len(equallyGoodResults),expertIndex)
+
+            programs = [ r.program.fixReflections(result.job.parse.canonicalTranslation()).removeDeadCode()
+                         for r in equallyGoodResults ]
 
         if result == None and arguments.extrapolate:
             print "Synthesis failure for %s"%f
@@ -316,7 +345,6 @@ def viewSynthesisResults(arguments):
             syntaxTree = syntaxTree.fixReflections(result.job.parse.canonicalTranslation())
             print syntaxTree
             print syntaxTree.features()
-            print syntaxTree.convertToPython()
             print syntaxTree.convertToSequence()
             #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
             programFeatures[f] = syntaxTree.features()
@@ -324,27 +352,31 @@ def viewSynthesisResults(arguments):
         extrapolations = []
         if arguments.extrapolate:
             syntaxTree = syntaxTree.explode()
-            trace = syntaxTree.convertToSequence()
+            trace = syntaxTree.convertToSequence().removeDuplicates()
+            print "original trace:"
             print trace
-            originalHasCollisions = result.job.parse.hasCollisions()
-            print "COLLISIONS",originalHasCollisions
+            originalUndesirability = parse.undesirabilityVector()
+            print "original undesirability",originalUndesirability
 
             framedExtrapolations = []
-            for e in syntaxTree.extrapolations():
-                t = e.convertToSequence()
-                if not originalHasCollisions and t.removeDuplicates().hasCollisions(): continue
-                if t == trace: continue
-                if any([t == o for o in extrapolations ]): continue
+            extrapolationGenerators = [ program.explode().extrapolations() for program in programs ]
+            for e in interleaveGenerators(extrapolationGenerators):
+                t = e.convertToSequence().removeDuplicates()
+                newUndesirability = t.undesirabilityVector()
+                if (newUndesirability > originalUndesirability).sum() > 0: continue
+                if t.canonicalTranslation() == trace.canonicalTranslation(): continue
+                if any([t.canonicalTranslation() == o.canonicalTranslation() for o in extrapolations ]): continue
                 extrapolations.append(t)
 
-                framedExtrapolations.append(1 - frameImageNicely(1 - t.framedRendering(result.job.parse)))
+                framedExtrapolations.append(1 - frameImageNicely(t.draw(adjustCanvasSize = True)))
 
-                if len(framedExtrapolations) > 20:
+                if len(framedExtrapolations) > 30:
                     break
                 
             if framedExtrapolations != []:
                 for crap in interestingExtrapolations:
                     if isinstance(crap,tuple) and crap[0] == expertIndex:
+                        print "Just taking the %d extrapolation..."%(crap[1])
                         framedExtrapolations = [framedExtrapolations[crap[1]]]
                         break
                 
@@ -368,7 +400,6 @@ def viewSynthesisResults(arguments):
                 extrapolationMatrix.append(a)
                 print "Saving extrapolation column to",'extrapolations/expert-%d-extrapolation.png'%expertIndex
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
-                #saveMatrixAsImage(255*(1 - framedExtrapolations[1]),'../TikZpaper/figures/39-extrapolated.png')
 
             
         
@@ -384,15 +415,7 @@ def viewSynthesisResults(arguments):
             rightEntryOfTable = ""
         if False and extrapolations != [] and arguments.extrapolate:
             
-            #}make the big matrix
-            bigMatrix = np.zeros((max([m.shape[0] for m in extrapolationMatrix ]),256*len(extrapolationMatrix)))
-            for j,r in enumerate(extrapolationMatrix):
-                bigMatrix[0:r.shape[0],256*j:256*(j+1)] = r
-            if len(extrapolations) < 10 and False:
-                saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrix.png')
-            else:
-                saveMatrixAsImage(bigMatrix,'../TikZpaper/figures/extrapolationMatrixSupplement.png')
-            print e
+            #print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
             parseImage = '\\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d-parses/0.png}'%expertIndex
@@ -416,6 +439,13 @@ def viewSynthesisResults(arguments):
 
     if arguments.similarity:
         analyzeFeatures(programFeatures)
+
+    if arguments.extrapolate:
+        #}make the big matrix
+        bigMatrix = np.zeros((max([m.shape[0] for m in extrapolationMatrix ]),256*len(extrapolationMatrix)))
+        for j,r in enumerate(extrapolationMatrix):
+            bigMatrix[0:r.shape[0],256*j:256*(j+1)] = r
+        saveMatrixAsImage(bigMatrix,'extrapolations/allTheExtrapolations.png')
 
         
 def rankUsingPrograms():

@@ -1,5 +1,5 @@
 from recognitionModel import RecognitionModel
-from utilities import loadImage,removeBorder
+from utilities import loadImage,removeBorder,showImage,saveMatrixAsImage
 
 
 import random
@@ -104,6 +104,46 @@ def analyzeFeatures(featureMaps):
         print n
         print featureMaps[n]
         print featureVectors[j]
+
+    # Figure out things that are close / far as measured by different metrics
+    percentile = 80
+    imageDistances = learnedDistanceMatrix(None)
+    numberOfPrograms = len(featureVectors)
+    programDistances = np.zeros((numberOfPrograms,numberOfPrograms))
+    featureVectors = preprocessing.scale(np.array(featureVectors))
+    for j in range(numberOfPrograms):
+        for k in range(numberOfPrograms):
+            programDistances[j,k] = ((featureVectors[j,:] - featureVectors[k,:])*(featureVectors[j,:] - featureVectors[k,:])).sum()
+    smallDistance = np.percentile(programDistances,100 - percentile)
+    bigDistance = np.percentile(programDistances,percentile)
+    closePrograms = set([(n1,n2) for j,n1 in enumerate(imageNames) for k,n2 in enumerate(imageNames)
+                     if n1 < n2 and programDistances[j,k] < smallDistance])
+    farPrograms = set([(n1,n2) for j,n1 in enumerate(imageNames) for k,n2 in enumerate(imageNames)
+                   if n1 < n2 and programDistances[j,k] > bigDistance])
+    smallDistance = np.percentile(imageDistances,100 - percentile)
+    bigDistance = np.percentile(imageDistances,percentile)
+    imageNames = ["drawings/expert-%d.png"%j for j in range(100) ]
+    closeImages = set([(n1,n2) for j,n1 in enumerate(imageNames) for k,n2 in enumerate(imageNames)
+                       if n1 < n2 and imageDistances[j,k] < smallDistance])
+    farImages = set([(n1,n2) for j,n1 in enumerate(imageNames) for k,n2 in enumerate(imageNames)
+                     if n1 < n2 and imageDistances[j,k] > bigDistance])
+    programOptions = [(closePrograms,'close in program space'),(farPrograms,'distant in program space')]
+    imageOptions = [(closeImages,'close in image space'),(farImages,'far in image space')]
+    for programSet,programName in programOptions:
+        for imageSet,imageName in imageOptions:
+            overlap = programSet&imageSet
+            print programName,'&',imageName,'have overlap',len(overlap)
+            overlap = list(sorted(list(overlap)))
+            indices = np.random.choice(range(len(overlap)),size = min(100,len(overlap)),replace = False)
+            overlap = [overlap[j] for j in indices ]
+            
+            matrix = 1 - np.concatenate([ np.concatenate((loadImage(n1),loadImage(n2)), axis = 0) for n1,n2 in overlap ],axis = 1)
+            saveMatrixAsImage(matrix*255,"similarity/%s%s.png"%(programName,imageName))            
+
+
+
+    assert False
+    
 
     for algorithm in [0,1,2]:
         if algorithm == 0:

@@ -1308,6 +1308,10 @@ def handleTest(a):
     particles = model.SMC(targetImage,
                           beamSize = arguments.beamWidth,
                           beamLength = l)
+    # place where we will save the parses
+    parseDirectory = f[:-4] + "-parses"
+    model.saveParticles(particles, parseDirectory, targetImage)
+    
     gotGroundTruth = None
     groundTruth = getGroundTruthParse(f)
     if groundTruth != None:
@@ -1320,12 +1324,13 @@ def handleTest(a):
                 break
         if not gotGroundTruth:
             print "Did not get ground truth for %s"%f
+
+        return gotGroundTruth,particles
     else:
-        raise Exception('No ground truth annotated for %s'%f)
-    # place where we will save the parses
-    parseDirectory = f[:-4] + "-parses"
-    model.saveParticles(particles, parseDirectory, targetImage)
-    return gotGroundTruth,particles
+        gotGroundTruth = True
+        if l == 0:
+            return None,None
+
 
 def illustrateContinuous(model):
     global CONTINUOUSROUNDING
@@ -1438,7 +1443,7 @@ if __name__ == '__main__':
         else:
             gt = Pool(arguments.cores).map(handleTest, [ (f,arguments,model) for f in fs ])
         print "Got a ground truth parse correct %f"%(float(len([None for g,_ in gt if g ]))/float(len(gt)))
-        model.pickleSearchResults([ (f,p) for (f,(_,p)) in zip(fs,gt) ])
+        model.pickleSearchResults([ (f,p) for (f,(_,p)) in zip(fs,gt) if p != None])
     elif arguments.task == 'illustrateContinuous':
         assert arguments.beam
         assert arguments.continuous

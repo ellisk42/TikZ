@@ -7,6 +7,7 @@ import pickle
 
 
 groundTruth = {}
+groundTruth['drawings/expert-101.png'] = set(['Rectangle((1,8), (3,9))','Rectangle((1,10), (3,11))','Rectangle((1,12), (3,13))','Rectangle((4,8), (6,9))','Rectangle((4,10), (6,11))','Rectangle((4,12), (6,13))','Rectangle((7,8), (9,9))','Rectangle((1,14), (3,15))','Rectangle((7,10), (9,11))','Rectangle((4,14), (6,15))','Rectangle((7,12), (9,13))','Rectangle((10,8), (12,9))','Rectangle((10,12), (12,13))','Rectangle((7,14), (9,15))','Rectangle((10,10), (12,11))','Rectangle((10,14), (12,15))'])
 # Automatically generated code
 groundTruth['drawings/expert-0.png'] = set(['Line((7,8), (4,8), arrow = True, solid = True)', 'Line((4,13), (6,11), arrow = True, solid = True)', 'Line((7,8), (7,9), arrow = False, solid = True)', 'Rectangle((1,6), (9,15))', 'Rectangle((2,12), (4,14))', 'Rectangle((6,9), (8,12))', 'Rectangle((2,7), (4,9))', 'Line((4,8), (6,10), arrow = True, solid = True)'])
 groundTruth['drawings/expert-1.png'] = set(['Line((4,7), (6,9), arrow = True, solid = True)', 'Line((4,13), (6,11), arrow = True, solid = True)', 'Line((9,11), (9,13), arrow = False, solid = False)', 'Rectangle((12,9), (13,11))', 'Line((9,13), (4,13), arrow = True, solid = False)', 'Rectangle((2,12), (4,14))', 'Line((7,10), (8,10), arrow = True, solid = True)', 'Rectangle((2,6), (4,8))', 'Circle(center = (9,10), radius = 1)', 'Line((11,10), (12,10), arrow = True, solid = True)', 'Rectangle((14,9), (15,11))', 'Line((13,10), (14,10), arrow = True, solid = True)', 'Rectangle((6,8), (7,12))', 'Rectangle((1,5), (11,15))'])
