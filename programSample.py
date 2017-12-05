@@ -113,12 +113,15 @@ def randomPrograms(mutations = 200):
             e = oldEnvironment
     return ps
 
-def sampleManyPrograms(timeout = 1):
+def sampleManyPrograms(seed):
+    random.seed(seed)
+    timeout = 0.1
     from time import time
     start = time()
     ps = []
     while time() - start < timeout*60*60:
         ps += randomPrograms()
+    print "Returning",len(ps),"random programs"
     return ps
 
 
@@ -126,10 +129,12 @@ if __name__ == "__main__":
     from multiprocessing import Pool
     C = 30
     T = 4
-    results = Pool(C).map(sampleManyPrograms, [T]*C)
+    results = Pool(C).map(sampleManyPrograms, range(C))
     ps = []
     for r in results: ps += r
+    
 
     import pickle
     with open('randomlyGeneratedPrograms.p','wb') as handle:
         pickle.dump(ps, handle)
+    print "Collected",len(ps),"random programs altogether"
