@@ -97,7 +97,7 @@ def mutateProgram(e,p):
     return Reflection(p.axis,p.coordinate,mutateProgram(e,p.body))
 
 
-def randomPrograms(mutations = 500):
+def randomPrograms(mutations = 200):
     ps = []
     p = Block([])
     e = SampleEnvironment([])
