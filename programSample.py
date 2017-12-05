@@ -115,7 +115,7 @@ def randomPrograms(mutations = 200):
 
 def sampleManyPrograms(seed):
     random.seed(seed)
-    timeout = 0.1
+    timeout = 2
     from time import time
     start = time()
     ps = []
