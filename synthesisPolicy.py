@@ -266,7 +266,7 @@ class SynthesisPolicy():#nn.Module):
         bestResult = None
         for result in executeTimeshareTasks(tasks,
                                             dt = 5.0, # Share 5s at a time
-                                            minimumSlice = 1.0, # don't let anything run for less than a second
+                                            minimumSlice = 0.25, # don't let anything run for less than a quarter second
                                             globalTimeout = globalTimeout):
             if result.cost != None:
                 if bestResult == None or bestResult.cost > result.cost:
