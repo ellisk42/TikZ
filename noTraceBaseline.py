@@ -6,7 +6,7 @@ from dispatch import dispatch
 import random
 import numpy as np
 
-import cPickle
+import cPickle as pickle
 import torch
 from torch import nn
 from torch.nn import functional as F
