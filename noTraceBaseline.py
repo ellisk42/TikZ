@@ -17,6 +17,8 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 GPU = cuda.is_available()
 
+
+
 def variable(x, volatile=False):
     if isinstance(x,list): x = np.array(x)
     if isinstance(x,(np.ndarray,np.generic)): x = torch.from_numpy(x)
@@ -32,6 +34,7 @@ LEXICON = ["START","END",
            "}",
            "if",
            "i","j","None"] + map(str,range(-5,20))
+symbolToIndex = dict(zip(LEXICON,range(len(LEXICON))))
 
 @dispatch(Loop)
 def serializeProgram(l):
@@ -141,15 +144,13 @@ class CaptionEncoder(nn.Module):
         c3 = self.horizontalFilters(x)
         c0 = torch.cat((c1,c2,c3),dim = 1)
         output = self.laterStages(c0)
-        return output.view(output.size(0),-1)
+        return output
+        #return output.view(output.size(0),-1)
 
 class CaptionDecoder(nn.Module):
     def __init__(self):
         super(CaptionDecoder, self).__init__()
         
-        self.LEXICON = LEXICON
-        self.symbolToIndex = dict(zip(LEXICON,range(len(LEXICON))))
-
         IMAGEFEATURESIZE = 2560
         EMBEDDINGSIZE = 64
         INPUTSIZE = IMAGEFEATURESIZE + EMBEDDINGSIZE
@@ -165,6 +166,9 @@ class CaptionDecoder(nn.Module):
         self.tokenPrediction = nn.Linear(HIDDEN,len(LEXICON))
 
     def forward(self, features, captions, lengths):
+        # flatten the convolution output
+        features = features.view(features.size(0),-1)
+        
         e = self.embedding(captions) # e: BxLx embeddingSize
         #print "e = ",e.size()
         #expandedFeatures: BxTx2560
@@ -190,13 +194,13 @@ class CaptionDecoder(nn.Module):
         states = None
 
         while True:
-            e = self.embedding(variable([self.symbolToIndex[result[-1]]]).view((1,-1)))
+            e = self.embedding(variable([symbolToIndex[result[-1]]]).view((1,-1)))
             recurrentInput = torch.cat((features,e),2)
             output, states = self.rnn(recurrentInput,states)
             distribution = self.tokenPrediction(output).view(-1).data
             distribution = F.log_softmax(distribution).data.exp()
             draw = torch.multinomial(distribution,1)[0]
-            c = self.LEXICON[draw]
+            c = LEXICON[draw]
             if len(result) > 20 or c == "END":
                 return result[1:]
             else:
@@ -251,7 +255,7 @@ class NoTrace(nn.Module):
     
 class TrainingExample():
     def __init__(self,p):
-        self.tokens = np.array([self.symbolToIndex["START"]] + [ self.symbolToIndex[s] for s in serializeProgram(p) ] + [self.symbolToIndex["END"]])
+        self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
         self.image = p.convertToSequence.draw()
         self.program = p
 
