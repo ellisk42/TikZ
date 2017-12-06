@@ -12,11 +12,9 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 import torch.optim as optimization
 import torch.cuda as cuda
+from torch.nn.utils.rnn import pack_padded_sequence
 
 GPU = cuda.is_available()
-
-
-
 
 
 
@@ -167,8 +165,8 @@ def serializeLine(p):
     for a in p.arguments[:4]:
         s += serializeLine(a)
     if p.k == 'line':
-        s += ["arrow = True" if "True" in p.arguments[4] else "arrow = False" ]
-        s += ["solid = True" if "True" in p.arguments[5] else "solid = False"]
+        s += ["arrow = True" if p.arguments[4] else "arrow = False" ]
+        s += ["solid = True" if p.arguments[5] else "solid = False"]
     return s
 
 @dispatch(Circle)
