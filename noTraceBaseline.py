@@ -262,7 +262,9 @@ class TrainingExample():
 
 def loadTrainingData(n):
     with open('randomlyGeneratedPrograms.p','rb') as handle:
-        X = pickle.load(handle)[:n]
+        X = pickle.load(handle)
+    print "Keeping %d/%d examples"%(n,len(X))
+    X = X[:n]
     return [TrainingExample(p) for p in X ]
         
 if __name__ == "__main__":
