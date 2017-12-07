@@ -255,7 +255,12 @@ class NoTrace(nn.Module):
     
 class TrainingExample():
     def __init__(self,p):
-        self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
+        try:
+            self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
+        except KeyError:
+            print "Key error in tokenization",serializeProgram(p)
+            assert False
+        
         self.image = p.convertToSequence().draw()
         self.program = p
 
