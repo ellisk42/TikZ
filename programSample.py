@@ -80,8 +80,8 @@ def mutateProgram(e,p):
         return Block(p.items[:n] + [new] + p.items[n+1:])
     else:
         u = random.random()
-        if u < 0.3: new = samplePrimitive(e)
-        elif u < 0.75: new = sampleLoop(e)
+        if len(e.freeVariables) <= 1 and u < 0.3: new = sampleLoop(e)
+        elif u < 0.75: new = samplePrimitive(e)
         else: new = sampleReflection(e)
         return Block(p.items + [new])
 

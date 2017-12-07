@@ -33,7 +33,7 @@ LEXICON = ["START","END",
            "reflect","x","y",
            "}",
            "if",
-           "i","j","None"] + map(str,range(-5,20))
+           "i","j","k","None"] + map(str,range(-5,20))
 symbolToIndex = dict(zip(LEXICON,range(len(LEXICON))))
 
 @dispatch(Loop)
