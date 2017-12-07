@@ -282,12 +282,13 @@ class TrainingExample():
 
 def loadTrainingData(n):
     print "About to load the examples"
-    with open('randomlyGeneratedPrograms.p','rb') as handle:
+    with open('/scratch/ellisk/randomlyGeneratedPrograms.p','rb') as handle:
         X = pickle.load(handle)
     print "Keeping %d/%d examples"%(n,len(X))
     pruned = []
     
     for x in X:
+        x = pickle.loads(x)
         if x.items != []:
             pruned.append(TrainingExample(x))
         if len(pruned) >= n:
@@ -303,8 +304,8 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.double()
 
-    N = 10#000
-    B = 2#64
+    N = 2*(10**7)
+    B = 64
     X = loadTrainingData(N)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
