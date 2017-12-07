@@ -113,6 +113,34 @@ class SynthesisPolicy():#nn.Module):
         
         return bestTime
 
+    def deepCoderLoss(self, results):
+        jobs = results.keys()
+        TIMEOUT = 999
+        minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
+        if minimumCost == TIMEOUT:
+            print "TIMEOUT",sequence
+            assert False
+        
+        # Find the winning program
+        bestResult = min(results.values(),key = lambda r: r.cost if r.cost != None else TIMEOUT)
+        incremental = bestResult.job.incremental
+        p = bestResult.program
+        depth = p.depth()
+        assert depth >= 1 and depth <= 3
+        reflects = False
+        loops = False
+        for k in p.walk():
+            if isinstance(k,Loop): loops = True
+            elif isinstance(k,Reflection): reflects = True
+            if loops and reflects: break
+        
+        f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
+        f = Variable(f)
+        y = self.parameters.matmul(f)
+        #z = lse([y[3],y[4],y[5]])
+
+        return -(binary(y[0],incremental) + binary(y[1],loops) + binary(y[2],reflects))# + y[2 + depth] - z)
+
     def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = [], numberOfIterations = 2000, regularize = 0.0):
         o = optimization.Adam([self.parameters],lr = 0.1)
 
@@ -126,6 +154,9 @@ class SynthesisPolicy():#nn.Module):
                 B = 2*float(s)/numberOfIterations
                 loss = sum([self.biasOptimalTime(results, B) for results in data ])
                 testingLoss = sum([self.biasOptimalTime(results, B) for results in testingData ]).data[0] if testingData != [] else 0.0
+            elif L == 'DC':
+                loss = sum(self.deepCoderLoss(results) for results in data)
+                testingLoss = sum(self.deepCoderLoss(results) for results in data).data[0] if testingData != [] else 0.0
             else:
                 print "unknown loss function",L
                 assert False
@@ -215,7 +246,55 @@ class SynthesisPolicy():#nn.Module):
                 for candidate, weight in zip(candidates,resourceDistribution):
                     jobProgress[candidate] += weight*dt
                 
-                
+        if L == 'DC':
+            assert not returnLogLikelihood
+            f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
+            f = Variable(f)
+            y = F.sigmoid(self.parameters.matmul(f))
+            incrementalScore = y.data[0]
+            loopScore = y.data[1]
+            reflectScore = y.data[2]
+            print "incrementalScore",incrementalScore
+            print "loopScore",loopScore
+            print "reflectScore",reflectScore
+
+            T = 0.0
+            canLoop = False
+            canReflect = False
+            initialIncremental = incrementalScore > 0.5
+            while True:
+                for d in range(1,4):
+                    j1 = [ j for j in jobs \
+                           if j.incremental == initialIncremental \
+                           and j.canLoop == canLoop \
+                           and j.canReflect == canReflect \
+                           and j.maximumDepth == d ]
+                    assert len(j1) == 1
+                    j1 = j1[0]
+                    result = results[j1]
+                    T += result.time
+                    if result.cost != None and result.cost <= minimumCost + 1: return T
+                    j2 = [ j for j in jobs \
+                           if j.incremental == (not initialIncremental) \
+                           and j.canLoop == canLoop \
+                           and j.canReflect == canReflect \
+                           and j.maximumDepth == d ]
+                    assert len(j2) == 1
+                    j2 = j2[0]
+                    result = results[j2]
+                    T += result.time
+                    if result.cost != None and result.cost <= minimumCost + 1: return T
+                if not canLoop:
+                    if canReflect or loopScore >= reflectScore: canLoop = True
+                elif not canReflect:
+                    if canLoop or loopScore < reflectScore: canReflect = True
+                else:
+                    print "Could not get minimum cost for the following problem:"
+                    for k,v in results.iteritems():
+                        print k,v
+                    assert False
+            
+            
 
         time = 0
         trajectoryLogProbability = 0
@@ -382,7 +461,7 @@ if __name__ == '__main__':
                         choices = ['nothing','basic','fancy','basic+fancy'],
                         default = 'basic+fancy')
     parser.add_argument('-m', '--mode',
-                        choices = ['expected','bias'],
+                        choices = ['expected','bias','DC'],
                         default = 'bias')
     parser.add_argument('--folds', default = 10, type = int)
     parser.add_argument('--regularize', default = 0, type = float)

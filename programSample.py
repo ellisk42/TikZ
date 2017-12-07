@@ -134,7 +134,7 @@ if __name__ == "__main__":
     for r in results: ps += r
     
 
-    import pickle
+    import cPickle as pickle
     with open('randomlyGeneratedPrograms.p','wb') as handle:
-        pickle.dump(ps, handle)
+        pickle.dump(ps, handle, protocol = -1)
     print "Collected",len(ps),"random programs altogether"

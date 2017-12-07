@@ -218,10 +218,17 @@ class CaptionDecoder(nn.Module):
         # Training input sequences are START, ...
         # Target output sequences are ..., END
         # the sizes are actually one smaller therefore
-        tokens.sort(key = len,reverse = True)
+
+        # Make sure that the token sequences are decreasing in size
+        previousLength = None
+        for t in tokens:
+            assert previousLength == None or len(t) <= previousLength
+            previousLength = len(t)
+            
+        
         sizes = map(lambda t: len(t) - 1,tokens)
         maximumSize = max(sizes)
-        tokens = [ p + [0]*(maximumSize + 1 - len(p))
+        tokens = [ np.concatenate((p, np.zeros(maximumSize + 1 - len(p),dtype = np.int)))
                    for p in tokens ]
         tokens = np.array(tokens)
         return variable(tokens[:,:-1]),sizes,variable(tokens[:,1:])
@@ -241,7 +248,9 @@ class NoTrace(nn.Module):
         examples.sort(key = lambda e: len(e.tokens), reverse = True)
         
         x = variable(np.array([ e.image for e in examples]))
-        
+
+        x = x.unsqueeze(1) # insert the channel
+
         imageFeatures = self.encoder(x)
         
         inputs, sizes, T = self.decoder.buildCaptions([ e.tokens for e in examples ])
@@ -271,11 +280,18 @@ class TrainingExample():
             assert False
 
 def loadTrainingData(n):
+    print "About to load the examples"
     with open('randomlyGeneratedPrograms.p','rb') as handle:
         X = pickle.load(handle)
     print "Keeping %d/%d examples"%(n,len(X))
-    X = X[:n]
-    return [TrainingExample(p) for p in X ]
+    pruned = []
+    
+    for x in X:
+        if x.items != []:
+            pruned.append(TrainingExample(x))
+        if len(pruned) >= n:
+            break
+    return pruned
         
 if __name__ == "__main__":
     model = NoTrace()
@@ -286,8 +302,8 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.double()
 
-    N = 10000
-    B = 64
+    N = 10#000
+    B = 2#64
     X = loadTrainingData(N)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
