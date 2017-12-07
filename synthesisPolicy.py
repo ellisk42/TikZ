@@ -289,9 +289,9 @@ class SynthesisPolicy():#nn.Module):
                 elif not canReflect:
                     if canLoop or loopScore < reflectScore: canReflect = True
                 else:
-                    print "Could not get minimum cost for the following problem:"
+                    print "Could not get minimum cost for the following problem:",minimumCost
                     for k,v in results.iteritems():
-                        print k,v
+                        print k,v.cost
                     assert False
             
             

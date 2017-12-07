@@ -27,11 +27,11 @@ def addFeatures(fs):
             composite[k] = composite.get(k,0) + f[k]
     return composite
 
-class AbstractionVariable(object):
+class AbstractionVariable():
     def __init__(self,v): self.v = v
     def __eq__(self,o): return isinstance(o,AbstractionVariable) and self.v == o.v
     def __str__(self): return "__v__(%d)"%(self.v)
-class Environment(object):
+class Environment():
     def __init__(self,b = []): self.bindings = b
     def lookup(self,x):
         for k,v in self.bindings:
@@ -81,7 +81,7 @@ class Environment(object):
         return Environment([(v,x) for v,(x,y) in self.bindings ])
     def secondInstantiation(self):
         return Environment([(v,y) for v,(x,y) in self.bindings ])
-class EnumerationEnvironment(object):
+class EnumerationEnvironment():
     def __init__(self, goal, progress, variableRanges):
         self.variableRanges = variableRanges
         self.goal = goal
@@ -97,7 +97,7 @@ class EnumerationEnvironment(object):
 class AbstractionFailure(Exception):
     pass
 
-class LinearExpression(object):
+class LinearExpression():
     def __init__(self, m,x,b):
         self.m = m
         self.x = x
@@ -156,7 +156,7 @@ class LinearExpression(object):
         if b == None: b = self.b
         return LinearExpression(m,self.x,b)
 
-class RelativeExpression(object):
+class RelativeExpression():
     orientations = {'n':'North',
                     'w':'West',
                     'e':'East',
@@ -180,7 +180,7 @@ class RelativeExpression(object):
 
                 
 
-class Primitive(object):
+class Primitive():
     def pretty(self):
         arguments = self.arguments
         if self.k == 'line':
@@ -267,7 +267,7 @@ class Primitive(object):
     def depth(self): return 1
 
 
-class Reflection(object):
+class Reflection():
     def pretty(self):
         return "reflect(%s = %s)\n%s"%(self.axis,self.coordinate,
                                        indent(self.body.pretty()))
@@ -351,7 +351,7 @@ class Reflection(object):
     def depth(self): return 1 + self.body.depth()
 
 
-class Loop(object):
+class Loop():
     def pretty(self):
         p = "for (%s < %s)\n"%(self.v,self.bound)
         if self.boundary != None:
@@ -511,7 +511,7 @@ class Loop(object):
         else:
             yield Loop(self.v,self.bound,self.body,boundary = Block([]))
         
-class Block(object):
+class Block():
     def pretty(self): return "\n".join([x.pretty() for x in self.items ])
     def convertToSequence(self):
         e = Environment([])
