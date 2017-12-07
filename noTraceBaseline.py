@@ -256,7 +256,7 @@ class NoTrace(nn.Module):
 class TrainingExample():
     def __init__(self,p):
         self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
-        self.image = p.convertToSequence.draw()
+        self.image = p.convertToSequence().draw()
         self.program = p
 
         if str(parseOutput(serializeProgram(p))) != str(p):
