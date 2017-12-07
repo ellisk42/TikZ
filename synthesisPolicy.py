@@ -142,7 +142,7 @@ class SynthesisPolicy():#nn.Module):
         return -(binary(y[0],incremental) + binary(y[1],loops) + binary(y[2],reflects))# + y[2 + depth] - z)
 
     def learn(self, data, L = 'expected', foldsRemaining = 0, testingData = [], numberOfIterations = 2000, regularize = 0.0):
-        o = optimization.Adam([self.parameters],lr = 0.1)
+        o = optimization.Adam([self.parameters],lr = 0.01)
 
         startTime = time.time()
         for s in range(1,numberOfIterations+1):
@@ -173,7 +173,7 @@ class SynthesisPolicy():#nn.Module):
             ETAthis = timePerIteration * (numberOfIterations - s)
             ETA = timePerFold * foldsRemaining + ETAthis
             if testingData != []: testingLoss = testingLoss * len(data) / len(testingData)
-            if s%100 == 0:
+            if s%10 == 0:
                 print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
 
     def reinforce(self,data):
@@ -254,15 +254,18 @@ class SynthesisPolicy():#nn.Module):
             incrementalScore = y.data[0]
             loopScore = y.data[1]
             reflectScore = y.data[2]
-            print "incrementalScore",incrementalScore
-            print "loopScore",loopScore
-            print "reflectScore",reflectScore
 
             T = 0.0
             canLoop = False
             canReflect = False
             initialIncremental = incrementalScore > 0.5
-            while True:
+            attempts = 0
+            if loopScore > reflectScore:
+                attemptSequence = [(False,False),(True,False),(True,True),(False,True)]
+            else:
+                attemptSequence = [(False,False),(False,True),(True,True),(True,False)]
+            for (canLoop,canReflect) in attemptSequence:
+                attempts += 1
                 for d in range(1,4):
                     j1 = [ j for j in jobs \
                            if j.incremental == initialIncremental \
@@ -284,15 +287,11 @@ class SynthesisPolicy():#nn.Module):
                     result = results[j2]
                     T += result.time
                     if result.cost != None and result.cost <= minimumCost + 1: return T
-                if not canLoop:
-                    if canReflect or loopScore >= reflectScore: canLoop = True
-                elif not canReflect:
-                    if canLoop or loopScore < reflectScore: canReflect = True
-                else:
-                    print "Could not get minimum cost for the following problem:",minimumCost
-                    for k,v in results.iteritems():
-                        print k,v.cost
-                    assert False
+
+            print "Could not get minimum cost for the following problem:",minimumCost
+            for k,v in results.iteritems():
+                print k,v.cost
+            assert False
             
             
 
