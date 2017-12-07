@@ -91,8 +91,8 @@ def parseOutput(l):
             a = get(l)
             s = get(l)
             return Primitive(k,x1,y1,x2,y2,
-                             arrow = "arrow = True" == a,
-                             solid = "solid = True" == s)
+                             "arrow = True" == a,
+                             "solid = True" == s)
         if k == 'for':
             v = get(l)
             b = parseLinear(l)
