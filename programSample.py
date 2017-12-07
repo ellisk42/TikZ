@@ -5,6 +5,7 @@ from CRP import *
 
 from dispatch import dispatch
 
+import cPickle as pickle
 import random
 
 class SampleEnvironment():
@@ -120,21 +121,21 @@ def sampleManyPrograms(seed):
     start = time()
     ps = []
     while time() - start < timeout*60*60:
-        ps += randomPrograms()
+        ps += [ pickle.dumps(p,protocol =  -1) for p in randomPrograms() ]
     print "Returning",len(ps),"random programs"
     return ps
 
 
 if __name__ == "__main__":
     from multiprocessing import Pool
-    C = 30
-    T = 4
+    C = 40
+    T = 0.1
     results = Pool(C).map(sampleManyPrograms, range(C))
     ps = []
     for r in results: ps += r
     
 
-    import cPickle as pickle
+
     with open('randomlyGeneratedPrograms.p','wb') as handle:
         pickle.dump(ps, handle, protocol = -1)
     print "Collected",len(ps),"random programs altogether"
