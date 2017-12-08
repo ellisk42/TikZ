@@ -230,7 +230,7 @@ class Line(Program):
         if not self.solid:
             context.set_dash([])
 
-        if self.arrow:
+        if self.arrow and self.points[0] != self.points[1]:
             # corners of the arrow
             retreat = (self.points[0] - self.points[1]).normalized()*0.5 + self.points[1]
             wings = (self.points[1] - self.points[0]).rotateNinetyDegrees().normalized()*0.3

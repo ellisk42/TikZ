@@ -266,7 +266,7 @@ class SynthesisPolicy():#nn.Module):
                 attemptSequence = [(False,False),(False,True),(True,True),(True,False)]
             for (canLoop,canReflect) in attemptSequence:
                 attempts += 1
-                for d in range(1,4):
+                for d in [2,3]:#range(1,4):
                     j1 = [ j for j in jobs \
                            if j.incremental == initialIncremental \
                            and j.canLoop == canLoop \
@@ -460,7 +460,7 @@ if __name__ == '__main__':
                         choices = ['nothing','basic','fancy','basic+fancy'],
                         default = 'basic+fancy')
     parser.add_argument('-m', '--mode',
-                        choices = ['expected','bias','DC'],
+                        choices = ['expected','bias','DC+bias','DC'],
                         default = 'bias')
     parser.add_argument('--folds', default = 10, type = int)
     parser.add_argument('--regularize', default = 0, type = float)
@@ -481,32 +481,35 @@ if __name__ == '__main__':
 
 
     print "Features:",arguments.features
-    mode = arguments.mode
-    policy = []
-    numberOfFolds = arguments.folds
-    foldCounter = 0
-    for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
-        path = 'checkpoints/policy_%s_%s_%s%d_%d.pt'%(arguments.features,arguments.mode,
-                                                      '' if arguments.regularize == 0 else 'regularize%f_'%arguments.regularize,
-                                                      foldCounter,arguments.folds)            
-        foldCounter += 1
-        print "Fold %d..."%foldCounter
-        model = SynthesisPolicy()
-        if arguments.load:
-            model.load(path)
-            print " [+] Successfully loaded model from %s"%path
-        else:
-            model.learn(train,L = mode,
-                        foldsRemaining = numberOfFolds - foldCounter,
-                        testingData = test,
-                        numberOfIterations = arguments.steps,
-                        regularize = arguments.regularize)
-            if arguments.save:
-                model.save(path)            
-        if not arguments.evaluate:
-            policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
-        else:
-            assert arguments.load
+    modes = arguments.mode.split('+')
+    policyRollouts = {}
+    for mode in modes:
+        policy = []
+        numberOfFolds = arguments.folds
+        foldCounter = 0
+        for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
+            path = 'checkpoints/policy_%s_%s_%s%d_%d.pt'%(arguments.features,mode,
+                                                          '' if arguments.regularize == 0 else 'regularize%f_'%arguments.regularize,
+                                                          foldCounter,arguments.folds)            
+            foldCounter += 1
+            print "Fold %d..."%foldCounter
+            model = SynthesisPolicy()
+            if arguments.load:
+                model.load(path)
+                print " [+] Successfully loaded model from %s"%path
+            else:
+                model.learn(train,L = mode,
+                            foldsRemaining = numberOfFolds - foldCounter,
+                            testingData = test,
+                            numberOfIterations = arguments.steps,
+                            regularize = arguments.regularize)
+                if arguments.save:
+                    model.save(path)            
+            if not arguments.evaluate:
+                policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
+            else:
+                assert arguments.load
+        policyRollouts[mode] = policy
 
 
     if arguments.evaluate != None:
@@ -548,12 +551,15 @@ if __name__ == '__main__':
     randomModel.zeroParameters()
     #randomPolicy = [ randomModel.rollout(r,L = mode) for r in data for _ in range(10)  ]
 
+    modelsToCompare = [(exact,'sketch'),(optimistic,'oracle')]
+    if 'DC' in policyRollouts: modelsToCompare.append((policyRollouts['DC'], 'DC'))
+    if 'bias' in policyRollouts: modelsToCompare.append((policyRollouts['bias'], 'learned policy (ours)'))
     
     bins = np.logspace(0,5,30)
     figure = plot.figure(figsize = (6,1.6))
-    for j,(ys,l) in enumerate([(exact,'sketch'),(optimistic,'oracle'),(policy,'learned policy (ours)')]):
+    for j,(ys,l) in enumerate(modelsToCompare):
         ys += [TIMEOUT]*totalFailures
-        plot.subplot(1,3,1 + j)
+        plot.subplot(1,len(modelsToCompare),1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
         if j == 1: plot.gca().set_xlabel('time (sec)',fontsize = 9)
         if j == 0: plot.ylabel('frequency',fontsize = 9)
@@ -587,6 +593,6 @@ if __name__ == '__main__':
     figureFilename = 'policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds)
     plot.savefig(figureFilename)
     os.system('convert -trim %s %s'%(figureFilename,figureFilename))
-    
+    os.system('feh %s'%figureFilename)
     
     
