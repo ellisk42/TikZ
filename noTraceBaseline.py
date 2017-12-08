@@ -264,7 +264,6 @@ class NoTrace(nn.Module):
     
 class TrainingExample():
     def __init__(self,p):
-        p = pickle.loads(p)
         try:
             self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
         except KeyError:
