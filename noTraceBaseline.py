@@ -247,7 +247,7 @@ class NoTrace(nn.Module):
         # IMPORTANT: Sort the examples by their size. recurrent network stuff needs this
         examples.sort(key = lambda e: len(e.tokens), reverse = True)
         
-        x = variable(np.array([ e.image for e in examples]))
+        x = variable(np.array([ e.sequence.draw() for e in examples]))
 
         x = x.unsqueeze(1) # insert the channel
 
@@ -270,8 +270,8 @@ class TrainingExample():
             print "Key error in tokenization",serializeProgram(p)
             assert False
         
-        self.image = p.convertToSequence().draw()
-        self.program = p
+        self.sequence = p.convertToSequence()
+        #self.program = p
 
         if str(parseOutput(serializeProgram(p))) != str(p):
             print "Serialization failure for program",p
