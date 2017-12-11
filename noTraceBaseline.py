@@ -292,6 +292,7 @@ def loadTrainingData(n):
             pruned.append(TrainingExample(x))
         if len(pruned) >= n:
             break
+    print "Pruned down to %d examples"%(len(pruned))
     return pruned
         
 if __name__ == "__main__":
