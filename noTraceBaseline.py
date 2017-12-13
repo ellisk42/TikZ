@@ -22,7 +22,7 @@ GPU = cuda.is_available()
 def variable(x, volatile=False):
     if isinstance(x,list): x = np.array(x)
     if isinstance(x,(np.ndarray,np.generic)): x = torch.from_numpy(x)
-    if GPU: x = x.float().cuda()
+    if GPU: x = x.cuda()
     return Variable(x, volatile=volatile)
 
 LEXICON = ["START","END",
