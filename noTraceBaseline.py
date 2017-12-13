@@ -22,7 +22,7 @@ GPU = cuda.is_available()
 def variable(x, volatile=False):
     if isinstance(x,list): x = np.array(x)
     if isinstance(x,(np.ndarray,np.generic)): x = torch.from_numpy(x)
-    if GPU: x = x.cuda()
+    if GPU: x = x.float().cuda()
     return Variable(x, volatile=volatile)
 
 LEXICON = ["START","END",
@@ -251,6 +251,7 @@ class NoTrace(nn.Module):
 
         x = x.unsqueeze(1) # insert the channel
 
+        print "x = ",x
         imageFeatures = self.encoder(x)
         
         inputs, sizes, T = self.decoder.buildCaptions([ e.tokens for e in examples ])
@@ -304,7 +305,7 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.double()
 
-    N = 1*(10**5)
+    N = 1*(10**4)
     B = 64
     X = loadTrainingData(N)
 
