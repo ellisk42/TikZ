@@ -313,7 +313,7 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.double()
 
-    print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
+    #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
         
 
     N = 1*(10**4)
