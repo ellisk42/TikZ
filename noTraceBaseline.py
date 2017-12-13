@@ -315,7 +315,7 @@ if __name__ == "__main__":
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
         
 
-    N = 1*(10**4)
+    N = 1*(10**6)
     B = 64
     X = loadTrainingData(N)
 
