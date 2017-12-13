@@ -247,11 +247,10 @@ class NoTrace(nn.Module):
         # IMPORTANT: Sort the examples by their size. recurrent network stuff needs this
         examples.sort(key = lambda e: len(e.tokens), reverse = True)
         
-        x = variable(np.array([ e.sequence.draw() for e in examples]))
+        x = variable(np.array([ e.sequence.draw() for e in examples], dtype = np.float32))
 
         x = x.unsqueeze(1) # insert the channel
 
-        print "x = ",x
         imageFeatures = self.encoder(x)
         
         inputs, sizes, T = self.decoder.buildCaptions([ e.tokens for e in examples ])
@@ -311,7 +310,7 @@ if __name__ == "__main__":
         model = model.float().cuda()
     else:
         print "Using the CPU"
-        model = model.double()
+        model = model.float()
 
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
         
