@@ -282,7 +282,15 @@ class TrainingExample():
 
 def loadTrainingData(n):
     print "About to load the examples"
-    with open('/scratch/ellisk/randomlyGeneratedPrograms.p','rb') as handle:
+    alternatives = ['/scratch/ellisk/randomlyGeneratedPrograms.p',
+                    'randomlyGeneratedPrograms.p']
+    for alternative in alternatives:
+        if os.path.exists(alternative):
+            trainingDataPath = alternative
+            print "Loading training data from",trainingDataPath
+            break
+        
+    with open(trainingDataPath,'rb') as handle:
         X = pickle.load(handle)
     print "Keeping %d/%d examples"%(n,len(X))
     pruned = []
@@ -300,10 +308,13 @@ if __name__ == "__main__":
     model = NoTrace()
     if GPU:
         print "Using the GPU"
-        model = model.cuda()
+        model = model.float().cuda()
     else:
         print "Using the CPU"
         model = model.double()
+
+    print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
+        
 
     N = 1*(10**4)
     B = 64
