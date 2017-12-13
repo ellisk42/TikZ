@@ -96,7 +96,9 @@ class AbsolutePoint(Expression):
 
     def normalized(self):
         l = (self.x*self.x + self.y*self.y)**0.5
-        return AbsolutePoint(self.x/l,self.y/l)
+        if l > 0.0001:
+            return AbsolutePoint(self.x/l,self.y/l)
+        else: return self
     def rotateNinetyDegrees(self):
         return AbsolutePoint(self.y,
                              -self.x)

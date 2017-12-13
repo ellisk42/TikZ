@@ -304,7 +304,7 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.double()
 
-    N = 2*(10**7)
+    N = 1*(10**5)
     B = 64
     X = loadTrainingData(N)
 
