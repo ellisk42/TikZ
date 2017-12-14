@@ -323,10 +323,12 @@ if __name__ == "__main__":
         print "Using the CPU"
         model = model.float()
 
+    model.load("checkpoints/noTrace.torch")
+
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
         
 
-    N = 1*(10**6)
+    N = 1*(10**7)
     B = 64
     X = loadTrainingData(N)
 
@@ -348,6 +350,7 @@ if __name__ == "__main__":
             L = model.loss(batch)
             if batchIndex%50 == 0:
                 print "Batch [%d/%d], LOSS = %s"%(batchIndex,batchesPerLoop,L.data[0])
+                model.dump("checkpoints/noTrace.torch")
                     
             L.backward()
             optimizer.step()
