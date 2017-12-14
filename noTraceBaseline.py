@@ -261,6 +261,17 @@ class NoTrace(nn.Module):
         
         return F.cross_entropy(outputDistributions, T)
 
+    def load(self,path):
+        if os.path.isfile(path):
+            self.load_state_dict(torch.load(path))
+            print "Loaded checkpoint",path
+        else:
+            print "Could not find checkpoint",path
+
+    def dump(self,path):
+        torch.save(self.state_dict(),path)
+        print "Dumped checkpoint",path
+
     
 class TrainingExample():
     def __init__(self,p):

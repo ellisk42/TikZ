@@ -438,7 +438,7 @@ def analyzePossibleFeatures(data):
                         for parse, flag in iterativeProblems
                         for (x,y) in [parse.usedDisplacements()] ]
     
-TIMEOUT = 10**5
+TIMEOUT = 10**6
 def bestPossibleTime(results):
     minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
     return (min([ r.time for r in results.values() if r.cost != None and r.cost <= minimumCost + 1 ] + [TIMEOUT]))
@@ -483,6 +483,9 @@ if __name__ == '__main__':
     print "Features:",arguments.features
     modes = arguments.mode.split('+')
     policyRollouts = {}
+    # Map from problem index to which model should be used for that problem
+    testingModels = {}
+    
     for mode in modes:
         policy = []
         numberOfFolds = arguments.folds
@@ -509,6 +512,9 @@ if __name__ == '__main__':
                 policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
             else:
                 assert arguments.load
+                for r in test:
+                    testingModels[data.index(r)] = model
+                
         policyRollouts[mode] = policy
 
 
@@ -526,7 +532,8 @@ if __name__ == '__main__':
             for j,r in data[problemIndex].iteritems():
                 print j
                 print r.cost,r.time
-                print 
+                print
+            model = testingModels[problemIndex]
             theoretical = model.rollout(data[problemIndex], L = mode)
             print "Theoretical time:",theoretical
             startTime = time.time()
@@ -535,7 +542,7 @@ if __name__ == '__main__':
             print "Total time:",actualTime
             return (actualTime,theoretical)
         
-        discrepancies = Pool(10).map(policyEvaluator,thingsToEvaluate)
+        discrepancies = parallelMap(10, policyEvaluator,thingsToEvaluate)
         print "DISCREPANCIES:",discrepancies
         with open('discrepancies.p','wb') as handle:
             pickle.dump(discrepancies, handle)
@@ -551,22 +558,23 @@ if __name__ == '__main__':
     randomModel.zeroParameters()
     #randomPolicy = [ randomModel.rollout(r,L = mode) for r in data for _ in range(10)  ]
 
-    modelsToCompare = [(exact,'sketch'),(optimistic,'oracle')]
+    modelsToCompare = [(exact,'sketch')]
     if 'DC' in policyRollouts: modelsToCompare.append((policyRollouts['DC'], 'DC'))
+    modelsToCompare.append((optimistic,'oracle'))
     if 'bias' in policyRollouts: modelsToCompare.append((policyRollouts['bias'], 'learned policy (ours)'))
     
-    bins = np.logspace(0,5,30)
-    figure = plot.figure(figsize = (6,1.6))
+    bins = np.logspace(0,6,30)
+    figure = plot.figure(figsize = (8,1.6))
+    plot.gca().set_xlabel('time (sec)',fontsize = 9)
     for j,(ys,l) in enumerate(modelsToCompare):
         ys += [TIMEOUT]*totalFailures
         plot.subplot(1,len(modelsToCompare),1 + j)
         plot.hist(ys, bins, alpha = 0.3, label = l)
-        if j == 1: plot.gca().set_xlabel('time (sec)',fontsize = 9)
         if j == 0: plot.ylabel('frequency',fontsize = 9)
 
         plot.gca().set_xscale("log")
-        plot.gca().set_xticks([10**e for e in range(6) ])
-        plot.gca().set_xticklabels([ r"$10^%d$"%e if e < 5 else r"$\infty$" for e in range(6)  ],
+        plot.gca().set_xticks([10**e for e in range(int(round(log10(TIMEOUT) + 1))) ])
+        plot.gca().set_xticklabels([ r"$10^%d$"%e if e < 6 else r"$\infty$" for e in range(int(round(log10(TIMEOUT) + 1)))  ],
                                    fontsize = 9)
         plot.gca().set_yticklabels([])
         plot.gca().set_yticks([])
@@ -588,6 +596,9 @@ if __name__ == '__main__':
                   fontsize = 7)#, rotation = 90)
         
 
+    #plot.plot()
+    figure.text(0.5, 0.04, 'time (sec)', ha='center', va='center',
+                fontsize = 9)
     plot.tight_layout()
 
     figureFilename = 'policyComparison_%s_%s_%d.png'%(arguments.features,arguments.mode,arguments.folds)

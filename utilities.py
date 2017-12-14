@@ -11,6 +11,8 @@ def NIPSPRIMITIVES(): return True
 
 def log2(x):
     return math.log(x)/math.log(2)
+def log10(x):
+    return math.log(x)/math.log(10)
 
 def image2array(p):
     p = p.convert('L')
@@ -284,6 +286,20 @@ def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False)
             if f == folds - 1:
                 assert len(thingsWeHaveTestedOn) == n
             yield ([ fullDataSet[j] for j in train ], [ fullDataSet[j] for j in test ])
+def parallelMap(numberOfCPUs, f, *xs):
+    from pathos.multiprocessing import ProcessingPool as Pool
+
+    numberOfCPUs = min(numberOfCPUs,len(zip(*xs)))
+    
+    if numberOfCPUs == 1: return map(f,*xs)
+    def safeCall(x):
+        try:
+            y = f(*x)
+            return y
+        except Exception as e:
+            print "Exception in worker during parallel map:\n%s"%(traceback.format_exc())
+            raise e
+    return Pool(numberOfCPUs).map(safeCall,zip(*xs))
 
 if __name__ == "__main__":
     for x in interleaveGenerators([iter(range(9)),iter(xrange(3))]):
