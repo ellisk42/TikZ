@@ -542,7 +542,7 @@ if __name__ == '__main__':
             print "Total time:",actualTime
             return (actualTime,theoretical)
         
-        discrepancies = parallelMap(10, policyEvaluator,thingsToEvaluate)
+        discrepancies = parallelMap(1, policyEvaluator,thingsToEvaluate)
         print "DISCREPANCIES:",discrepancies
         with open('discrepancies.p','wb') as handle:
             pickle.dump(discrepancies, handle)
