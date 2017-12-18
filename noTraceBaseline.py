@@ -3,6 +3,7 @@ from graphicsSearch import serializeLine
 
 from dispatch import dispatch
 
+import time
 import random
 import numpy as np
 
@@ -190,6 +191,7 @@ class CaptionDecoder(nn.Module):
 
         # (1,1,F)
         features = features.view(-1).unsqueeze(0).unsqueeze(0)
+        #features: 1x1x2560
         
         states = None
 
@@ -197,7 +199,7 @@ class CaptionDecoder(nn.Module):
             e = self.embedding(variable([symbolToIndex[result[-1]]]).view((1,-1)))
             recurrentInput = torch.cat((features,e),2)
             output, states = self.rnn(recurrentInput,states)
-            distribution = self.tokenPrediction(output).view(-1).data
+            distribution = self.tokenPrediction(output).view(-1)
             distribution = F.log_softmax(distribution).data.exp()
             draw = torch.multinomial(distribution,1)[0]
             c = LEXICON[draw]
@@ -239,9 +241,24 @@ class NoTrace(nn.Module):
         self.encoder = CaptionEncoder()
         self.decoder = CaptionDecoder()
 
-    def sample(self):
-        imageFeatures = variable(np.zeros((1,2560))).double()
-        return self.decoder.sample(imageFeatures)
+    def sampleMany(self, sequence, duration):
+        image = variable(np.array([ sequence.draw() ], dtype = np.float32), volatile = True).unsqueeze(1)
+
+        startTime = time()
+        
+        imageFeatures = self.encoder(image)
+        #imageFeatures: 1x10x16x16
+
+        programs = []
+        while time() < startTime + duration:
+            nextSequence = self.decoder.sample(imageFeatures)
+            try:
+                p = parseOutput(nextSequence)
+                print "Sampled",p
+                programs.append((p,p.convertToSequence()))
+            except: continue
+        return programs
+    
 
     def loss(self,examples):
         # IMPORTANT: Sort the examples by their size. recurrent network stuff needs this
@@ -263,7 +280,9 @@ class NoTrace(nn.Module):
 
     def load(self,path):
         if os.path.isfile(path):
-            self.load_state_dict(torch.load(path))
+            if not GPU: stuff = torch.load(path,map_location = lambda s,l: s)
+            else: stuff = torch.load(path)
+            self.load_state_dict(stuff)
             print "Loaded checkpoint",path
         else:
             print "Could not find checkpoint",path
@@ -315,6 +334,8 @@ def loadTrainingData(n):
     return pruned
         
 if __name__ == "__main__":
+    import sys
+    
     model = NoTrace()
     if GPU:
         print "Using the GPU"
@@ -325,6 +346,22 @@ if __name__ == "__main__":
 
     model.load("checkpoints/noTrace.torch")
 
+    if 'test' in sys.argv:
+        from groundTruthParses import *
+        import os
+        target = getGroundTruthParse('drawings/expert-%s.png'%(sys.argv[2]))
+        results = model.sampleMany(target, 60*60)
+        results.sort(key = lambda (_,s): s - target)
+        if len(results) > 0:
+            (p,s) = results[0]
+            print "Best program:"
+            print p.pretty()
+            #showImage(np.concatenate((1 - target.draw(),s.draw()),axis = 1))
+            saveMatrixAsImage(255*np.concatenate((1 - target.draw(),s.draw()),axis = 1),
+                              "noTraceOutputs/%s.png"%(sys.argv[2]))
+
+        os.exit(0)
+        
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
         
 
