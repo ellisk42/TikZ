@@ -527,13 +527,17 @@ if __name__ == '__main__':
             costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
             if costs == []: return None
             bestCost = min(costs)
+            model = testingModels[problemIndex]
+            jobs = data[problemIndex].keys()
+            job2w = dict(zip(jobs,
+                             np.exp(normalizeLogs(np.array([ s.data[0] for s in model.scoreJobs(jobs) ])))))
             print "Best cost:",bestCost
             print "Results:"
             for j,r in data[problemIndex].iteritems():
                 print j
-                print r.cost,r.time
+                print "COST =",r.cost,"\tTIME =",r.time,"\tWEIGHT =",job2w[j]
                 print
-            model = testingModels[problemIndex]
+            
             theoretical = model.rollout(data[problemIndex], L = mode)
             print "Theoretical time:",theoretical
             startTime = time.time()

@@ -10,7 +10,8 @@ def executeInProcessGroup(task):
 
 
 class TimeshareTask():
-    def __init__(self, command, arguments, logScore = 0):
+    def __init__(self, command, arguments, logScore = 0, timeout = None):
+        self.timeout = timeout
         self.logScore = logScore
         self.running = False
         self.finished = False
@@ -47,7 +48,7 @@ class TimeshareTask():
             os.killpg(self.process.pid, signal.SIGKILL)
 
 
-def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = None):
+def executeTimeshareTasks(tasks, dt = 1, exponent = 1, minimumSlice = 0.05, globalTimeout = None):
     startTime = time.time()
     while len(tasks) > 0:
         sliceStartTime = time.time()
@@ -88,11 +89,75 @@ def executeTimeshareTasks(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = No
 
         sliceTotalTime = time.time() - sliceStartTime
         print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        if exponent > 1:
+            dt = dt*exponent
+            print "Grew dt to",dt
+
+def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = None):
+    startTime = time.time()
+    progress = np.zeros(len(tasks))
+    totalRunTime = np.zeros(len(tasks))
+    
+    i = 0
+    while True:
+        sliceStartTime = time.time()
+
+        i += 1
+        
+        if len(tasks) == 0: break
+        if globalTimeout != None and time.time() - startTime > globalTimeout: break
+
+        # weight vector
+        W = np.exp(normalizeLogs(np.array([t.logScore for t in tasks ])))
+        
+        desiredSlices = dt * W * i - progress
+        desiredSlices[desiredSlices < minimumSlice] = 0
+        # failure case: nothing allocated at least minimum slice
+        if not np.any(desiredSlices > 0):
+            desiredSlices = (W >= W.max())*1.0
+        shares = desiredSlices * (dt/np.sum(desiredSlices))
+
+        progress = progress + shares
+        totalRunTime = totalRunTime + shares
+
+        print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
+        for share,task, in zip(shares,tasks):
+            if share < minimumSlice: continue
+            # This can happen if the caller decides to explicitly mark something is finished
+            if task.finished: continue
+            
+            print "Executing task:",[str(a) for a in task.arguments],"for",share,"sec"
+            result = task.execute(share)
+            if result == "still running": continue
+            elif result == "finished": assert False
+            else: yield result
+
+        for task,totalTime in zip(tasks,totalRunTime):
+            if task.timeout != None and totalTime >= task.timeout:
+                task.finished = True
+                task.cleanup()
+                print "(task %s timed out)"%(task.arguments)
+
+        if any(t.finished for t in tasks):
+            tasksAndRuntimes = [ (t,r) for t,r in zip(tasks,totalRunTime) if not t.finished ]
+            tasks = [t for t,r in tasksAndRuntimes ]
+            totalRunTime = np.array([r for t,r in tasksAndRuntimes ])
+            # Reset sharing
+            progress = np.zeros(len(tasks))
+            i = 0
+
+        sliceTotalTime = time.time() - sliceStartTime
+        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime))
         
     
 if __name__ == "__main__":
-    def callback():
-        os.system("wget http://archive.ubuntu.com/ubuntu/dists/zesty/main/installer-amd64/current/images/netboot/mini.iso")
+    def callback(dummy):
+        os.system("sleep 10")
         return "returning a value!"
-    for result in executeTimeshareTasks([TimeshareTask(callback,[]),TimeshareTask(callback,[])]):
+    from math import log
+    for result in executeTimeshareTasksFairly([TimeshareTask(callback,["high-priority"],logScore = log(0.9)),
+                                               TimeshareTask(callback,["low-priority"],logScore = log(0.1),
+                                                             timeout = 2)],
+                                              dt = 1,
+                                              minimumSlice = 0.15):
         print result

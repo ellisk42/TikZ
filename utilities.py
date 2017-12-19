@@ -104,6 +104,11 @@ def truncatedNormal(lower = None,upper = None):
     if upper != None and x > upper: return truncatedNormal(lower = lower,upper = upper)
     return x
 
+def normalizeLogs(x):
+    from scipy.misc import logsumexp
+    z = logsumexp(x)
+    return x - z
+
 def isFinite(x):
     return not (math.isnan(x) or math.isinf(x))
 def lse(x,y):
