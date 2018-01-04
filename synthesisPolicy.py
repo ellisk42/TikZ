@@ -340,12 +340,12 @@ class SynthesisPolicy():#nn.Module):
              for l in [True,False]
              for r in [True,False] ]
         scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
-        tasks = [ TimeshareTask(invokeExecuteMethod, [j], s) for j,s in zip(jobs, scores) ]
+        tasks = [ TimeshareTask(invokeExecuteMethod, [j], s, timeout = 2*60*60) for j,s in zip(jobs, scores) ]
         bestResult = None
-        for result in executeTimeshareTasks(tasks,
-                                            dt = 5.0, # Share 5s at a time
-                                            minimumSlice = 0.25, # don't let anything run for less than a quarter second
-                                            globalTimeout = globalTimeout):
+        for result in executeTimeshareTasksFairly(tasks,
+                                                  dt = 5.0, # Share 5s at a time
+                                                  minimumSlice = 0.25, # don't let anything run for less than a quarter second
+                                                  globalTimeout = globalTimeout):
             if result.cost != None:
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result

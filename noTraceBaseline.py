@@ -357,7 +357,7 @@ if __name__ == "__main__":
             print "Best program:"
             print p.pretty()
             #showImage(np.concatenate((1 - target.draw(),s.draw()),axis = 1))
-            saveMatrixAsImage(255*np.concatenate((1 - target.draw(),s.draw()),axis = 1),
+            saveMatrixAsImage(255*np.concatenate((1 - target.draw(),s.draw()),axis = 0),
                               "noTraceOutputs/%s.png"%(sys.argv[2]))
 
         os.exit(0)
