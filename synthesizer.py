@@ -7,7 +7,7 @@ from language import *
 from utilities import showImage,loadImage,saveMatrixAsImage,mergeDictionaries,frameImageNicely
 from recognitionModel import Particle
 from groundTruthParses import groundTruthSequence,getGroundTruthParse
-
+from extrapolate import *
 from DSL import *
 
 import traceback
@@ -303,13 +303,7 @@ def viewSynthesisResults(arguments):
 
     programFeatures = {}
 
-    for expertIndex in list(range(100)):# + [101]:
-        if arguments.extrapolate:
-            if not any([ e == expertIndex or isinstance(e,tuple) and e[0] == expertIndex
-                         for e in interestingExtrapolations ]):
-                continue
-            
-        
+    for expertIndex in list(range(100)):        
         f = 'drawings/expert-%d.png'%expertIndex
         parse = getGroundTruthParse(f)
         if parse == None:
@@ -326,8 +320,32 @@ def viewSynthesisResults(arguments):
             if len(equallyGoodResults) > 1:
                 print "Got %d results for %d"%(len(equallyGoodResults),expertIndex)
 
-            programs = [ r.program.fixReflections(result.job.parse.canonicalTranslation()).removeDeadCode()
+            programs = [ r.program.fixStringParameters().\
+                         fixReflections(result.job.parse.canonicalTranslation()).removeDeadCode()
                          for r in equallyGoodResults ]
+            gt = result.job.parse.canonicalTranslation()
+            badPrograms = [ p
+                            for p in programs
+                            if p.convertToSequence().canonicalTranslation() != gt ]
+            if badPrograms:
+                print " [-] WARNING: Got %d programs that are inconsistent with ground truth"%(len(badPrograms))
+            if False:
+                for program in programs:
+                    prediction = program.convertToSequence().canonicalTranslation()
+                    actual = gt
+                    if not (prediction == actual):
+                        print "FATAL: program does notproduce spec"
+                        print "Specification:"
+                        print actual
+                        print "Program:"
+                        print program
+                        print program.pretty()
+                        print "Program output:"
+                        print prediction
+                        print set(map(str,prediction.lines))
+                        print set(map(str,actual.lines))
+                        print set(map(str,actual.lines))^set(map(str,prediction.lines))
+                        assert False
 
         if result == None and arguments.extrapolate:
             print "Synthesis failure for %s"%f
@@ -341,62 +359,21 @@ def viewSynthesisResults(arguments):
             print result.source
 
         if result != None:
-            syntaxTree = result.program
+            syntaxTree = result.program.fixStringParameters()
             syntaxTree = syntaxTree.fixReflections(result.job.parse.canonicalTranslation())
-            print syntaxTree
+            print syntaxTree.pretty()
             print syntaxTree.features()
             print syntaxTree.convertToSequence()
             #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
             programFeatures[f] = syntaxTree.features()
 
-        extrapolations = []
         if arguments.extrapolate:
-            syntaxTree = syntaxTree.explode()
-            trace = syntaxTree.convertToSequence().removeDuplicates()
-            print "original trace:"
-            print trace
-            originalUndesirability = parse.undesirabilityVector()
-            print "original undesirability",originalUndesirability
-
-            framedExtrapolations = []
-            extrapolationGenerators = [ program.explode().extrapolations() for program in programs ]
-            for e in interleaveGenerators(extrapolationGenerators):
-                t = e.convertToSequence().removeDuplicates()
-                newUndesirability = t.undesirabilityVector()
-                if (newUndesirability > originalUndesirability).sum() > 0: continue
-                if t.canonicalTranslation() == trace.canonicalTranslation(): continue
-                if any([t.canonicalTranslation() == o.canonicalTranslation() for o in extrapolations ]): continue
-                extrapolations.append(t)
-
-                framedExtrapolations.append(1 - frameImageNicely(t.draw(adjustCanvasSize = True)))
-
-                if len(framedExtrapolations) > 30:
-                    break
-                
-            if framedExtrapolations != []:
-                for crap in interestingExtrapolations:
-                    if isinstance(crap,tuple) and crap[0] == expertIndex:
-                        print "Just taking the %d extrapolation..."%(crap[1])
-                        framedExtrapolations = [framedExtrapolations[crap[1]]]
-                        break
-                
-                        
-                if arguments.debug:
-                    framedExtrapolations = [loadImage(f), syntaxTree.convertToSequence().draw()] + framedExtrapolations
-                else:
-                    framedExtrapolations = [frameImageNicely(loadImage(f))] + framedExtrapolations
-                a = np.zeros((256*len(framedExtrapolations),256))
-                for j,e in enumerate(framedExtrapolations):
-                    a[j*256:(1+j)*256,:] = 1 - e
-                    a[j*256,:] = 0.5
-                    a[(1+j)*256-1,:] = 0.5
-                a[0,:] = 0.5
-                a[:,0] = 0.5
-                a[:,255] = 0.5
-                a[256*len(framedExtrapolations)-1,:] = 0.5
-                a = 255*a
-                # to show the first one
-                #a = a[:(256*2),:]
+            extrapolations = proposeExtrapolations(programs)
+            if extrapolations:
+                framedExtrapolations = [1 - frameImageNicely(loadImage(f))] + \
+                                       [ frameImageNicely(t.draw(adjustCanvasSize = True))
+                                         for t in extrapolations ]
+                a = 255*makeImageArray(framedExtrapolations)
                 extrapolationMatrix.append(a)
                 print "Saving extrapolation column to",'extrapolations/expert-%d-extrapolation.png'%expertIndex
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)

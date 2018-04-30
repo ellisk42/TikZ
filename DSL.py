@@ -156,6 +156,9 @@ class LinearExpression():
         if b == None: b = self.b
         return LinearExpression(m,self.x,b)
 
+    def offset(self,o):
+        return LinearExpression(self.m,self.x,self.b+o)
+
 class RelativeExpression():
     orientations = {'n':'North',
                     'w':'West',
@@ -206,13 +209,27 @@ class Primitive():
                                       self.arguments[2].evaluate(e),
                                       self.arguments[3].evaluate(e))
         if self.k == 'line':
+            arrow = self.arguments[4]
+            solid = self.arguments[5]
+            if isinstance(arrow,str): assert False
+            if isinstance(solid,str): assert False
             return Line.absolute(self.arguments[0].evaluate(e),
                                  self.arguments[1].evaluate(e),
                                  self.arguments[2].evaluate(e),
                                  self.arguments[3].evaluate(e),
-                                 arrow = self.arguments[4],
-                                 solid = self.arguments[5])
+                                 arrow = arrow,
+                                 solid = solid)
         raise Exception('unknown primitives when evaluating')
+
+    def fixStringParameters(self):
+        if self.k == 'line':
+            arguments = list(self.arguments)
+            arrow = self.arguments[4]
+            solid = self.arguments[5]
+            if isinstance(arrow,str): arguments[4] = 'True' in arrow
+            if isinstance(solid,str): arguments[5] = 'True' in solid
+            return Primitive(self.k, *arguments)
+        else: return self
     
     def extrapolations(self): yield self
     def explode(self):
@@ -282,6 +299,11 @@ class Reflection():
     def evaluate(self,environment):
         body = self.body.evaluate(environment)
         return body | set([ x.reflect(self.axis,self.coordinate) for x in body ])
+
+    def fixStringParameters(self):
+        return Reflection(self.axis,
+                          self.coordinate,
+                          self.body.fixStringParameters())
 
     @staticmethod
     def enumerate(environment, maximumCoordinate = 16):
@@ -372,6 +394,12 @@ class Loop():
                 accumulator|= self.boundary.evaluate(environmentp)
             accumulator|= self.body.evaluate(environmentp)
         return accumulator
+
+    def fixStringParameters(self):
+        return Loop(self.v, self.bound,
+                    self.body.fixStringParameters(),
+                    boundary = None if self.boundary is None else self.boundary.fixStringParameters(),
+                    lowerBound=self.lowerBound)
     
     def removeDeadCode(self):
         body = self.body.removeDeadCode()
@@ -404,7 +432,7 @@ class Loop():
         for b in self.body.extrapolations():
             for boundary in ([None] if self.boundary == None else self.boundary.extrapolations()):
                 for ub,lb in [(1,0),(0,1),(1,1),(0,0)]:
-                    yield Loop(self.v, '%s + %d'%(self.bound,ub), b,
+                    yield Loop(self.v, self.bound.offset(ub), b,
                                lowerBound = self.lowerBound - lb,
                                boundary = boundary)
     def explode(self):
@@ -543,12 +571,12 @@ class Block():
                 copy = list(self.items)
                 copy[j] = y
                 yield Block(copy)
+    def fixStringParameters(self):
+        return Block([x.fixStringParameters() for x in self.items ])
 
     def fixReflections(self,target):
         distance = self.convertToSequence() - target
         if distance == 0: return self
-
-        print "Fixing reflections"
 
         candidates = [self] + list(self.hoistReflection())
         sequences = [k.convertToSequence() for k in candidates ]
@@ -792,8 +820,10 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
                                    parseExpression(m.group(2)),
                                    parseExpression(m.group(3)),
                                    parseExpression(m.group(4)),
-                                   'arrow = %s'%(m.group(6) == '1'),
-                                   'solid = %s'%(m.group(5) == '0'))]         
+                                   # arrow
+                                   m.group(6) == '1',
+                                   # solid
+                                   m.group(5) == '0')]         
             j += 1
             continue
         

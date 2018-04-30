@@ -7,6 +7,30 @@ import numpy as np
 from PIL import Image
 
 
+def makeImageArray(l):
+    assert isinstance(l,list)
+    if not isinstance(l[0],list): l = [[c] for c in l]
+
+    for c in l:
+        assert allSame(c, lambda i: i.shape)
+    assert allSame([ c[0] for c in l ], lambda i: i.shape)
+
+    w,h = l[0][0].shape
+
+    nx = len(l)
+    ny = max(len(c) for c in l)
+    a = np.zeros((w*nx,h*ny))
+
+    for j,c in enumerate(l):
+        for k,i in enumerate(c):
+            a[j*w:(j+1)*w, k*h:(k+1)*h] = i
+    for j in xrange(1, nx):
+        a[w*j,:] = 0.5
+    for j in xrange(1, ny):
+        a[:,h*j] = 0.5
+
+    return a
+
 def NIPSPRIMITIVES(): return True
 
 def log2(x):
@@ -305,6 +329,12 @@ def parallelMap(numberOfCPUs, f, *xs):
             print "Exception in worker during parallel map:\n%s"%(traceback.format_exc())
             raise e
     return Pool(numberOfCPUs).map(safeCall,zip(*xs))
+
+def allSame(l,k):
+    v = k(l[0])
+    for x in l[1:]:
+        if k(x) != v: return False
+    return True
 
 if __name__ == "__main__":
     for x in interleaveGenerators([iter(range(9)),iter(xrange(3))]):

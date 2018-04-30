@@ -255,7 +255,9 @@ class NoTrace(nn.Module):
             try:
                 p = parseOutput(nextSequence)
                 print "Sampled",p
-                programs.append((p,p.convertToSequence()))
+                programs.append({"time": time() - startTime,
+                                 "program": p,
+                                 "spec": p.convertToSequence()})
             except: continue
         return programs
     
@@ -351,14 +353,17 @@ if __name__ == "__main__":
         import os
         target = getGroundTruthParse('drawings/expert-%s.png'%(sys.argv[2]))
         results = model.sampleMany(target, 60*60)
-        results.sort(key = lambda (_,s): s - target)
+        results.sort(key = lambda z: (z["spec"] - target, z["program"].totalCost(), z["time"]))
         if len(results) > 0:
-            (p,s) = results[0]
+            z = results[0]
             print "Best program:"
-            print p.pretty()
+            print z["program"].pretty()
             #showImage(np.concatenate((1 - target.draw(),s.draw()),axis = 1))
-            saveMatrixAsImage(255*np.concatenate((1 - target.draw(),s.draw()),axis = 0),
+            saveMatrixAsImage(255*np.concatenate((1 - target.draw(),z["spec"].draw()),axis = 0),
                               "noTraceOutputs/%s.png"%(sys.argv[2]))
+            with open("noTraceOutputs/%s.p"%(sys.argv[2]),'wb') as handle:
+                pickle.dump(z,handle)
+            
 
         os.exit(0)
         

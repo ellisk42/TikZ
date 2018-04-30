@@ -402,7 +402,7 @@ class Rectangle(Program):
 
     def reflect(self,a,c):
         (x1,y1) = reflectPoint(a,c,self.p1.x,self.p1.y)
-        (x2,y2) = reflectPoint(a,c,self.p1.x,self.p2.y)
+        (x2,y2) = reflectPoint(a,c,self.p2.x,self.p2.y)
         return Rectangle.absolute(min(x1,x2),
                                   min(y1,y2),
                                   max(x1,x2),
@@ -680,6 +680,7 @@ class Sequence(Program):
     def __eq__(self,o):
         if not isinstance(o,Sequence): return False
         return set(map(str,self.lines)) == set(map(str,o.lines))
+    def __ne__(self,o): return not (self == o)
 
     def removeDuplicates(self):
         return Sequence([ l for j,l in enumerate(self.lines) if not (str(l) in map(str,self.lines[:j])) ])
