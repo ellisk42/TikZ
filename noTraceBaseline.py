@@ -373,7 +373,7 @@ if __name__ == "__main__":
         results = []
         gt = []
         for n in xrange(100):
-            gt.append(getGroundTruthParse('drawings/expert-%s.png'%(n)))
+            gt = gt + [getGroundTruthParse('drawings/expert-%s.png'%(n))]
             f = "noTraceOutputs/%d.p"%n
             try:
                 with open(f,"rb") as handle:
@@ -385,7 +385,7 @@ if __name__ == "__main__":
                   for r in results ]
         medianTime = sorted(times)[len(times)/2]
         print "Median time",medianTime
-        successful = sum(r is not None and len(r["spec"] - g) == 0
+        successful = sum(r is not None and (r["spec"] - g) == 0
                          for r,g in zip(results,gt) )
         print "# times that we got a program which was consistent with the data",successful
         os.exit(0)
