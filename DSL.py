@@ -1,6 +1,6 @@
 from language import Rectangle,Circle,Line,AbsolutePoint,Sequence
 from utilities import *
-from fastRender import fastRender
+#from fastRender import fastRender
 from render import render
 
 import re
