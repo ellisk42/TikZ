@@ -127,6 +127,8 @@ for k in groundTruth:
     groundTruthSequence[k] = Sequence([ parseLineOfCode(l) for l in groundTruth[k] ])
 
 def getGroundTruthParse(f):
+    if f.startswith('/om/user/ellisk/'):
+        f = f[len('/om/user/ellisk/'):]
     return groundTruthSequence.get(f,None)
 def prettyGroundTruth(j):
     stuff = '\n'.join(groundTruth['drawings/expert-%d.png'%j]).replace(', radius = 1','').replace('center = ','')
