@@ -681,5 +681,8 @@ if __name__ == '__main__':
                              usePrior = not arguments.noPrior,
                              incremental = arguments.incremental)
             print j
-            print j.execute(timeout = timeout,parallelSolving = parallelSolving)
+            r = j.execute(timeout = arguments.timeout,parallelSolving = arguments.parallelSolving)
+            print "Synthesis time:",r.time
+            print "Program:"
+            print r.program.pretty()
                      

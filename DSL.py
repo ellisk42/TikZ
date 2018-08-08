@@ -901,7 +901,9 @@ def parseExpression(e):
             factor = 1
         if offset == None: offset = 0
         if variable == None:
+            print("FATAL: parsing expression: could not find variable.")
             print e
+            print("^^^^")
             assert False
         #print "Parsed into:",LinearExpression(factor,variable,offset)
         return LinearExpression(factor,variable,offset)

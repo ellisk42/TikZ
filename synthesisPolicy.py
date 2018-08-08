@@ -326,7 +326,7 @@ class SynthesisPolicy():#nn.Module):
                     return time, trajectoryLogProbability
                 return time
 
-    def timeshare(self, f, optimalCost = None, globalTimeout = None):
+    def timeshare(self, f, optimalCost = None, globalTimeout = None, verbose=False):
         f = 'drawings/expert-%d.png'%f
         parse = getGroundTruthParse(f)
         jobs = [ SynthesisJob(parse, f,
@@ -347,6 +347,12 @@ class SynthesisPolicy():#nn.Module):
                                                   minimumSlice = 0.25, # don't let anything run for less than a quarter second
                                                   globalTimeout = globalTimeout):
             if result.cost != None:
+                if verbose:
+                    print 
+                    print " [+] Found the following program:"
+                    print result.program.pretty()
+                    print
+                    print 
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result
                 if result.cost <= optimalCost + 1: break
@@ -541,15 +547,15 @@ if __name__ == '__main__':
             theoretical = model.rollout(data[problemIndex], L = mode)
             print "Theoretical time:",theoretical
             startTime = time.time()
-            model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout)
+            model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True)
             actualTime = time.time() - startTime
             print "Total time:",actualTime
             return (actualTime,theoretical)
         
         discrepancies = parallelMap(1, policyEvaluator,thingsToEvaluate)
-        print "DISCREPANCIES:",discrepancies
-        with open('discrepancies.p','wb') as handle:
-            pickle.dump(discrepancies, handle)
+        # print "DISCREPANCIES:",discrepancies
+        # with open('discrepancies.p','wb') as handle:
+        #     pickle.dump(discrepancies, handle)
         sys.exit(0)
         
         

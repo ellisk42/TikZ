@@ -72,14 +72,11 @@ class StandardPrimitiveDecoder():
                 self.attentionTransforms += [theta]
                 # clobber the existing image input with the region that attention is focusing on
                 C = int(imageRepresentation.shape[3]) # channel count
-                print "c = ",C
                 transformed = spatial_transformer_network(imageRepresentation,
                                                           theta,
                                                           (self.attentionSize,self.attentionSize))
-                print "transfodrmed",transformed
                 flat = tf.reshape(transformed,
                                   [-1, self.attentionSize*self.attentionSize*C])
-                print "flat",flat
                 predictionInputs[0] = flat
                 
             # construct the intermediate representation, if the decoder has one

@@ -34,6 +34,8 @@ To synthesize all of the programs for all of the drawings in every way possible 
 python synthesizer.py --makePolicyTrainingData --cores 20
 ```
 
+
+
 To view some extrapolations, do:
 ```
 python synthesizer.py -n policyTrainingData.p --view --extrapolate

@@ -120,7 +120,7 @@ def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeou
         progress = progress + shares
         totalRunTime = totalRunTime + shares
 
-        print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
+        # print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
         for share,task, in zip(shares,tasks):
             if share < minimumSlice: continue
             # This can happen if the caller decides to explicitly mark something is finished
@@ -147,7 +147,7 @@ def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeou
             i = 0
 
         sliceTotalTime = time.time() - sliceStartTime
-        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d%%"%(sliceTotalTime,int(100*dt/sliceTotalTime))
         
     
 if __name__ == "__main__":
