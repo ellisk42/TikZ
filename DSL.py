@@ -388,7 +388,7 @@ class Loop():
         self.lowerBound = lowerBound
     def evaluate(self,environment):
         accumulator = set([])
-        for j in range(self.bound.evaluate(environment)):
+        for j in range(self.lowerBound, self.bound.evaluate(environment)):
             environmentp = environment.extend(self.v,j)[0]
             if j > self.lowerBound and self.boundary != None:
                 accumulator|= self.boundary.evaluate(environmentp)

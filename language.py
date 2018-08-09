@@ -686,6 +686,11 @@ class Sequence(Program):
         return Sequence([ l for j,l in enumerate(self.lines) if not (str(l) in map(str,self.lines[:j])) ])
 
     def children(self): return self.lines
+
+    def onlyOneKindOfObject(self):
+        return all( isinstance(l,Line) for l in self.lines  ) or \
+            all( isinstance(l,Rectangle) for l in self.lines  ) or \
+            all( isinstance(l,Circle) for l in self.lines  )
     
     def evaluate(self):
         trace = []
@@ -724,6 +729,15 @@ class Sequence(Program):
                             if not isinstance(l,Line)
                             for (x,y,_) in l.attachmentPoints() ])
         return len(linePoints - attachmentPoints) > 0
+    def haveOrphanLines(self):
+        linePoints = [{(p.x,p.y) for p in l.points}
+                      for l in self.lines
+                      if isinstance(l,Line)]                      
+        for j,ps in enumerate(linePoints):
+            others = [pp for i,pp in enumerate(linePoints)
+                      if i != j]
+            if all( len(ps&pp) == 0 for pp in others ): return True
+        return False
     def haveOrphanCircles(self):
         linePoints = set([(p.x,p.y) for l in self.lines
                       if isinstance(l,Line)
@@ -748,6 +762,7 @@ class Sequence(Program):
 
     def undesirabilityVector(self):
         return np.array([self.hasCollisions(),
+                         self.haveOrphanLines(),
                          self.haveUnattachedLines(),
                          self.haveOrphanCircles(),
                          self.haveOrphanRectangles(),

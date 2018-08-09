@@ -13,13 +13,14 @@ import torchvision.transforms as T
 from synthesizer import *
 from utilities import sampleLogMultinomial
 from timeshare import *
+from extrapolate import *
 
 import time
 import numpy as np
 import math
 import os
 from pathos.multiprocessing import ProcessingPool as Pool
-
+import re
 
 def binary(x,f):
     if not f: x = -x
@@ -326,9 +327,9 @@ class SynthesisPolicy():#nn.Module):
                     return time, trajectoryLogProbability
                 return time
 
-    def timeshare(self, f, optimalCost = None, globalTimeout = None, verbose=False):
+    def timeshare(self, f, optimalCost = None, globalTimeout = None, verbose=False, parse=None):
         f = 'drawings/expert-%d.png'%f
-        parse = getGroundTruthParse(f)
+        parse = parse or getGroundTruthParse(f)
         jobs = [ SynthesisJob(parse, f,
                               usePrior = True,
                               maximumDepth = d,
@@ -336,7 +337,7 @@ class SynthesisPolicy():#nn.Module):
                               canReflect = r,
                               incremental = i)
              for d in [1,2,3]
-             for i in [True,False]
+             for i in ([True,False] if not parse.onlyOneKindOfObject() else [False])
              for l in [True,False]
              for r in [True,False] ]
         scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
@@ -471,15 +472,17 @@ if __name__ == '__main__':
     parser.add_argument('--folds', default = 10, type = int)
     parser.add_argument('--regularize', default = 0, type = float)
     parser.add_argument('-s','--steps', default = 2000, type = int)
-    parser.add_argument('--evaluate', default = None, type = int)
+    parser.add_argument('--evaluate', default = None, type = str)
     parser.add_argument('--save', action = 'store_true',default = False)
     parser.add_argument('--load', action = 'store_true',default = False)
     parser.add_argument('--timeout', default = None, type = int)
+    parser.add_argument('--extrapolate', default = None, type = str)
 
     arguments = parser.parse_args()
+    assert arguments.extrapolate is None or arguments.evaluate is not None
 
     data = loadPolicyData()
-    if not arguments.evaluate:
+    if arguments.evaluate is None:
         data = [results for results in data
                 if any([r.cost != None for r in results.values() ]) ]
         print "Pruned down to %d problems"%len(data)
@@ -514,7 +517,7 @@ if __name__ == '__main__':
                             regularize = arguments.regularize)
                 if arguments.save:
                     model.save(path)            
-            if not arguments.evaluate:
+            if arguments.evaluate is None:
                 policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
             else:
                 assert arguments.load
@@ -524,12 +527,22 @@ if __name__ == '__main__':
         policyRollouts[mode] = policy
 
 
-    if arguments.evaluate != None:
-        if arguments.evaluate == -1:
+    if arguments.evaluate is not None:
+        if arguments.evaluate == "-1":
             thingsToEvaluate = list(range(100))
-        else: thingsToEvaluate = [arguments.evaluate]
+        else:
+            thingsToEvaluate = [arguments.evaluate]
         
         def policyEvaluator(problemIndex):
+            try:
+                problemIndex = int(problemIndex)
+                parse = None
+            except:
+                with open(problemIndex,"rb") as handle: particle = pickle.load(handle)
+                parse = particle.sequence()
+                problemIndex = int(re.search("expert-(\d+)-p",problemIndex).group(1))
+                
+                
             costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
             if costs == []: return None
             bestCost = min(costs)
@@ -547,9 +560,15 @@ if __name__ == '__main__':
             theoretical = model.rollout(data[problemIndex], L = mode)
             print "Theoretical time:",theoretical
             startTime = time.time()
-            model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True)
+            result = model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True,
+                            parse=parse)
             actualTime = time.time() - startTime
             print "Total time:",actualTime
+
+            if arguments.extrapolate:
+                print "Extrapolating into",arguments.extrapolate
+                exportExtrapolations([result.program], arguments.extrapolate,
+                                     "drawings/expert-%d.png"%problemIndex)
             return (actualTime,theoretical)
         
         discrepancies = parallelMap(1, policyEvaluator,thingsToEvaluate)

@@ -1,4 +1,8 @@
-
+If you want to run on drawing 29 (`drawings/expert-29.png`) with pretrained models, do:
+```
+python demo.py 29
+```
+which will parse the image, and use the learned synthesis policy to synthesize a program from the ground truth parse as well as the parse discovered by the neural network (which hopefully should be the same!); it will also produce extrapolations and export them, printing out the files which contain extrapolations.
 
 To generate synthetic training data for the neural network:
 ```
