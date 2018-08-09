@@ -2,10 +2,7 @@ from utilities import *
 
 def proposeExtrapolations(programs, N=30):
     trace = programs[0].explode().convertToSequence().removeDuplicates()
-    print "original trace:"
-    print trace
     originalUndesirability = trace.undesirabilityVector()
-    print "original undesirability",originalUndesirability
 
     extrapolations = []
 
