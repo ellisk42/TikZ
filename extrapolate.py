@@ -10,7 +10,7 @@ def proposeExtrapolations(programs, N=30):
     for e in interleaveGenerators(extrapolationGenerators):
         t = e.convertToSequence().removeDuplicates()
         newUndesirability = t.undesirabilityVector()
-        badness =  (newUndesirability > originalUndesirability).sum() > 0
+        badness =  (newUndesirability > originalUndesirability).sum()
         if t.canonicalTranslation() == trace.canonicalTranslation(): continue
         if any([t.canonicalTranslation() == o.canonicalTranslation() for _,o in extrapolations ]): continue
         extrapolations.append((badness,t))
