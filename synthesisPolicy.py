@@ -327,7 +327,10 @@ class SynthesisPolicy():#nn.Module):
                     return time, trajectoryLogProbability
                 return time
 
-    def timeshare(self, f, optimalCost = None, globalTimeout = None, verbose=False, parse=None):
+    def timeshare(self, f, optimalCost = None, globalTimeout = None, verbose=False, parse=None,
+                  outputDirectory = None):
+        if outputDirectory is not None:
+            os.system("mkdir  -p %s"%outputDirectory)
         f = 'drawings/expert-%d.png'%f
         parse = parse or getGroundTruthParse(f)
         jobs = [ SynthesisJob(parse, f,
@@ -343,11 +346,18 @@ class SynthesisPolicy():#nn.Module):
         scores = [ s.data[0] for s in self.scoreJobs(jobs) ]
         tasks = [ TimeshareTask(invokeExecuteMethod, [j], s, timeout = 2*60*60) for j,s in zip(jobs, scores) ]
         bestResult = None
+        resultIndex = 0
         for result in executeTimeshareTasksFairly(tasks,
                                                   dt = 5.0, # Share 5s at a time
                                                   minimumSlice = 0.25, # don't let anything run for less than a quarter second
                                                   globalTimeout = globalTimeout):
             if result.cost != None:
+                # Write the program out to a file
+                if outputDirectory is not None:
+                    fn = "%s/program_%d.txt"%(outputDirectory,resultIndex)
+                    result.exportToFile(fn)
+                    print "Exported program to",fn
+                    resultIndex += 1
                 if verbose:
                     print 
                     print " [+] Found the following program:"
@@ -356,10 +366,14 @@ class SynthesisPolicy():#nn.Module):
                     print 
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result
-                if result.cost <= optimalCost + 1: break
+                if result.cost <= optimalCost + 1 and globalTimeout is None: break
                 for t in tasks:
                     if result.job.subsumes(t.arguments[0]): t.finished = True            
         for t in tasks: t.cleanup()
+        if outputDirectory is not None and bestResult is not None:
+            fn = "%s/best.txt"%(outputDirectory)
+            print "Exporting best program to",fn
+            bestResult.exportToFile(fn)
         return bestResult
 
             
@@ -477,6 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('--load', action = 'store_true',default = False)
     parser.add_argument('--timeout', default = None, type = int)
     parser.add_argument('--extrapolate', default = None, type = str)
+    parser.add_argument('--programOutputDirectory', default=None, type=str)
 
     arguments = parser.parse_args()
     assert arguments.extrapolate is None or arguments.evaluate is not None
@@ -561,7 +576,8 @@ if __name__ == '__main__':
             print "Theoretical time:",theoretical
             startTime = time.time()
             result = model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True,
-                            parse=parse)
+                                     parse=parse,
+                                     outputDirectory=arguments.programOutputDirectory)
             actualTime = time.time() - startTime
             print "Total time:",actualTime
 

@@ -29,6 +29,12 @@ class SynthesisResult():
         self.cost = cost
     def __str__(self):
         return "SynthesisResult(%s)"%(self.job)
+    def exportToFile(self,f):
+        with open(f,"w") as handle:
+            handle.write("Found the following cost-%d program after %f seconds:\n%s"%
+                                     (self.cost, self.time,
+                                      self.program.pretty()))
+
 
 class SynthesisJob():
     def __init__(self, parse, originalDrawing, usePrior = True, maximumDepth = 3, canLoop = True, canReflect = True, incremental = False):
