@@ -555,25 +555,33 @@ if __name__ == '__main__':
             except:
                 with open(problemIndex,"rb") as handle: particle = pickle.load(handle)
                 parse = particle.sequence()
-                problemIndex = int(re.search("expert-(\d+)-p",problemIndex).group(1))
+                try:
+                    problemIndex = int(re.search("expert-(\d+)-p",problemIndex).group(1))
+                except: problemIndex = None
+                    
+            if problemIndex is not None:
+                costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
+                if costs == []: return None
+                bestCost = min(costs)
+                model = testingModels[problemIndex]
+                jobs = data[problemIndex].keys()
+                job2w = dict(zip(jobs,
+                                 np.exp(normalizeLogs(np.array([ s.data[0] for s in model.scoreJobs(jobs) ])))))
+                print "Best cost:",bestCost
+                print "Results:"
+                for j,r in data[problemIndex].iteritems():
+                    print j
+                    print "COST =",r.cost,"\tTIME =",r.time,"\tWEIGHT =",job2w[j]
+                    print
+
+                theoretical = model.rollout(data[problemIndex], L = mode)
+                print "Theoretical time:",theoretical
+            else:
+                bestCost = 0
+                model = testingModels[0] # arbitrary
+                theoretical = None
                 
-                
-            costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
-            if costs == []: return None
-            bestCost = min(costs)
-            model = testingModels[problemIndex]
-            jobs = data[problemIndex].keys()
-            job2w = dict(zip(jobs,
-                             np.exp(normalizeLogs(np.array([ s.data[0] for s in model.scoreJobs(jobs) ])))))
-            print "Best cost:",bestCost
-            print "Results:"
-            for j,r in data[problemIndex].iteritems():
-                print j
-                print "COST =",r.cost,"\tTIME =",r.time,"\tWEIGHT =",job2w[j]
-                print
             
-            theoretical = model.rollout(data[problemIndex], L = mode)
-            print "Theoretical time:",theoretical
             startTime = time.time()
             result = model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True,
                                      parse=parse,

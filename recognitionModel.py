@@ -976,7 +976,7 @@ class SearchModel():
         
         searchStartTime = time()
 
-        for iteration in range(beamLength):
+        for iteration in range(beamLength if beamLength > 0 else 50):
             lastIteration = iteration == beamLength - 1 # are we the last iteration
             children = []
             startTime = time()
@@ -1047,7 +1047,11 @@ class SearchModel():
             finishedPrograms += [ n for n in beam if n.finished() ]
             beam = [ n for n in beam if not n.finished() ]
 
-            if beam == []: break            
+            if beam == []: break
+            if len(beam) < beamSize:
+                if not self.arguments.quiet:
+                    print "Narrowing beam to",len(beam),"due to finishing",len(finishedPrograms),"particles"
+                beamSize = len(beam)
 
             # Resample
             for n in beam:
@@ -1301,7 +1305,11 @@ def handleTest(a):
     # l = 0 implies that we should look at the ground truth and use that to abound the length
     l = arguments.beamLength
     if l == 0:
-        l = len(getGroundTruthParse(f).lines) + 1        
+        try:
+            l = len(getGroundTruthParse(f).lines) + 1
+            # if this fails we will have no guess as to the maximum length;
+            # heuristically abort
+        except: pass
     particles = model.SMC(targetImage,
                           beamSize = arguments.beamWidth,
                           beamLength = l)
