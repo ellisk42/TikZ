@@ -1043,15 +1043,8 @@ class SearchModel():
 
             if not self.arguments.quiet: print "Computed distances"
 
-            # record/remove all of the finished programs
+            # record all of the finished programs
             finishedPrograms += [ n for n in beam if n.finished() ]
-            beam = [ n for n in beam if not n.finished() ]
-
-            if beam == []: break
-            if len(beam) < beamSize:
-                if not self.arguments.quiet:
-                    print "Narrowing beam to",len(beam),"due to finishing",len(finishedPrograms),"particles"
-                beamSize = len(beam)
 
             # Resample
             for n in beam:
@@ -1064,7 +1057,8 @@ class SearchModel():
                 n.score += self.arguments.distanceCoefficient *(- n.distance)
                 if self.arguments.parentCoefficient:
                     n.score += self.arguments.distanceCoefficient   *(n.parent.distance)
-                n.score += self.arguments.priorCoefficient    *(n.program[-1].logPrior())
+                if not n.finished():
+                    n.score += self.arguments.priorCoefficient *(n.program[-1].logPrior())
                 n.score /= self.arguments.temperature
 
             z = lseList([ n.score for n in beam ])
@@ -1079,6 +1073,14 @@ class SearchModel():
             if not self.arguments.beam:
                 beam = [ n for n in beam if n.count > 0 ]
 
+            beam = [ n for n in beam if not n.finished() ]
+            particleCount = sum(n.count for n in beam)
+            if particleCount < beamSize:
+                if not self.arguments.quiet:
+                    print "Narrowing beam to",particleCount,"due to finishing",len(finishedPrograms),"particles"
+                beamSize = particleCount
+
+
             beam = self.consolidateIdenticalParticles(beam)
 
             if not self.arguments.quiet:
@@ -1086,7 +1088,7 @@ class SearchModel():
                     p = n.program
                     if not n.finished(): p = Sequence(p)
                     print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
-                    print "Blurred distance: %f"%n.distance
+                    print "Distance: %f"%n.distance
                     if n.count > beamSize/5 and self.arguments.showParticles:
                         showImage(n.output + targetImage)
                     print "\n"
