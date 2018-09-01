@@ -1,3 +1,8 @@
+BREAKING NEWS: we have a docker image, complete with pretrained models+`sketch`. Get it here:
+```
+https://hub.docker.com/r/ellisk/graphics/
+```
+
 If you want to run on drawing 29 (`drawings/expert-29.png`) with pretrained models, do:
 ```
 python demo.py 29
