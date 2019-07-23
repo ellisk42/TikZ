@@ -50,3 +50,5 @@ To view some extrapolations, do:
 python synthesizer.py -n policyTrainingData.p --view --extrapolate
 ```
 which should place its outputs into `extrapolations/`.
+
+Released under GPLv3.
