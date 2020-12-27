@@ -42,7 +42,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
 
         if False:
             Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
-            
+
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     cs = [c for c in things if isinstance(c,Circle) ]
