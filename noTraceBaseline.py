@@ -11,7 +11,6 @@ import pickle as pickle
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Variable
 import torch.optim as optimization
 import torch.cuda as cuda
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -21,10 +20,13 @@ GPU = cuda.is_available()
 
 
 def variable(x, volatile=False):
-    if isinstance(x,list): x = np.array(x)
-    if isinstance(x,(np.ndarray,np.generic)): x = torch.from_numpy(x)
-    if GPU: x = x.cuda()
-    return Variable(x, volatile=volatile)
+    if isinstance(x, list):
+        x = np.array(x)
+    if isinstance(x, (np.ndarray, np.generic)):
+        x = torch.from_numpy(x)
+    if GPU:
+        x = x.cuda()
+    return torch.Tensor(x, volatile=volatile)
 
 LEXICON = ["START","END",
            "circle",
@@ -55,7 +57,7 @@ def parseOutput(l):
         n = l[0]
         del l[0]
         return n
-    
+
     def parseLinear(l):
         b = int(get(l))
         x = get(l)
@@ -71,7 +73,7 @@ def parseOutput(l):
                 get(l)
                 return Block(items)
             items.append(parseAtomic(l))
-    
+
     def parseAtomic(l):
         k = get(l)
         if k == 'circle':
@@ -116,12 +118,12 @@ def parseOutput(l):
 class CaptionEncoder(nn.Module):
     def __init__(self):
         super(CaptionEncoder, self).__init__()
-        
+
         (squareFilters,rectangularFilters,numberOfFilters,kernelSizes,poolSizes,poolStrides) = (20,2,[10],
                           [9,9],
                           [8,4],
                           [4,4])
-        
+
         self.squareFilters = nn.Conv2d(1, squareFilters, kernelSizes[0], padding = kernelSizes[0]/2)
         self.verticalFilters = nn.Conv2d(1, rectangularFilters,
                                          (kernelSizes[0]/2 - 1,kernelSizes[0]*2 - 1),
@@ -137,7 +139,7 @@ class CaptionEncoder(nn.Module):
                                                    padding = kernelSizes[1]/2),
                                          nn.ReLU(),
                                          nn.MaxPool2d(poolSizes[1],poolStrides[1],padding = poolSizes[1]/2 - 1))
-        
+
 
     def forward(self,x):
         c1 = self.squareFilters(x)
@@ -151,7 +153,7 @@ class CaptionEncoder(nn.Module):
 class CaptionDecoder(nn.Module):
     def __init__(self):
         super(CaptionDecoder, self).__init__()
-        
+
         IMAGEFEATURESIZE = 2560
         EMBEDDINGSIZE = 64
         INPUTSIZE = IMAGEFEATURESIZE + EMBEDDINGSIZE
@@ -169,7 +171,7 @@ class CaptionDecoder(nn.Module):
     def forward(self, features, captions, lengths):
         # flatten the convolution output
         features = features.view(features.size(0),-1)
-        
+
         e = self.embedding(captions) # e: BxLx embeddingSize
         #print "e = ",e.size()
         #expandedFeatures: BxTx2560
@@ -179,7 +181,7 @@ class CaptionDecoder(nn.Module):
         recurrentInputs = torch.cat((expandedFeatures,e),2)
         #print "recurrentInputs = ",recurrentInputs.size()
 
-        
+
         packed = pack_padded_sequence(recurrentInputs, lengths, batch_first = True)
         hidden,_ = self.rnn(packed)
         outputs = self.tokenPrediction(hidden[0])
@@ -192,7 +194,7 @@ class CaptionDecoder(nn.Module):
         # (1,1,F)
         features = features.view(-1).unsqueeze(0).unsqueeze(0)
         #features: 1x1x2560
-        
+
         states = None
 
         while True:
@@ -207,15 +209,15 @@ class CaptionDecoder(nn.Module):
                 return result[1:]
             else:
                 result.append(c)
-            
-            
+
+
 
     def buildCaptions(self,tokens):
         '''returns inputs, sizes, targets'''
-        
+
         #tokens = [ [self.symbolToIndex["START"]] + [ self.symbolToIndex[s] for s in serializeProgram(p) ] + [self.symbolToIndex["END"]]
         #          for p in programs ]
-        
+
         # The full token sequences are START, ..., END
         # Training input sequences are START, ...
         # Target output sequences are ..., END
@@ -226,8 +228,8 @@ class CaptionDecoder(nn.Module):
         for t in tokens:
             assert previousLength == None or len(t) <= previousLength
             previousLength = len(t)
-            
-        
+
+
         sizes = [len(t) - 1 for t in tokens]
         maximumSize = max(sizes)
         tokens = [ np.concatenate((p, np.zeros(maximumSize + 1 - len(p),dtype = np.int)))
@@ -245,7 +247,7 @@ class NoTrace(nn.Module):
         image = variable(np.array([ sequence.draw() ], dtype = np.float32), volatile = True).unsqueeze(1)
 
         startTime = time()
-        
+
         imageFeatures = self.encoder(image)
         #imageFeatures: 1x10x16x16
 
@@ -260,24 +262,24 @@ class NoTrace(nn.Module):
                                  "spec": p.convertToSequence()})
             except: continue
         return programs
-    
+
 
     def loss(self,examples):
         # IMPORTANT: Sort the examples by their size. recurrent network stuff needs this
         examples.sort(key = lambda e: len(e.tokens), reverse = True)
-        
+
         x = variable(np.array([ e.sequence.draw() for e in examples], dtype = np.float32))
 
         x = x.unsqueeze(1) # insert the channel
 
         imageFeatures = self.encoder(x)
-        
+
         inputs, sizes, T = self.decoder.buildCaptions([ e.tokens for e in examples ])
-        
+
         outputDistributions = self.decoder(imageFeatures, inputs, sizes)
-        
+
         T = pack_padded_sequence(T, sizes, batch_first = True)[0]
-        
+
         return F.cross_entropy(outputDistributions, T)
 
     def load(self,path):
@@ -293,7 +295,7 @@ class NoTrace(nn.Module):
         torch.save(self.state_dict(),path)
         print("Dumped checkpoint",path)
 
-    
+
 class TrainingExample():
     def __init__(self,p):
         try:
@@ -301,7 +303,7 @@ class TrainingExample():
         except KeyError:
             print("Key error in tokenization",serializeProgram(p))
             assert False
-        
+
         self.sequence = p.convertToSequence()
         #self.program = p
 
@@ -320,12 +322,12 @@ def loadTrainingData(n):
             trainingDataPath = alternative
             print("Loading training data from",trainingDataPath)
             break
-        
+
     with open(trainingDataPath,'rb') as handle:
         X = pickle.load(handle)
     print("Keeping %d/%d examples"%(n,len(X)))
     pruned = []
-    
+
     for x in X:
         x = pickle.loads(x)
         if x.items != []:
@@ -334,10 +336,10 @@ def loadTrainingData(n):
             break
     print("Pruned down to %d examples"%(len(pruned)))
     return pruned
-        
+
 if __name__ == "__main__":
     import sys
-    
+
     model = NoTrace()
     if GPU:
         print("Using the GPU")
@@ -363,7 +365,7 @@ if __name__ == "__main__":
                               "noTraceOutputs/%s.png"%(sys.argv[2]))
             with open("noTraceOutputs/%s.p"%(sys.argv[2]),'wb') as handle:
                 pickle.dump(z,handle)
-            
+
 
         os.exit(0)
 
@@ -389,9 +391,9 @@ if __name__ == "__main__":
                          for r,g in zip(results,gt) )
         print("# times that we got a program which was consistent with the data",successful)
         os.exit(0)
-        
+
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
-        
+
 
     N = 1*(10**7)
     B = 64
@@ -410,13 +412,13 @@ if __name__ == "__main__":
         batchIndex = 0
         while start < N:
             batch = X[start:start + B]
-            
+
             model.zero_grad()
             L = model.loss(batch)
             if batchIndex%50 == 0:
                 print("Batch [%d/%d], LOSS = %s"%(batchIndex,batchesPerLoop,L.data[0]))
                 model.dump("checkpoints/noTrace.torch")
-                    
+
             L.backward()
             optimizer.step()
 

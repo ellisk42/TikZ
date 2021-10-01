@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optimization
 import torch.nn.functional as F
-from torch.autograd import Variable
 import torchvision.transforms as T
 
 
@@ -25,7 +24,7 @@ import re
 def binary(x,f):
     if not f: x = -x
     return (F.sigmoid(x) + 0.0001).log()
-    
+
 def lse(xs):
     largest = xs[0].data[0]
     for x in xs:
@@ -50,8 +49,10 @@ class SynthesisPolicy():#nn.Module):
         self.inputDimensionality = len(SynthesisPolicy.featureExtractor(Sequence([])))
         self.outputDimensionality = 6
 
-        self.parameters = Variable(torch.randn(self.outputDimensionality,self.inputDimensionality),
-                                   requires_grad = True)
+        self.parameters = torch.Tensor(
+            torch.randn(self.outputDimensionality, self.inputDimensionality),
+            requires_grad=True,
+        )
 
     def zeroParameters(self):
         self.parameters.data.zero_()
@@ -68,7 +69,7 @@ class SynthesisPolicy():#nn.Module):
 
     def scoreJobs(self,jobs):
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-        f = Variable(f)
+        f = torch.FloatTensor(f)
         y = self.parameters.matmul(f)
         z = lse([y[3],y[4],y[5]])
         scores = []
@@ -105,13 +106,13 @@ class SynthesisPolicy():#nn.Module):
             assert False
         scores = self.scoreJobs(jobs)
         z = lse(scores)
-        
+
         logTimes = [ math.log(results[j].time) - s + z
                      for j,s in zip(jobs, scores)
                      if results[j].cost != None and results[j].cost <= minimumCost + 1 ]
         #bestTime = min(times, key = lambda t: t.data[0])
         bestTime = softMinimum(logTimes, inverseTemperature)
-        
+
         return bestTime
 
     def deepCoderLoss(self, results):
@@ -121,7 +122,7 @@ class SynthesisPolicy():#nn.Module):
         if minimumCost == TIMEOUT:
             print("TIMEOUT",sequence)
             assert False
-        
+
         # Find the winning program
         bestResult = min(list(results.values()),key = lambda r: r.cost if r.cost != None else TIMEOUT)
         incremental = bestResult.job.incremental
@@ -134,9 +135,9 @@ class SynthesisPolicy():#nn.Module):
             if isinstance(k,Loop): loops = True
             elif isinstance(k,Reflection): reflects = True
             if loops and reflects: break
-        
+
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-        f = Variable(f)
+        f = torch.FloatTensor(f)
         y = self.parameters.matmul(f)
         #z = lse([y[3],y[4],y[5]])
 
@@ -167,7 +168,7 @@ class SynthesisPolicy():#nn.Module):
             o.step()
 
 
-            
+
             dt = (time.time() - startTime)/(60*60)
             timePerIteration = dt/s
             timePerFold = timePerIteration*numberOfIterations
@@ -189,9 +190,9 @@ class SynthesisPolicy():#nn.Module):
             o.zero_grad()
             L.backward()
             o.step()
-        
-        
-            
+
+
+
 
     @staticmethod
     def featureExtractor(sequence):
@@ -212,14 +213,14 @@ class SynthesisPolicy():#nn.Module):
         if arguments.features == 'nothing':
             return np.array([1])
         assert False
-        
+
 
     def rollout(self, results, returnLogLikelihood = False, L = 'expected'):
         jobs = list(results.keys())
         jobLogLikelihood = {}
         for j,s in zip(jobs,self.scoreJobs(jobs)):
             jobLogLikelihood[j] = s
-        
+
         history = []
         TIMEOUT = 999
         minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
@@ -246,11 +247,13 @@ class SynthesisPolicy():#nn.Module):
                 finishedJobs.append(nextResult)
                 for candidate, weight in zip(candidates,resourceDistribution):
                     jobProgress[candidate] += weight*dt
-                
+
         if L == 'DC':
             assert not returnLogLikelihood
-            f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-            f = Variable(f)
+            f = torch.from_numpy(
+                SynthesisPolicy.featureExtractor(jobs[0].parse)
+            ).float()
+            f = torch.FloatTensor(f)
             y = F.sigmoid(self.parameters.matmul(f))
             incrementalScore = y.data[0]
             loopScore = y.data[1]
@@ -293,8 +296,8 @@ class SynthesisPolicy():#nn.Module):
             for k,v in results.items():
                 print(k,v.cost)
             assert False
-            
-            
+
+
 
         time = 0
         trajectoryLogProbability = 0
@@ -359,16 +362,16 @@ class SynthesisPolicy():#nn.Module):
                     print("Exported program to",fn)
                     resultIndex += 1
                 if verbose:
-                    print() 
+                    print()
                     print(" [+] Found the following program:")
                     print(result.program.pretty())
                     print()
-                    print() 
+                    print()
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result
                 if result.cost <= optimalCost + 1 and globalTimeout is None: break
                 for t in tasks:
-                    if result.job.subsumes(t.arguments[0]): t.finished = True            
+                    if result.job.subsumes(t.arguments[0]): t.finished = True
         for t in tasks: t.cleanup()
         if outputDirectory is not None and bestResult is not None:
             fn = "%s/best.txt"%(outputDirectory)
@@ -376,7 +379,7 @@ class SynthesisPolicy():#nn.Module):
             bestResult.exportToFile(fn)
         return bestResult
 
-            
+
 def loadPolicyData():
     with open('policyTrainingData.p','rb') as handle:
         results = pickle.load(handle)
@@ -406,11 +409,11 @@ def loadPolicyData():
                     result.program = newProgram
                     result.cost = result.program.totalCost()
 
-        
+
 
         # Check that the subsumption trick can never cause us to not get an optimal program
         for job1, result1 in resultsArray[-1].items():
-            for job2, result2 in resultsArray[-1].items():            
+            for job2, result2 in resultsArray[-1].items():
                 if job1.subsumes(job2): # job1 is more general which implies that either there is no result or it is better than the result for job2
                     if not (result1.cost == None or result2.cost == None or result1.cost <= result2.cost):
                         print(job1,'\t',result1.cost)
@@ -418,15 +421,15 @@ def loadPolicyData():
                         print(job2,'\t',result2.cost)
                         print(result2.program.pretty())
                     assert result1.cost == None or result2.cost == None or result1.cost <= result2.cost
-        
+
     if legacyFixUp:
         print("")
         print(" [?] WARNING: Fixed up legacy file.")
 
     return resultsArray
 
- 
-            
+
+
 
 
 def analyzePossibleFeatures(data):
@@ -458,7 +461,7 @@ def analyzePossibleFeatures(data):
     iterativeScores = [ (flag, (len(x) + len(y))/float(len(parse)))
                         for parse, flag in iterativeProblems
                         for (x,y) in [parse.usedDisplacements()] ]
-    
+
 TIMEOUT = 10**6
 def bestPossibleTime(results):
     minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
@@ -472,8 +475,8 @@ def incrementalTime(results):
     return (min([ r.time for j,r in results.items()
                           if j.incremental and j.canLoop and j.canReflect and j.maximumDepth == 3 and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
 
-    
-        
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description = 'training and evaluation of synthesis policies')
@@ -509,7 +512,7 @@ if __name__ == '__main__':
     policyRollouts = {}
     # Map from problem index to which model should be used for that problem
     testingModels = {}
-    
+
     for mode in modes:
         policy = []
         numberOfFolds = arguments.folds
@@ -517,7 +520,7 @@ if __name__ == '__main__':
         for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
             path = 'checkpoints/policy_%s_%s_%s%d_%d.pt'%(arguments.features,mode,
                                                           '' if arguments.regularize == 0 else 'regularize%f_'%arguments.regularize,
-                                                          foldCounter,arguments.folds)            
+                                                          foldCounter,arguments.folds)
             foldCounter += 1
             print("Fold %d..."%foldCounter)
             model = SynthesisPolicy()
@@ -531,14 +534,14 @@ if __name__ == '__main__':
                             numberOfIterations = arguments.steps,
                             regularize = arguments.regularize)
                 if arguments.save:
-                    model.save(path)            
+                    model.save(path)
             if arguments.evaluate is None:
                 policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
             else:
                 assert arguments.load
                 for r in test:
                     testingModels[data.index(r)] = model
-                
+
         policyRollouts[mode] = policy
 
 
@@ -547,7 +550,7 @@ if __name__ == '__main__':
             thingsToEvaluate = list(range(100))
         else:
             thingsToEvaluate = [arguments.evaluate]
-        
+
         def policyEvaluator(problemIndex):
             try:
                 problemIndex = int(problemIndex)
@@ -558,7 +561,7 @@ if __name__ == '__main__':
                 try:
                     problemIndex = int(re.search("expert-(\d+)-p",problemIndex).group(1))
                 except: problemIndex = None
-                    
+
             if problemIndex is not None:
                 costs = [ r.cost for _,r in data[problemIndex].items() if r.cost != None ]
                 if costs == []: return None
@@ -580,8 +583,8 @@ if __name__ == '__main__':
                 bestCost = 0
                 model = testingModels[0] # arbitrary
                 theoretical = None
-                
-            
+
+
             startTime = time.time()
             result = model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True,
                                      parse=parse,
@@ -594,15 +597,15 @@ if __name__ == '__main__':
                 exportExtrapolations([result.program], arguments.extrapolate,
                                      "drawings/expert-%d.png"%problemIndex)
             return (actualTime,theoretical)
-        
+
         discrepancies = parallelMap(1, policyEvaluator,thingsToEvaluate)
         # print "DISCREPANCIES:",discrepancies
         # with open('discrepancies.p','wb') as handle:
         #     pickle.dump(discrepancies, handle)
         sys.exit(0)
-        
-        
-    
+
+
+
     optimistic = list(map(bestPossibleTime, data))
     exact = list(map(exactTime,data))
     incremental = list(map(incrementalTime,data))
@@ -615,7 +618,7 @@ if __name__ == '__main__':
     if 'DC' in policyRollouts: modelsToCompare.append((policyRollouts['DC'], 'DC'))
     modelsToCompare.append((optimistic,'oracle'))
     if 'bias' in policyRollouts: modelsToCompare.append((policyRollouts['bias'], 'learned policy (ours)'))
-    
+
     bins = np.logspace(0,6,30)
     figure = plot.figure(figsize = (8,1.6))
     plot.gca().set_xlabel('time (sec)',fontsize = 9)
@@ -647,7 +650,7 @@ if __name__ == '__main__':
                   plot.gca().get_ylim()[1]*0.7,
                   'median: %ds'%(int(median)),
                   fontsize = 7)#, rotation = 90)
-        
+
 
     #plot.plot()
     figure.text(0.5, 0.04, 'time (sec)', ha='center', va='center',
@@ -658,5 +661,3 @@ if __name__ == '__main__':
     plot.savefig(figureFilename)
     os.system('convert -trim %s %s'%(figureFilename,figureFilename))
     os.system('feh %s'%figureFilename)
-    
-    

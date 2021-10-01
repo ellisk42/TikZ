@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Variable
 import torch.optim as optimization
 import torch.cuda as cuda
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -36,16 +35,22 @@ class GraphicsSearchPolicy(SearchPolicy):
 
     def encodeProblem(self, s):
         if s == []:
-            t = torch.from_numpy(np.zeros((self.H,1))).float()
-            return Variable(t.cuda() if GPU else t)
-        encodings = [ self.circleEncoder(Variable(t.cuda() if GPU else t)).clamp(min = 0) \
-                      for c in s\
-                      for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()] ]
-        interactions = [self.interactionEncoder1(torch.cat([x,y],dim = 0)).clamp(min = 0)
-                        for i,x in enumerate(encodings)
-                        for j,y in enumerate(encodings)]
-        interactions = [self.interactionEncoder2(interaction).clamp(min = 0)
-                        for interaction in interactions ]
+            t = torch.from_numpy(np.zeros((self.H, 1))).float()
+            return (t.cuda() if GPU else t)
+        encodings = [
+            self.circleEncoder((t.cuda() if GPU else t)).clamp(min=0)
+            for c in s
+            for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()]
+        ]
+        interactions = [
+            self.interactionEncoder1(torch.cat([x, y], dim=0)).clamp(min=0)
+            for i, x in enumerate(encodings)
+            for j, y in enumerate(encodings)
+        ]
+        interactions = [
+            self.interactionEncoder2(interaction).clamp(min=0)
+            for interaction in interactions
+        ]
         return sum(interactions)
 
     def candidateEnvironments(self, program):
@@ -62,7 +67,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                               coordinate = program.coordinate)
 
         assert isinstance(program, Block)
-        
+
         if environment == []:
             return Block([self.parseLine(line)] + program.items)
         # Figure out what it is that's being indexed into
@@ -74,7 +79,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                 newItems[j] = lp
                 return Block(newItems)
         raise Exception('Environment indexes nonexistent context')
-    
+
     def Oracle(self, program): return list(Oracle(program))
 
     def evaluate(self, program):
@@ -123,11 +128,11 @@ class GraphicsSearchPolicy(SearchPolicy):
             finish(l)
             return Reflection(body = Block([]), axis = a, coordinate = c)
         raise Exception('parsing line '+k)
-            
 
-    
-        
-        
+
+
+
+
 @dispatch(Block)
 def Oracle(b):
     for j,x in enumerate(b.items):
@@ -147,7 +152,7 @@ def Oracle(l):
 def Oracle(l):
     for program, environment, line in Oracle(l.body):
         yield Reflection(axis = l.axis, coordinate = l.coordinate, body = program), environment, line
-    
+
 
 
 @dispatch(Loop)
@@ -185,7 +190,7 @@ def candidateEnvironments(b):
 @dispatch(Primitive)
 def candidateEnvironments(_):
     return
-    yield 
+    yield
 @dispatch(Loop)
 def candidateEnvironments(l):
     this = serializeLine(l)
@@ -216,7 +221,7 @@ def simpleSceneSample():
         by = random.choice(list(range(1,16)))
         my = random.choice(list(range(-5,6)))
         if my == 0 and mx == 0: continue
-        
+
         if all([y > 0 and y < 16 for j in range(loopIterations) for y in [my*j + by] ]): break
 
 
@@ -226,32 +231,32 @@ def simpleSceneSample():
                                      LinearExpression(mx,'j' if mx else None,bx),
                                      LinearExpression(my,'j' if my else None,by))]))
     return Block([l] + primitives)
-    
-    
+
+
 if __name__ == "__main__":
     p = GraphicsSearchPolicy()
 
     if os.path.isfile('checkpoints/neuralSearch.p'):
         p.load_state_dict(torch.load('checkpoints/neuralSearch.p'))
         print("Resuming state from",'checkpoints/neuralSearch.p')
-        
+
     if GPU:
         print("Using the GPU")
         p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
-    
+
     step = 0
     losses = []
     while True:
         step += 1
 
-        
+
         program = simpleSceneSample()
         scene = set(program.convertToSequence().lines)
 
         examples = p.makeOracleExamples(program, scene)
-        
+
         for example in examples:
             o.zero_grad()
             loss = p.loss(example)
@@ -281,4 +286,3 @@ if __name__ == "__main__":
                 if len(scene - denotation) == 0:
                     print("Nothing left to explain.")
                     break
-                
