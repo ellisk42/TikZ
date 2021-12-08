@@ -3,7 +3,8 @@ from utilities import sampleLogMultinomial
 import numpy as np
 from random import choice
 import tensorflow as tf
-import tensorflow.contrib.rnn as rnn
+# import tensorflow.contrib.rnn as rnn
+import tensorflow.python.ops.rnn as rnn
 from tensorflow.python.ops import array_ops
 
 
