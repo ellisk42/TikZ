@@ -41,7 +41,7 @@ def randomCoordinate():
         return random()*(MAXIMUMCOORDINATE - 2) + 1
 def sampleRadius():
     if NIPSPRIMITIVES(): return 1
-    return choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
+    return choice(list(range(5))) + 1 if SNAPTOGRID else (1 + random()*5)
 
 def randomCoordinatePerturbation():
     if SNAPTOGRID:
@@ -301,8 +301,8 @@ class Line(Program):
             attributes.append(style%(scale))
         if not solid:
             if not noisy: attributes += ["dashed"]
-            else: attributes += ["dash pattern = on %dpt off %dpt"%(choice(range(5)) + 2,
-                                                                    choice(range(5)) + 2)]
+            else: attributes += ["dash pattern = on %dpt off %dpt"%(choice(list(range(5))) + 2,
+                                                                    choice(list(range(5))) + 2)]
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
         return "\\draw [%s] %s;" % (a," -- ".join(map(str,points)))
@@ -683,7 +683,7 @@ class Sequence(Program):
     def __ne__(self,o): return not (self == o)
 
     def removeDuplicates(self):
-        return Sequence([ l for j,l in enumerate(self.lines) if not (str(l) in map(str,self.lines[:j])) ])
+        return Sequence([ l for j,l in enumerate(self.lines) if not (str(l) in list(map(str,self.lines[:j]))) ])
 
     def children(self): return self.lines
 
@@ -908,7 +908,7 @@ class Sequence(Program):
 
 
 def randomLineOfCode():
-    k = choice(range(5))
+    k = choice(list(range(5)))
     if k == 0: return None
     if k == 1: return Circle.sample()
     if k == 2: return Line.sample()
@@ -987,7 +987,7 @@ def drawAttentionSequence(background, transformations, l):
 if __name__ == '__main__':
     SNAPTOGRID = True
     s = Sequence.sample(10)
-    print s
+    print(s)
     x = render([s.noisyTikZ()],yieldsPixels = True)[0]
     y = (s.draw())
 
@@ -998,4 +998,4 @@ if __name__ == '__main__':
     N = 100
     for _ in range(N):
         s.draw()
-    print "%f fps"%(N/(time() - startTime))
+    print("%f fps"%(N/(time() - startTime)))

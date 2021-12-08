@@ -149,7 +149,7 @@ class RecurrentNetwork():
 
         for j in range(self.maximumLength):
             mostRecentOutput = 0 if j == 0 else sequenceSoFar[-1]
-            feed = dict(baseFeed.iteritems())
+            feed = dict(iter(baseFeed.items()))
             feed.update({self.statePlaceholders[0]: s0,
                          self.statePlaceholders[1]: s1,
                          self.oneInputPlaceholder: np.array([mostRecentOutput])})
@@ -252,9 +252,9 @@ if __name__ == '__main__':
             l,a,_ = session.run([loss,accuracy,Optimizer],
                               feed)
             if i%1000 == 0:
-                print i,l,a
+                print(i,l,a)
         for h in [1.0,2.0]:
-            print "Sampling h = %s"%h
+            print("Sampling h = %s"%h)
             samples = [ tuple(m.sample(session,
                                        stopSymbol = 0,
                                        baseFeed = {hint: np.array([[h]])}))
@@ -262,9 +262,9 @@ if __name__ == '__main__':
             histogram = {}
             for s in samples: histogram[s] = histogram.get(s,0) + 1
             histogram = sorted([(histogram[s],s) for s in histogram ])
-            print "\n".join(map(str,histogram[-10:]))
+            print("\n".join(map(str,histogram[-10:])))
 
-            print "Beaming h = %s"%h
+            print("Beaming h = %s"%h)
             b = m.beam(session, k = 3, stopSymbol = 0, maximumLength = 20,
                        baseFeed = {hint: np.array([h])})
-            print "\n".join(map(str,b))
+            print("\n".join(map(str,b)))

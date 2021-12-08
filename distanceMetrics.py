@@ -76,8 +76,8 @@ def analyzeAsymmetric(a,b):
     d = a - b
     targetBigger = np.sum(d[d > 0]*d[d > 0])
     currentBigger = np.sum(d[d < 0]*d[d < 0])
-    print "targetBigger = %f"%targetBigger
-    print "currentBigger = %f"%currentBigger
+    print("targetBigger = %f"%targetBigger)
+    print("currentBigger = %f"%currentBigger)
 
 #    showImage(b)
 

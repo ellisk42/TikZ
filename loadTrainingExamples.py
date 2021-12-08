@@ -7,7 +7,7 @@ import pickle
 import tarfile
 
 def loadTar(handle = 'syntheticTrainingData.tar'):
-    print "Loading data from",handle
+    print("Loading data from",handle)
     handle = tarfile.open(handle)
     
     # just load everything into RAM - faster that way. screw you tar
@@ -19,7 +19,7 @@ def loadTar(handle = 'syntheticTrainingData.tar'):
         stuff.close()
     handle.close()
 
-    print "Loaded tar file into RAM: %d entries."%len(members)
+    print("Loaded tar file into RAM: %d entries."%len(members))
     return members
 
 
@@ -29,13 +29,13 @@ def loadExamples(numberOfExamples, f = 'syntheticTrainingData.tar'):
                      for j in range(numberOfExamples) ]
     programs = [ pickle.load(io.BytesIO(members[n])) for n in programNames ]
 
-    print "Loaded pickles."
+    print("Loaded pickles.")
 
     noisyTarget = [ "./randomScene-%d-noisy.png"%(j) for j in range(numberOfExamples) ]
     for t in noisyTarget:
         cacheImage(t,members[t])
 
-    print "Loaded images."
+    print("Loaded images.")
 
     return noisyTarget, programs
 

@@ -7,7 +7,7 @@ import time
 import random
 import numpy as np
 
-import cPickle as pickle
+import pickle as pickle
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -34,8 +34,8 @@ LEXICON = ["START","END",
            "reflect","x","y",
            "}",
            "if",
-           "i","j","k","None"] + map(str,range(-5,20))
-symbolToIndex = dict(zip(LEXICON,range(len(LEXICON))))
+           "i","j","k","None"] + list(map(str,list(range(-5,20))))
+symbolToIndex = dict(list(zip(LEXICON,list(range(len(LEXICON))))))
 
 @dispatch(Loop)
 def serializeProgram(l):
@@ -228,7 +228,7 @@ class CaptionDecoder(nn.Module):
             previousLength = len(t)
             
         
-        sizes = map(lambda t: len(t) - 1,tokens)
+        sizes = [len(t) - 1 for t in tokens]
         maximumSize = max(sizes)
         tokens = [ np.concatenate((p, np.zeros(maximumSize + 1 - len(p),dtype = np.int)))
                    for p in tokens ]
@@ -254,7 +254,7 @@ class NoTrace(nn.Module):
             nextSequence = self.decoder.sample(imageFeatures)
             try:
                 p = parseOutput(nextSequence)
-                print "Sampled",p
+                print("Sampled",p)
                 programs.append({"time": time() - startTime,
                                  "program": p,
                                  "spec": p.convertToSequence()})
@@ -285,13 +285,13 @@ class NoTrace(nn.Module):
             if not GPU: stuff = torch.load(path,map_location = lambda s,l: s)
             else: stuff = torch.load(path)
             self.load_state_dict(stuff)
-            print "Loaded checkpoint",path
+            print("Loaded checkpoint",path)
         else:
-            print "Could not find checkpoint",path
+            print("Could not find checkpoint",path)
 
     def dump(self,path):
         torch.save(self.state_dict(),path)
-        print "Dumped checkpoint",path
+        print("Dumped checkpoint",path)
 
     
 class TrainingExample():
@@ -299,31 +299,31 @@ class TrainingExample():
         try:
             self.tokens = np.array([symbolToIndex["START"]] + [ symbolToIndex[s] for s in serializeProgram(p) ] + [symbolToIndex["END"]])
         except KeyError:
-            print "Key error in tokenization",serializeProgram(p)
+            print("Key error in tokenization",serializeProgram(p))
             assert False
         
         self.sequence = p.convertToSequence()
         #self.program = p
 
         if str(parseOutput(serializeProgram(p))) != str(p):
-            print "Serialization failure for program",p
-            print serializeProgram(p)
-            print parseOutput(serializeProgram(p))
+            print("Serialization failure for program",p)
+            print(serializeProgram(p))
+            print(parseOutput(serializeProgram(p)))
             assert False
 
 def loadTrainingData(n):
-    print "About to load the examples"
+    print("About to load the examples")
     alternatives = ['/scratch/ellisk/randomlyGeneratedPrograms.p',
                     'randomlyGeneratedPrograms.p']
     for alternative in alternatives:
         if os.path.exists(alternative):
             trainingDataPath = alternative
-            print "Loading training data from",trainingDataPath
+            print("Loading training data from",trainingDataPath)
             break
         
     with open(trainingDataPath,'rb') as handle:
         X = pickle.load(handle)
-    print "Keeping %d/%d examples"%(n,len(X))
+    print("Keeping %d/%d examples"%(n,len(X)))
     pruned = []
     
     for x in X:
@@ -332,7 +332,7 @@ def loadTrainingData(n):
             pruned.append(TrainingExample(x))
         if len(pruned) >= n:
             break
-    print "Pruned down to %d examples"%(len(pruned))
+    print("Pruned down to %d examples"%(len(pruned)))
     return pruned
         
 if __name__ == "__main__":
@@ -340,10 +340,10 @@ if __name__ == "__main__":
     
     model = NoTrace()
     if GPU:
-        print "Using the GPU"
+        print("Using the GPU")
         model = model.float().cuda()
     else:
-        print "Using the CPU"
+        print("Using the CPU")
         model = model.float()
 
     model.load("checkpoints/noTrace.torch")
@@ -356,8 +356,8 @@ if __name__ == "__main__":
         results.sort(key = lambda z: (z["spec"] - target, z["program"].totalCost(), z["time"]))
         if len(results) > 0:
             z = results[0]
-            print "Best program:"
-            print z["program"].pretty()
+            print("Best program:")
+            print(z["program"].pretty())
             #showImage(np.concatenate((1 - target.draw(),s.draw()),axis = 1))
             saveMatrixAsImage(255*np.concatenate((1 - target.draw(),z["spec"].draw()),axis = 0),
                               "noTraceOutputs/%s.png"%(sys.argv[2]))
@@ -372,7 +372,7 @@ if __name__ == "__main__":
         import os
         results = []
         gt = []
-        for n in xrange(100):
+        for n in range(100):
             gt = gt + [getGroundTruthParse('drawings/expert-%s.png'%(n))]
             f = "noTraceOutputs/%d.p"%n
             try:
@@ -384,10 +384,10 @@ if __name__ == "__main__":
         times = [ r["time"] if r else float('inf')
                   for r in results ]
         medianTime = sorted(times)[len(times)/2]
-        print "Median time",medianTime
+        print("Median time",medianTime)
         successful = sum(r is not None and (r["spec"] - g) == 0
                          for r,g in zip(results,gt) )
-        print "# times that we got a program which was consistent with the data",successful
+        print("# times that we got a program which was consistent with the data",successful)
         os.exit(0)
         
     #print "# Learnable parameters:",sum([ parameter.view(-1).shape[0] for parameter in model.parameters() ])
@@ -402,7 +402,7 @@ if __name__ == "__main__":
     E = 0
     while True:
         E += 1
-        print "epic",E
+        print("epic",E)
         # scrambled the data
         X = list(np.random.permutation(X))
         start = 0
@@ -414,7 +414,7 @@ if __name__ == "__main__":
             model.zero_grad()
             L = model.loss(batch)
             if batchIndex%50 == 0:
-                print "Batch [%d/%d], LOSS = %s"%(batchIndex,batchesPerLoop,L.data[0])
+                print("Batch [%d/%d], LOSS = %s"%(batchIndex,batchesPerLoop,L.data[0]))
                 model.dump("checkpoints/noTrace.torch")
                     
             L.backward()

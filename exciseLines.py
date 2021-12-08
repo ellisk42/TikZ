@@ -40,4 +40,4 @@ if __name__ == "__main__":
         j += 1
         # every one percent
         if j%int(len(lines)/100.0) == 0:
-            print "%d/%d" % (j,len(lines))
+            print("%d/%d" % (j,len(lines)))

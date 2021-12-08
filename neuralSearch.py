@@ -255,24 +255,24 @@ class SearchPolicy(nn.Module):
             #newFrontier = removeDuplicateStrings(newFrontier)
             newFrontier = [(self.value(problem,f),f) for f in newFrontier ]
             newFrontier.sort(reverse = True)
-            print "New frontier ( > 0):"
+            print("New frontier ( > 0):")
             for v,f in newFrontier:
-                if v > 0.0: print "V = ",v,"\t",f
+                if v > 0.0: print("V = ",v,"\t",f)
             if self.solvesTask(problem, f):
-                print "SOLVED TASK!"
+                print("SOLVED TASK!")
                 return 
-            print "(end of new frontier)"
-            print 
+            print("(end of new frontier)")
+            print() 
             # import pdb
             # pdb.set_trace()
             
             frontier = [ f for v,f in newFrontier[:size] ]
 
 
-            print "Step %d of graph search:"%step
-            for f in frontier: print f
-            print "(end of step)"
-            print 
+            print("Step %d of graph search:"%step)
+            for f in frontier: print(f)
+            print("(end of step)")
+            print() 
         
 
     def sampleOneStep(self, problem, initialProgram):

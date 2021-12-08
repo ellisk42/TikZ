@@ -20,8 +20,8 @@ def learnToRank(examples, folds = 0):
         topTen = []
         
         for fold in range(folds):
-            testingIndexes = range(len(examples)*fold/folds,
-                                   len(examples)*(fold+1)/folds)
+            testingIndexes = list(range(len(examples)*fold/folds,
+                                   len(examples)*(fold+1)/folds))
             trainingData = [ e for j,e in enumerate(examples) if not j in testingIndexes ]
             testingData = [ e for j,e in enumerate(examples) if j in testingIndexes ]
             w = learnToRank(trainingData)
@@ -36,14 +36,14 @@ def learnToRank(examples, folds = 0):
             topFive.append(float(len([ r for r in rs if r < 6 ]))/len(rs))
             topTen.append(float(len([ r for r in rs if r < 11 ]))/len(rs))
 
-        print "Average ranks for each of the folds:",meanAndStandardError(averageRanks)
-        print averageRanks
-        print "Top one accuracy:",meanAndStandardError(topOne)
-        print topOne
-        print "Top-five accuracy:",meanAndStandardError(topFive)
-        print topFive
-        print "Top ten accuracy:",meanAndStandardError(topTen)
-        print topTen
+        print("Average ranks for each of the folds:",meanAndStandardError(averageRanks))
+        print(averageRanks)
+        print("Top one accuracy:",meanAndStandardError(topOne))
+        print(topOne)
+        print("Top-five accuracy:",meanAndStandardError(topFive))
+        print(topFive)
+        print("Top ten accuracy:",meanAndStandardError(topTen))
+        print(topTen)
         return 
 
     d = len(examples[0][0][0])
@@ -62,7 +62,7 @@ def learnToRank(examples, folds = 0):
         
         loss += maximumOverall - maximumPositive
 
-    print loss
+    print(loss)
 
     learning_rate = 0.001
     Optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
@@ -72,7 +72,7 @@ def learnToRank(examples, folds = 0):
         for j in range(10000):
             l,_,parameters = s.run([loss,Optimizer,w])
             if j%1000 == 0:
-                print j,l,parameters
+                print(j,l,parameters)
     return parameters
         
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ CANONICAL = True
 def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
-    print "Sampled %d programs."%k
+    print("Sampled %d programs."%k)
     # remove all of the labels - we will render them separately
     noLabels = [ Sequence([ l for l in p.lines if not isinstance(l,Label) ])
                  for p in programs ]
@@ -23,10 +23,10 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     noisyTargets = [ p.noisyTikZ() for p in noLabels ]
     distinctPrograms = list(set(noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
-    print "Rendered %d images for %s."%(len(distinctPrograms),filePrefix)
+    print("Rendered %d images for %s."%(len(distinctPrograms),filePrefix))
 
     #pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
-    pixels = dict(zip(distinctPrograms,pixels))
+    pixels = dict(list(zip(distinctPrograms,pixels)))
     
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
@@ -103,7 +103,7 @@ def samplePoint(objects):
     xs = list(set([ x for o in objects for x in o.usedXCoordinates() ]))
     ys = list(set([ y for o in objects for y in o.usedYCoordinates() ]))
     if ls != [] and random() < 0.1: return choice(ls)
-    option = choice(range(3))
+    option = choice(list(range(3)))
     if option == 0 and len(xs) > 0:
         return AbsolutePoint((choice(xs)),(randomCoordinate()))
     if option == 1 and len(ys) > 0:
@@ -205,11 +205,11 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0,labels = 0):
 def randomScene(maximumNumberOfObjects):
     def sampler():
         while True:
-            n = choice(range(maximumNumberOfObjects)) + 1
+            n = choice(list(range(maximumNumberOfObjects))) + 1
             if NIPSPRIMITIVES():
-                shapeIdentities = [choice(range(3)) for _ in range(n) ]
+                shapeIdentities = [choice(list(range(3))) for _ in range(n) ]
             else:
-                shapeIdentities = [choice(range(4)) for _ in range(n) ]
+                shapeIdentities = [choice(list(range(4))) for _ in range(n) ]
                 numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
                 # make it so that there are not too many labels
                 if numberOfLabels > n/2: continue
@@ -229,7 +229,7 @@ def handleGeneration(arguments):
     
     os.system('mkdir %s/%d'%(outputName,startingPoint))
     makeSyntheticData("%s/%d/%s"%(outputName,startingPoint,n), generators[n], k = k, offset = startingPoint)
-    print "Generated %d training sequences into %s/%d"%(k,outputName,startingPoint)
+    print("Generated %d training sequences into %s/%d"%(k,outputName,startingPoint))
     
 if __name__ == '__main__':
     if not NIPSPRIMITIVES():
@@ -260,16 +260,16 @@ if __name__ == '__main__':
         kp = min(totalNumberOfExamples - startingPoint,examplesPerBatch)
         offsetsAndCounts.append((n,startingPoint,kp))
         startingPoint += examplesPerBatch
-    print offsetsAndCounts
+    print(offsetsAndCounts)
     workers = totalNumberOfExamples/examplesPerBatch
     if workers > 1:
         if workers > 10: workers = 10
         Pool(workers).map(handleGeneration, offsetsAndCounts)
     else:
-        map(handleGeneration, offsetsAndCounts)
+        list(map(handleGeneration, offsetsAndCounts))
 
     if totalNumberOfExamples > 100:
-        print "Generated files, building archive..."
+        print("Generated files, building archive...")
         os.system('tar cvf %s.tar -T /dev/null'%outputName)
 
         for _,startingPoint,_ in offsetsAndCounts:
@@ -278,4 +278,4 @@ if __name__ == '__main__':
         #         os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
         # os.system('rm -r syntheticTrainingData')
-        print "Done. You should see everything in %s.tar if you had at least 100 examples."%(outputName)
+        print("Done. You should see everything in %s.tar if you had at least 100 examples."%(outputName))

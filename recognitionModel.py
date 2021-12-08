@@ -22,13 +22,14 @@ import pickle
 import cProfile
 from multiprocessing import Pool
 import random
+from functools import reduce
 
 
 TESTINGFRACTION = 0.05
 CONTINUOUSROUNDING = 1
 ATTENTIONCANROTATE = True
 
-[STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
+[STOP,CIRCLE,LINE,RECTANGLE,LABEL] = list(range(5))
 
 
 class StandardPrimitiveDecoder():
@@ -583,7 +584,7 @@ class RecognitionModel():
     
     def loadCheckpoint(self):
         path = self.checkpointPath
-        print "Loading recognition model checkpoint:",path
+        print("Loading recognition model checkpoint:",path)
         with self.session.graph.as_default():
             saver = tf.train.Saver()
             saver.restore(self.session, path)
@@ -613,17 +614,17 @@ class RecognitionModel():
                     _,l,accuracy = self.session.run([self.optimizer, self.loss, self.averageAccuracy],
                                          feed_dict = feed)
                     if len(epicAccuracy)%1000 == 0:
-                        print "\t",len(epicAccuracy),l,accuracy                    
+                        print("\t",len(epicAccuracy),l,accuracy)                    
                     epicLoss.append(l)
                     epicAccuracy.append(accuracy)
-                print "Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss))
+                print("Epoch %d: accuracy = %f, loss = %f"%((e+1),sum(epicAccuracy)/len(epicAccuracy),sum(epicLoss)/len(epicLoss)))
                 testingAccuracy = []
                 for ts,ps in iterator.testingExamples():
                     feed = self.makeTrainingFeed(ts,ps)
                     feed[self.trainingPredicatePlaceholder] = False
                     testingAccuracy.append(self.session.run(self.averageAccuracy, feed_dict = feed))
-                print "\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy))
-                print "Saving checkpoint: %s" % saver.save(self.session, self.checkpointPath)
+                print("\tTesting accuracy = %f"%(sum(testingAccuracy)/len(testingAccuracy)))
+                print("Saving checkpoint: %s" % saver.save(self.session, self.checkpointPath))
                 flushEverything()
 
     def makeTrainingFeed(self, targets, programs):
@@ -664,7 +665,7 @@ class RecognitionModel():
 
         if False:
             for j in range(10):
-                print ps[j,:]
+                print(ps[j,:])
                 showImage(np.concatenate([gs[j],cs[j]]))
         
         
@@ -728,43 +729,43 @@ class RecognitionModel():
                         failures.append({'current': current, 'goal': goal,
                                          'target': target,
                                          'predictions': predictions})
-                        print "(failure)"
-                        print "\tExpected:",target
-                        print "\tActually:",predictions[0][1]
+                        print("(failure)")
+                        print("\tExpected:",target)
+                        print("\tActually:",predictions[0][1])
                     else:
-                        print "(success)"
+                        print("(success)")
                         if self.arguments.attention > 0:
                             attention = self.attentionSequence(current, goal, target)
                             if attention != []:
-                                print attention
-                                print target
+                                print(attention)
+                                print(target)
                                 illustration = drawAttentionSequence(goal, attention, target)
                                 saveMatrixAsImage(illustration, 'attentionIllustrations/%d.png'%(totalNumberOfAttempts - len(failures)))
 
         # report failures
-        print "%d/%d (%f%%) failure rate"%(len(failures),totalNumberOfAttempts,
-                                           100*float(len(failures))/totalNumberOfAttempts)
+        print("%d/%d (%f%%) failure rate"%(len(failures),totalNumberOfAttempts,
+                                           100*float(len(failures))/totalNumberOfAttempts))
         # compute the average rank of the failure
-        ranks = [ None if not f['target'] in map(snd,f['predictions']) else map(snd,f['predictions']).index(f['target']) + 1
+        ranks = [ None if not f['target'] in list(map(snd,f['predictions'])) else list(map(snd,f['predictions'])).index(f['target']) + 1
                   for f in failures ]
-        print ranks
-        print "In the frontier %d/%d"%(len([r for r in ranks if r != None ]),len(ranks))
+        print(ranks)
+        print("In the frontier %d/%d"%(len([r for r in ranks if r != None ]),len(ranks)))
         ranks = [r for r in ranks if r != None ]
-        print ranks
+        print(ranks)
         if len(ranks) > 0:
-            print "Average rank: %f"%(sum(ranks)/float(len(ranks)))
+            print("Average rank: %f"%(sum(ranks)/float(len(ranks))))
 
         # How many failures were of each type
-        print "Circle failures: %d"%(len([ None for f in failures
-                                           if isinstance(f['target'],Circle)]))
-        print "Line failures: %d"%(len([ None for f in failures
-                                           if isinstance(f['target'],Line)]))
-        print "Rectangle failures: %d"%(len([ None for f in failures
-                                           if isinstance(f['target'],Rectangle)]))
-        print "Label failures: %d"%(len([ None for f in failures
-                                           if isinstance(f['target'],Label)]))
-        print "Stop failures: %d"%(len([ None for f in failures
-                                         if None == f['target']]))
+        print("Circle failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Circle)])))
+        print("Line failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Line)])))
+        print("Rectangle failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Rectangle)])))
+        print("Label failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Label)])))
+        print("Stop failures: %d"%(len([ None for f in failures
+                                         if None == f['target']])))
             
 
         for j,failure in enumerate(failures):
@@ -857,13 +858,13 @@ class DistanceModel():
                                   np.tile(goal, (len(particles), 1, 1)))
         for j,p in enumerate(particles):
             if self.arguments.showParticles:
-                print "Distance vector:",d[j,:]
-                print "Likelihood:",p.logLikelihood
+                print("Distance vector:",d[j,:])
+                print("Likelihood:",p.logLikelihood)
                 showImage(p.output + goal)
             p.distance = (d[j,0], d[j,1])
 
     def loadCheckpoint(self):
-        print "Loading distance checkpoint from",self.checkpointPath
+        print("Loading distance checkpoint from",self.checkpointPath)
         with self.session.graph.as_default():
             saver = tf.train.Saver()
             saver.restore(self.session, self.checkpointPath)
@@ -899,9 +900,9 @@ class DistanceModel():
                     runningAverageCount += 1
                     if time() - lastUpdateTime > 120:
                         lastUpdateTime = time()
-                        print "\t\tRunning average loss: %f"%(runningAverage/runningAverageCount)
+                        print("\t\tRunning average loss: %f"%(runningAverage/runningAverageCount))
                         flushEverything()
-                print "Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount)
+                print("Epoch %d: loss = %f"%(e,runningAverage/runningAverageCount))
                 flushEverything()
 
                 testingLosses = [ self.session.run(self.distanceLoss,
@@ -911,15 +912,15 @@ class DistanceModel():
                                   for images,programs in iterator.testingExamples()
                                   for [targets, current, distances] in [makeDistanceExamples(images, programs)] ]
                 testingLosses = sum(testingLosses)/len(testingLosses)
-                print "\tTesting loss: %f"%testingLosses
-                print "Saving checkpoint: %s"%(saver.save(self.session, self.checkpointPath))
+                print("\tTesting loss: %f"%testingLosses)
+                print("Saving checkpoint: %s"%(saver.save(self.session, self.checkpointPath)))
                 flushEverything()
 
     def analyzeGroundTruth(self):
         self.loadCheckpoint()
         targetNames = [ "drawings/expert-%d.png"%j for j in range(100) ]
-        targetImages = map(loadImage,targetNames)
-        targetSequences = map(getGroundTruthParse,targetNames)
+        targetImages = list(map(loadImage,targetNames))
+        targetSequences = list(map(getGroundTruthParse,targetNames))
 
         for j in range(100):
             s = targetSequences[j]
@@ -931,9 +932,9 @@ class DistanceModel():
                                           np.array([targetImages[j]]))[0]
                 d1 = len(set(map(str,s.lines)) - set(map(str,sp.lines)))
                 d2 = len(set(map(str,sp.lines)) - set(map(str,s.lines)))
-                print "%f\t%f"%(d[0],d[1])
+                print("%f\t%f"%(d[0],d[1]))
                 if int(round(d[0])) != d1 or int(round(d[1])) != d2:
-                    print "\tvs:%d\t%d"%(d1,d2)
+                    print("\tvs:%d\t%d"%(d1,d2))
                     showImage(targetImages[j] + sp.draw())
         
 
@@ -992,7 +993,7 @@ class SearchModel():
                     kids += [(0.0, None)]
 
                 # remove children that duplicate an existing line of code
-                existingLinesOfCode = map(str,parent.program)
+                existingLinesOfCode = list(map(str,parent.program))
                 kids = [ child for child in kids
                          if not (str(child[1]) in existingLinesOfCode) ] 
                 kids.sort(key = lambda k: k[0], reverse = True)
@@ -1015,7 +1016,7 @@ class SearchModel():
             if lastIteration and self.arguments.task != 'evaluate': children = [p for p in children if p.finished() ]
                 
             if not self.arguments.quiet:
-                print "Ran neural network beam in %f seconds"%(time() - startTime)
+                print("Ran neural network beam in %f seconds"%(time() - startTime))
 
             beam = children
 
@@ -1028,7 +1029,7 @@ class SearchModel():
             totalNumberOfRenders += len(beam)
 
             if not self.arguments.quiet:
-                print "Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders)
+                print("Iteration %d: %d total renders.\n"%(iteration+1,totalNumberOfRenders))
 
             if self.arguments.distance: # use the learned distance metric
                 self.distance.learnedParticleDistances(targetImage, beam)
@@ -1041,7 +1042,7 @@ class SearchModel():
                     else:
                         n.distance = asymmetricBlurredDistance(targetImage, n.output)
 
-            if not self.arguments.quiet: print "Computed distances"
+            if not self.arguments.quiet: print("Computed distances")
 
             # record all of the finished programs
             finishedPrograms += [ n for n in beam if n.finished() ]
@@ -1067,7 +1068,7 @@ class SearchModel():
             for n,c in zip(beam,cs):
                 n.count = c
 
-            if not self.arguments.quiet: print "Resampled."
+            if not self.arguments.quiet: print("Resampled.")
 
             # Remove all of the dead particles, and less were doing a straight beam decoding
             if not self.arguments.beam:
@@ -1077,7 +1078,7 @@ class SearchModel():
             particleCount = sum(n.count for n in beam)
             if particleCount < beamSize:
                 if not self.arguments.quiet:
-                    print "Narrowing beam to",particleCount,"due to finishing",len(finishedPrograms),"particles"
+                    print("Narrowing beam to",particleCount,"due to finishing",len(finishedPrograms),"particles")
                 beamSize = particleCount
 
 
@@ -1087,19 +1088,19 @@ class SearchModel():
                 for n in beam:
                     p = n.program
                     if not n.finished(): p = Sequence(p)
-                    print "(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p))
-                    print "Distance: %f"%n.distance
+                    print("(x%d) Program in beam (%f):\n%s"%(n.count, n.logLikelihood, str(p)))
+                    print("Distance: %f"%n.distance)
                     if n.count > beamSize/5 and self.arguments.showParticles:
                         showImage(n.output + targetImage)
-                    print "\n"
+                    print("\n")
 
             if beam == []:
-                print "Empty beam."
+                print("Empty beam.")
                 break
 
 
         if finishedPrograms == []:
-            print "No finished programs!"
+            print("No finished programs!")
             # showImage(targetImage)
             # for p in beam:
             #     showImage(p.output)
@@ -1143,11 +1144,11 @@ class SearchModel():
             if collision != None:
                 particleMap[p.outputHash].remove(collision)
 
-        finalParticles = [ p for ps in particleMap.values() for p in ps  ]
+        finalParticles = [ p for ps in list(particleMap.values()) for p in ps  ]
         if not self.arguments.quiet:
-            print "Consolidated %d particles into %d particles in %f seconds."%(startingParticles,
+            print("Consolidated %d particles into %d particles in %f seconds."%(startingParticles,
                                                                                 len(finalParticles),
-                                                                                time() - startTime)
+                                                                                time() - startTime))
         return finalParticles
     
     def renderParticles(self,particles):
@@ -1155,10 +1156,10 @@ class SearchModel():
         # optimization: add the rendering of last command to the parent
         # todo: get that optimization working for Cairo if it does being important
         for n in particles: n.output = n.sequence().draw()
-        if not self.arguments.quiet: print "Rendered in %f seconds"%(time() - startTime)
+        if not self.arguments.quiet: print("Rendered in %f seconds"%(time() - startTime))
 
     def saveParticles(self,finishedPrograms, parseDirectory, targetImage):
-        print "Finished programs, sorted by likelihood:"
+        print("Finished programs, sorted by likelihood:")
         if os.path.exists(parseDirectory):
             os.system('rm -rf %s/*'%(parseDirectory))
         else:
@@ -1178,10 +1179,10 @@ class SearchModel():
             n.parent = None
             n.output = None
             if j < 10:
-                print "Finished program: log likelihood %f"%(n.logLikelihood)
-                print n.program
-                print "Distance: %s"%(str(n.distance))
-                print ""
+                print("Finished program: log likelihood %f"%(n.logLikelihood))
+                print(n.program)
+                print("Distance: %s"%(str(n.distance)))
+                print("")
 
             saveMatrixAsImage(n.program.draw()*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
@@ -1213,17 +1214,17 @@ class SearchModel():
             startTime = time()
             if self.arguments.LSTM:
                 maximumLength = len(self.recognizer.decoder.targetsOfProgram(targetProgram))
-                print "evaluation for"
-                print targetProgram
-                print "has a maximum length:"
-                print maximumLength
-                print 
+                print("evaluation for")
+                print(targetProgram)
+                print("has a maximum length:")
+                print(maximumLength)
+                print() 
                 particles = self.recognizer.beam(None,targetImage,arguments.beamWidth,
                                                  maximumLength = maximumLength)
-                print "Most likely particles:"
+                print("Most likely particles:")
                 for ll,program in particles[:10]:
-                    print program
-                    print "ll = ",ll
+                    print(program)
+                    print("ll = ",ll)
                 flushEverything()
                 # particles is now a list of tuples of likelihood and sequences
                 # converted into a list particle objects
@@ -1235,7 +1236,7 @@ class SearchModel():
                                      beamLength = k + 1)
             searchTime[k].append(time() - startTime)
             if particles == []:
-                print "No solutions."
+                print("No solutions.")
                 intersectionDistance[k].append(None)
                 programRank[k].append(None)
                 programDistance[k].append(None)
@@ -1265,22 +1266,22 @@ class SearchModel():
             for r,p in enumerate(particles):
                 if set(map(str,p.program.lines)) == targetSet:
                     rank = r + 1
-                    print "Rank: %d"%(r + 1)
+                    print("Rank: %d"%(r + 1))
                     break
             programRank[k].append(rank)
 
-        print programRank
-        print intersectionDistance
-        print programDistance
-        print searchTime
+        print(programRank)
+        print(intersectionDistance)
+        print(programDistance)
+        print(searchTime)
 
-        n = len([ r for rs in programRank.values() for r in rs ])
-        ranks = [ r for rs in programRank.values() for r in rs if r != None]
-        programDistances = [ r for rs in programDistance.values() for r in rs if r != None]
-        intersectionDistances = [ r for rs in intersectionDistance.values() for r in rs if r != None]
-        print "Got the correct program %d/%d times"%(len(ranks),n)
-        print "Average program distance: %f"%(sum(programDistances)/float(len(programDistances)))
-        print "Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances)))
+        n = len([ r for rs in list(programRank.values()) for r in rs ])
+        ranks = [ r for rs in list(programRank.values()) for r in rs if r != None]
+        programDistances = [ r for rs in list(programDistance.values()) for r in rs if r != None]
+        intersectionDistances = [ r for rs in list(intersectionDistance.values()) for r in rs if r != None]
+        print("Got the correct program %d/%d times"%(len(ranks),n))
+        print("Average program distance: %f"%(sum(programDistances)/float(len(programDistances))))
+        print("Average intersection distance: %f"%(sum(intersectionDistances)/float(len(intersectionDistances))))
 
     def pickleSearchResults(self, fileAndParticles):
         if self.arguments.unguided:
@@ -1295,7 +1296,7 @@ class SearchModel():
         path += '.p'
         with open(path,'wb') as handle:
             pickle.dump(dict(fileAndParticles), handle)
-        print "Dumped search results to %s"%path
+        print("Dumped search results to %s"%path)
         
 def handleTest(a):
     (f,arguments,model) = a
@@ -1326,11 +1327,11 @@ def handleTest(a):
         gotGroundTruth = False
         for p in particles:
             if len(set(map(str,p.sequence().lines)) ^ groundTruth) == 0:
-                print "Got ground truth for %s"%f
+                print("Got ground truth for %s"%f)
                 gotGroundTruth = True
                 break
         if not gotGroundTruth:
-            print "Did not get ground truth for %s"%f
+            print("Did not get ground truth for %s"%f)
 
         return gotGroundTruth,particles
     else:
@@ -1366,8 +1367,8 @@ def illustrateContinuous(model):
         if not os.path.exists('continuousParses/drawings/expert-%d-parses/0.png'%j): continue
         drawingsMatrix.append([1 - loadImage('continuousParses/drawings/expert-%d.png'%j),
                                1 - loadImage('continuousParses/drawings/expert-%d-parses/0.png'%j)])
-    drawingsMatrix = map(tuple,drawingsMatrix)
-    print len(drawingsMatrix)
+    drawingsMatrix = list(map(tuple,drawingsMatrix))
+    print(len(drawingsMatrix))
     m = []
     while len(drawingsMatrix) > 0:
         nextRow = drawingsMatrix[:8]
@@ -1383,7 +1384,7 @@ def illustrateContinuous(model):
     targetPrograms = [ randomScene(6)() for _ in range(model.arguments.numberOfExamples) ]
     resultMatrix = []
     for targetProgram in targetPrograms:
-        print "Target program: \n",targetProgram
+        print("Target program: \n",targetProgram)
         if not model.arguments.noisy:
             targetImage = targetProgram.draw()
         else:
@@ -1441,15 +1442,15 @@ if __name__ == '__main__':
     arguments.trainingData = "syntheticContinuousTrainingData.tar" if arguments.continuous else "syntheticTrainingData.tar"
     
     if arguments.task == 'showSynthetic':
-        print "not implemented"
+        print("not implemented")
     elif arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)
         model = SearchModel(arguments)
         if arguments.cores == 1:
-            gt = map(handleTest, [ (f,arguments,model) for f in fs ])
+            gt = list(map(handleTest, [ (f,arguments,model) for f in fs ]))
         else:
             gt = Pool(arguments.cores).map(handleTest, [ (f,arguments,model) for f in fs ])
-        print "Got a ground truth parse correct %f"%(float(len([None for g,_ in gt if g ]))/float(len(gt)))
+        print("Got a ground truth parse correct %f"%(float(len([None for g,_ in gt if g ]))/float(len(gt))))
         model.pickleSearchResults([ (f,p) for (f,(_,p)) in zip(fs,gt) if p != None])
     elif arguments.task == 'illustrateContinuous':
         assert arguments.beam

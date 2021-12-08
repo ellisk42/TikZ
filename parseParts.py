@@ -12,7 +12,7 @@ import cv2
 
 t = str(time())
 seed(t)
-print "seed:",t
+print("seed:",t)
 
 
 
@@ -49,10 +49,10 @@ class InverseRender(GeneticAlgorithm):
         def f(x): # fitness
             return -asymmetricBlurredDistance(self.target,x)
 
-        ds = map(f,pixels)
+        ds = list(map(f,pixels))
         return ds
 r = InverseRender()
 _,history = r.beam(100000, 5, 10)
-print "Rendered",len(r.history),"images in",(r.cumulativeRenderTime),"seconds."
+print("Rendered",len(r.history),"images in",(r.cumulativeRenderTime),"seconds.")
 animateMatrices([ fastRender(x) for x in history ],"stochasticGeneticAlgorithm.gif")
 

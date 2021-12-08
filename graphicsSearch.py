@@ -27,7 +27,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                    "line","arrow = True","arrow = False","solid = True","solid = False",
                    "for",
                    "reflect","x","y",
-                   "i","j","None"] + map(str,range(-5,20))
+                   "i","j","None"] + list(map(str,list(range(-5,20))))
         super(GraphicsSearchPolicy,self).__init__(LEXICON)
 
         self.circleEncoder = nn.Linear(2, self.H)
@@ -199,22 +199,22 @@ def candidateEnvironments(r):
 
 def simpleSceneSample():
     def isolatedCircle():
-        x = random.choice(range(1,16))
-        y = random.choice(range(1,16))
+        x = random.choice(list(range(1,16)))
+        y = random.choice(list(range(1,16)))
         return Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))
 
     MINIMUMATOMS = 1
     MAXIMUMATOMS = 1
-    primitives = [isolatedCircle() for _ in range(random.choice(range(MINIMUMATOMS,MAXIMUMATOMS+1))) ]
+    primitives = [isolatedCircle() for _ in range(random.choice(list(range(MINIMUMATOMS,MAXIMUMATOMS+1)))) ]
     loopIterations = random.choice([4])
 
     while True:
-        bx = random.choice(range(1,16))
-        mx = random.choice(range(-5,6))
+        bx = random.choice(list(range(1,16)))
+        mx = random.choice(list(range(-5,6)))
         if all([x > 0 and x < 16 for j in range(loopIterations) for x in [mx*j + bx] ]): break
     while True:
-        by = random.choice(range(1,16))
-        my = random.choice(range(-5,6))
+        by = random.choice(list(range(1,16)))
+        my = random.choice(list(range(-5,6)))
         if my == 0 and mx == 0: continue
         
         if all([y > 0 and y < 16 for j in range(loopIterations) for y in [my*j + by] ]): break
@@ -233,10 +233,10 @@ if __name__ == "__main__":
 
     if os.path.isfile('checkpoints/neuralSearch.p'):
         p.load_state_dict(torch.load('checkpoints/neuralSearch.p'))
-        print "Resuming state from",'checkpoints/neuralSearch.p'
+        print("Resuming state from",'checkpoints/neuralSearch.p')
         
     if GPU:
-        print "Using the GPU"
+        print("Using the GPU")
         p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
@@ -260,25 +260,25 @@ if __name__ == "__main__":
             losses.append(loss.data[0])
 
         if step%100 == 0:
-            print "LOSS:", step,'\t',sum(losses)/len(losses)
+            print("LOSS:", step,'\t',sum(losses)/len(losses))
             losses = []
         if step%5000 == 0:
             torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
-            print scene
-            print program.pretty()
-            print p.Oracle(program)
+            print(scene)
+            print(program.pretty())
+            print(p.Oracle(program))
             p0 = Block([])
             p.beamSearchGraph(scene, p0, 30, 3)
             continue
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
-                print p0
+                print(p0)
                 try:
                     denotation = p.evaluate(p0)
                 except EvaluationError:
-                    print "Error evaluating that program"
+                    print("Error evaluating that program")
                     break
                 if len(scene - denotation) == 0:
-                    print "Nothing left to explain."
+                    print("Nothing left to explain.")
                     break
                 

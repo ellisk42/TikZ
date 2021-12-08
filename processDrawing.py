@@ -101,7 +101,7 @@ def processRegion(r): # processes 1/6 of the handout
     # startX = 7
     # startY = 10
     
-    print startX,startY
+    print(startX,startY)
     
     r = r.crop((startX,startY,
                 startX + size,startY + size))

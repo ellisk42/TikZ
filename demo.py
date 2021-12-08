@@ -2,18 +2,18 @@ import os
 import sys
 
 def eprint(s):
-    print "[DEMO] %s"%s
+    print("[DEMO] %s"%s)
 
 def execute(k,n):
-    print "[EXECUTING] %s:"%n
-    print "\t%s"%k
+    print("[EXECUTING] %s:"%n)
+    print("\t%s"%k)
     os.system(k + " 2>&1 | awk '{print \" [%s] \" $0}'"%n)
 
 def getIndex(f):
     import filecmp
     try: return int(f)
     except:
-        for j in xrange(100):
+        for j in range(100):
             if filecmp.cmp(f,"drawings/expert-%d.png"%j):
                 return j
     return None

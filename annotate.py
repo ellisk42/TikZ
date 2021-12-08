@@ -55,16 +55,16 @@ def annotate(f):
         for event in pygame.event.get():
 #            if not hasattr(event, 'key'): continue
             down = event.type == KEYDOWN     # key down or up?
-            if down: print event.key
+            if down: print(event.key)
             if down and event.key == 120:
                 mode = 'c'
-                print "CIRCLEMODE"
+                print("CIRCLEMODE")
             if down and event.key == 121:
                 mode = 'r'
-                print "RECTANGLEMODE"
+                print("RECTANGLEMODE")
             if down and event.key == 122:
                 mode = 'l'
-                print "LINEMODE"
+                print("LINEMODE")
             if down and event.key == K_RETURN: done = True
             if down and event.key == 117: #}u
                 program = program[:-1]
@@ -72,7 +72,7 @@ def annotate(f):
             if down and event.key == 99 or mode == 'c' and event.type == MOUSEBUTTONDOWN: # c
                 modified = True
                 x,y = mouse_position()
-                print "Circle@",x,y
+                print("Circle@",x,y)
                 if x in range(1,16) and y in range(1,16):
                     program.append(Circle.absolute(x,y))
             if down and event.key == 114 or mode == 'r' and event.type == MOUSEBUTTONDOWN:#r
@@ -133,17 +133,17 @@ def annotate(f):
                         line = (x,y)
         if modified:
             output = Sequence(program).draw()
-            print "Current program:"
-            print Sequence(program)
-            print
+            print("Current program:")
+            print(Sequence(program))
+            print()
 
         if done: break
 
         if line != None and lastLine == None:
-            print "LINE: ",line
+            print("LINE: ",line)
         lastLine = line
         if rectangle != None and lastRectangle == None:
-            print "RECTANGLE:",rectangle
+            print("RECTANGLE:",rectangle)
         lastRectangle = rectangle
         
 
@@ -151,7 +151,7 @@ def annotate(f):
 
         pygame.display.flip()
     stuff = "groundTruth['%s'] = %s"%(f, set(map(str,program)))
-    print stuff
+    print(stuff)
     return stuff
 
 if len(sys.argv[1:]) > 0:
@@ -159,4 +159,4 @@ if len(sys.argv[1:]) > 0:
 else:
     fs = ["drawings/expert-%s.png"%j for j in range(100) ]
     fs = [f for f in fs if not f in groundTruth ]
-print "\n".join(map(annotate,fs))
+print("\n".join(map(annotate,fs)))
