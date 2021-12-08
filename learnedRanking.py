@@ -48,27 +48,27 @@ def learnToRank(examples, folds = 0):
 
     d = len(examples[0][0][0])
 
-    w = tf.Variable(tf.random_normal([d], stddev = 0.3), name = "W") #placeholder(tf.float32,[d])
+    w = tf.Variable(tf.random.normal([d], stddev = 0.3), name = "W") #placeholder(tf.float32,[d])
     wp = tf.reshape(w,[d,1])
 
     loss = 0
     for positives,negatives in examples:
-        positiveScores = tf.transpose(tf.matmul(np.array(positives,dtype = np.float32),wp))
-        negativeScores = tf.transpose(tf.matmul(np.array(negatives,dtype = np.float32),wp))
+        positiveScores = tf.transpose(a=tf.matmul(np.array(positives,dtype = np.float32),wp))
+        negativeScores = tf.transpose(a=tf.matmul(np.array(negatives,dtype = np.float32),wp))
         scores = tf.concat([positiveScores,negativeScores],axis = 1)
 
-        maximumPositive = tf.reduce_logsumexp(positiveScores)
-        maximumOverall = tf.reduce_logsumexp(scores)
+        maximumPositive = tf.reduce_logsumexp(input_tensor=positiveScores)
+        maximumOverall = tf.reduce_logsumexp(input_tensor=scores)
         
         loss += maximumOverall - maximumPositive
 
     print(loss)
 
     learning_rate = 0.001
-    Optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+    Optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-    with tf.Session() as s:
-        s.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as s:
+        s.run(tf.compat.v1.global_variables_initializer())
         for j in range(10000):
             l,_,parameters = s.run([loss,Optimizer,w])
             if j%1000 == 0:

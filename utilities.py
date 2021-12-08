@@ -81,7 +81,7 @@ def crossEntropyWithMask(labels, masks, predictions):
     # zero out anything that is not in the mask
     masked = tf.multiply(crossEntropy,mask)
     print("masked = ",masked)
-    l = tf.reduce_sum(masked)
+    l = tf.reduce_sum(input_tensor=masked)
     print("l = ",l)
     return l
 

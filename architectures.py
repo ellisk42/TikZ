@@ -20,23 +20,23 @@ class Architecture():
 
     def makeModel(self,imageInput):
         if imageInput.shape[1] != self.inputSize:
-            imageInput = tf.image.resize_bilinear(imageInput, [self.inputSize]*2)
+            imageInput = tf.image.resize(imageInput, [self.inputSize]*2, method=tf.image.ResizeMethod.BILINEAR)
 
-        horizontalKernels = tf.layers.conv2d(inputs = imageInput,
+        horizontalKernels = tf.compat.v1.layers.conv2d(inputs = imageInput,
                                              filters = self.rectangularFilters,
                                              kernel_size = [self.kernelSizes[0]*2,
                                                             self.kernelSizes[0]/2],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              strides = 1)
-        verticalKernels = tf.layers.conv2d(inputs = imageInput,
+        verticalKernels = tf.compat.v1.layers.conv2d(inputs = imageInput,
                                              filters = self.rectangularFilters,
                                              kernel_size = [self.kernelSizes[0]/2,
                                                             self.kernelSizes[0]*2],
                                              padding = "same",
                                              activation = tf.nn.relu,
                                              strides = 1)
-        squareKernels = tf.layers.conv2d(inputs = imageInput,
+        squareKernels = tf.compat.v1.layers.conv2d(inputs = imageInput,
                                              filters = self.squareFilters,
                                              kernel_size = [self.kernelSizes[0],
                                                             self.kernelSizes[0]],
@@ -44,7 +44,7 @@ class Architecture():
                                              activation = tf.nn.relu,
                                              strides = 1)
         c1 = tf.concat([horizontalKernels,verticalKernels,squareKernels], axis = 3)
-        c1 = tf.layers.max_pooling2d(inputs = c1,
+        c1 = tf.compat.v1.layers.max_pooling2d(inputs = c1,
                                      pool_size = self.poolSizes[0],
                                      strides = self.poolStrides[0],
                                      padding = "same")
@@ -55,13 +55,13 @@ class Architecture():
         poolStrides = self.poolStrides[1:]
         nextInput = c1
         for filterCount,kernelSize,poolSize,poolStride in zip(numberOfFilters,kernelSizes,poolSizes,poolStrides):
-            c1 = tf.layers.conv2d(inputs = nextInput,
+            c1 = tf.compat.v1.layers.conv2d(inputs = nextInput,
                                   filters = filterCount,
                                   kernel_size = [kernelSize,kernelSize],
                                   padding = "same",
                                   activation = tf.nn.relu,
                                   strides = 1)
-            c1 = tf.layers.max_pooling2d(inputs = c1,
+            c1 = tf.compat.v1.layers.max_pooling2d(inputs = c1,
                                          pool_size = poolSize,
                                          strides = poolStride,
                                          padding = "same")

@@ -35,8 +35,8 @@ ATTENTIONCANROTATE = True
 class StandardPrimitiveDecoder():
     def makeNetwork(self,imageRepresentation):
         # A placeholder for each target
-        self.targetPlaceholder = [ (tf.placeholder(tf.int32, [None]) if t == int
-                                    else tf.placeholder(tf.float32, [None]))
+        self.targetPlaceholder = [ (tf.compat.v1.placeholder(tf.int32, [None]) if t == int
+                                    else tf.compat.v1.placeholder(tf.float32, [None]))
                                    for t,d in self.outputDimensions ]
         if not hasattr(self, 'hiddenSizes'):
             self.hiddenSizes = [None]*len(self.outputDimensions)
@@ -61,11 +61,11 @@ class StandardPrimitiveDecoder():
             # should we modify the image representation using a spatial transformer?
             if j in self.attentionIndices:
                 theta0 = np.array([[1., 0, 0], [0, 1., 0]]).astype('float32').flatten()
-                theta = tf.layers.dense(tf.concat(predictionInputs[1:],axis = 1),
+                theta = tf.compat.v1.layers.dense(tf.concat(predictionInputs[1:],axis = 1),
                                         6,
                                         activation = tf.nn.tanh,
-                                        bias_initializer=tf.constant_initializer(theta0),
-                                        kernel_initializer = tf.zeros_initializer())
+                                        bias_initializer=tf.compat.v1.constant_initializer(theta0),
+                                        kernel_initializer = tf.compat.v1.zeros_initializer())
                 if not ATTENTIONCANROTATE:
                     # force the off diagonal entries to be 0
                     theta = tf.multiply(theta, np.array([[1., 0, 1], [0, 1., 1]]).astype('float32').flatten())
@@ -88,16 +88,16 @@ class StandardPrimitiveDecoder():
                 intermediateRepresentation = tf.concat(predictionInputs,axis = 1)
             
             if self.hiddenSizes[j] != None and self.hiddenSizes[j] > 0:
-                intermediateRepresentation = tf.layers.dense(intermediateRepresentation,
+                intermediateRepresentation = tf.compat.v1.layers.dense(intermediateRepresentation,
                                                              self.hiddenSizes[j],
                                                              activation = tf.nn.relu)
             # decoding of categorical variables
             if t == int:
                 # p = prediction
-                p = tf.layers.dense(intermediateRepresentation, d, activation = None)
+                p = tf.compat.v1.layers.dense(intermediateRepresentation, d, activation = None)
                 self.prediction.append(p)
                 predictionInputs.append(tf.one_hot(self.targetPlaceholder[j], d))
-                self.hard.append(tf.cast(tf.argmax(p,dimension = 1),tf.int32))
+                self.hard.append(tf.cast(tf.argmax(input=p,axis = 1),tf.int32))
                 self.soft.append(tf.nn.log_softmax(p))
                 self.loss.append(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder[j],
                                                                                 logits = p))
@@ -352,19 +352,19 @@ class PrimitiveDecoder():
         self.decoders = [k(imageRepresentation,continuous,attention) for k in PrimitiveDecoder.decoderClasses]
 
         self.imageRepresentation = imageRepresentation
-        self.prediction = tf.layers.dense(flattenImageOutput(self.imageRepresentation), len(self.decoders))
-        self.hard = tf.cast(tf.argmax(self.prediction,dimension = 1),tf.int32)
+        self.prediction = tf.compat.v1.layers.dense(flattenImageOutput(self.imageRepresentation), len(self.decoders))
+        self.hard = tf.cast(tf.argmax(input=self.prediction,axis = 1),tf.int32)
         self.soft = tf.nn.log_softmax(self.prediction)
-        self.targetPlaceholder = tf.placeholder(tf.int32, [None])
+        self.targetPlaceholder = tf.compat.v1.placeholder(tf.int32, [None])
         self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
 
     def loss(self):
         # the first label is for the primitive category
-        ll = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder,
+        ll = tf.reduce_sum(input_tensor=tf.nn.sparse_softmax_cross_entropy_with_logits(labels = self.targetPlaceholder,
                                                                           logits = self.prediction))
         for decoder in self.decoders:
             decoderMask = tf.cast(tf.equal(self.targetPlaceholder, decoder.token), tf.float32)
-            decoderLoss = tf.reduce_sum(tf.multiply(decoderMask,decoder.loss))
+            decoderLoss = tf.reduce_sum(input_tensor=tf.multiply(decoderMask,decoder.loss))
             ll += decoderLoss
 
         return ll
@@ -377,7 +377,7 @@ class PrimitiveDecoder():
                 if vector != True:
                     a = tf.logical_and(a,
                                        tf.logical_or(vector, tf.not_equal(self.hard,decoder.token)))
-        return tf.reduce_mean(tf.cast(a, tf.float32))
+        return tf.reduce_mean(input_tensor=tf.cast(a, tf.float32))
 
     def placeholders(self):
         p = [self.targetPlaceholder]
@@ -451,7 +451,7 @@ class RecurrentDecoder():
         MAXIMUMRECURRENT = 1 + MAXIMUMPRIMITIVES*(7) #  + 1stop symbol, MAXIMUMPRIMITIVES instructions, 6+1 arguments for a line
 
         self.trainingPredicatePlaceholder = trainingPredicatePlaceholder
-        self.outputPlaceholder = tf.placeholder(tf.int32, shape = [None,MAXIMUMRECURRENT],
+        self.outputPlaceholder = tf.compat.v1.placeholder(tf.int32, shape = [None,MAXIMUMRECURRENT],
                                                 name = 'recurrentOutputPlaceholder')
 
         self.imageRepresentation = flattenImageOutput(imageFeatures)
@@ -549,14 +549,14 @@ class RecognitionModel():
         self.noisy = arguments.noisy
         self.arguments = arguments
         self.graph = tf.Graph()
-        self.session = tf.Session(graph = self.graph)
+        self.session = tf.compat.v1.Session(graph = self.graph)
         with self.session.graph.as_default():
             # current and goal images
             if not self.arguments.LSTM:
-                self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
-            self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+                self.currentPlaceholder = tf.compat.v1.placeholder(tf.float32, [None, 256, 256])
+            self.goalPlaceholder = tf.compat.v1.placeholder(tf.float32, [None, 256, 256])
 
-            self.trainingPredicatePlaceholder = tf.placeholder(tf.bool)
+            self.trainingPredicatePlaceholder = tf.compat.v1.placeholder(tf.bool)
 
             if self.arguments.LSTM:
                 imageInput = tf.stack([self.goalPlaceholder], axis = 3)
@@ -572,7 +572,7 @@ class RecognitionModel():
             self.loss = self.decoder.loss()
             self.averageAccuracy = self.decoder.accuracy()
 
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
+            self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.loss)
 
     @property
     def checkpointPath(self):
@@ -586,7 +586,7 @@ class RecognitionModel():
         path = self.checkpointPath
         print("Loading recognition model checkpoint:",path)
         with self.session.graph.as_default():
-            saver = tf.train.Saver()
+            saver = tf.compat.v1.train.Saver()
             saver.restore(self.session, path)
             
     def train(self, numberOfExamples, restore = False):
@@ -597,8 +597,8 @@ class RecognitionModel():
         flushEverything()
 
         with self.session.graph.as_default():
-            initializer = tf.global_variables_initializer()
-            saver = tf.train.Saver()
+            initializer = tf.compat.v1.global_variables_initializer()
+            saver = tf.compat.v1.train.Saver()
 
             if not restore:
                 self.session.run(initializer)
@@ -704,7 +704,7 @@ class RecognitionModel():
         iterator = BatchIterator(1,(np.array(noisyTarget),np.array(programs)),
                                  testingFraction = TESTINGFRACTION, stringProcessor = loadImage)
         with self.session.graph.as_default():
-            saver = tf.train.Saver()
+            saver = tf.compat.v1.train.Saver()
             saver.restore(self.session, self.checkpointPath)
 
             totalNumberOfAttempts = 0
@@ -815,11 +815,11 @@ class DistanceModel():
             setSnapToGrid(False)
         
         self.graph = tf.Graph()
-        self.session = tf.Session(graph = self.graph)
+        self.session = tf.compat.v1.Session(graph = self.graph)
         with self.session.graph.as_default():
             # current and goal images
-            self.currentPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
-            self.goalPlaceholder = tf.placeholder(tf.float32, [None, 256, 256])
+            self.currentPlaceholder = tf.compat.v1.placeholder(tf.float32, [None, 256, 256])
+            self.goalPlaceholder = tf.compat.v1.placeholder(tf.float32, [None, 256, 256])
 
             imageInput = tf.stack([self.currentPlaceholder,self.goalPlaceholder], axis = 3)
 
@@ -829,13 +829,13 @@ class DistanceModel():
             f1 = tf.reshape(c1, [-1, c1d])
 
             # Value function learning
-            self.valueTargets = tf.placeholder(tf.float32, [None,2]) # (extra target, extra current)
+            self.valueTargets = tf.compat.v1.placeholder(tf.float32, [None,2]) # (extra target, extra current)
             # this line of code collapses all of the filters into batchSize*numberOfFilters
             #f2 = tf.reduce_sum(c1, [1,2])
             f2 = f1
-            self.distanceFunction = tf.layers.dense(f2, 2, activation = tf.nn.relu)
-            self.distanceLoss = tf.reduce_mean(tf.squared_difference(self.valueTargets, self.distanceFunction))
-            self.distanceOptimizer = tf.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
+            self.distanceFunction = tf.compat.v1.layers.dense(f2, 2, activation = tf.nn.relu)
+            self.distanceLoss = tf.reduce_mean(input_tensor=tf.math.squared_difference(self.valueTargets, self.distanceFunction))
+            self.distanceOptimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.arguments.learningRate).minimize(self.distanceLoss)
 
     @property
     def checkpointPath(self):
@@ -866,7 +866,7 @@ class DistanceModel():
     def loadCheckpoint(self):
         print("Loading distance checkpoint from",self.checkpointPath)
         with self.session.graph.as_default():
-            saver = tf.train.Saver()
+            saver = tf.compat.v1.train.Saver()
             saver.restore(self.session, self.checkpointPath)
         
     def train(self, numberOfExamples, restore = False):
@@ -877,8 +877,8 @@ class DistanceModel():
 
         # use the session to make sure that we save or initialize the right things
         with self.session.graph.as_default():
-            initializer = tf.global_variables_initializer()
-            saver = tf.train.Saver()
+            initializer = tf.compat.v1.global_variables_initializer()
+            saver = tf.compat.v1.train.Saver()
             flushEverything()
             if not restore:
                 self.session.run(initializer)
