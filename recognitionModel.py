@@ -841,14 +841,18 @@ class DistanceModel():
     def checkpointPath(self):
         return "checkpoints/distance_%s_%s.checkpoint"%(self.arguments.architecture,
                                                         "noisy" if self.arguments.noisy else "clean")
-    
+
     def learnedDistances(self, currentBatch, goalBatch):
-        return self.session.run(self.distanceFunction,
+        # initializer = tf.compat.v1.global_variables_initializer()
+        # self.session.run(initializer)
+        # initializer.feed_dict = {self.currentPlaceholder: currentBatch,
+                                 # self.goalPlaceholder: goalBatch}
+        return self.session.run(initializer, self.distanceFunction,
                                 feed_dict = {self.currentPlaceholder: currentBatch,
                                              self.goalPlaceholder: goalBatch})
-    
+
     def learnedParticleDistances(self, goal, particles):
-        if particles == []: return 
+        if particles == []: return
         # only do it for 50 particles at a time
         maximumBatchSize = 50
         if len(particles) > maximumBatchSize:

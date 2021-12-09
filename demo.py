@@ -54,7 +54,7 @@ if __name__ == "__main__":
         eprint("Clearing parse directory: %s"%parseFileName)
         execute("rm %s/*.png %s/particle*.p"%(parseFileName,parseFileName),
                 "RM")
-        execute("python3 recognitionModel.py test  -t %s -b %d -l 0 --proposalCoefficient 1 --parentCoefficient --distanceCoefficient 5 --distance --mistakePenalty 10 --attention 16 --noisy --quiet "%
+        execute("python3 recognitionModel.py test  -t %s -b %d -l 0 --proposalCoefficient 1 --parentCoefficient --distanceCoefficient 5 --distance --mistakePenalty 10 --attention 16 --noisy --quiet --unguided "%
               (imageFilename,
                arguments.particles),
             "NEURALNET")

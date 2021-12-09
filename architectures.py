@@ -21,7 +21,12 @@ class Architecture():
     def makeModel(self,imageInput):
         if imageInput.shape[1] != self.inputSize:
             imageInput = tf.image.resize(imageInput, [self.inputSize]*2, method=tf.image.ResizeMethod.BILINEAR)
-
+        print("here")
+        print(imageInput)
+        print(self.rectangularFilters)
+        print(self.kernelSizes[0])
+        print(tf.nn.relu)
+        print("/here")
         horizontalKernels = tf.compat.v1.layers.conv2d(inputs = imageInput,
                                              filters = self.rectangularFilters,
                                              kernel_size = [self.kernelSizes[0]*2,
