@@ -18,7 +18,7 @@ def learnToRank(examples, folds = 0):
         topOne = []
         topFive = []
         topTen = []
-        
+
         for fold in range(folds):
             testingIndexes = list(range(len(examples)*fold/folds,
                                    len(examples)*(fold+1)/folds))
@@ -44,7 +44,7 @@ def learnToRank(examples, folds = 0):
         print(topFive)
         print("Top ten accuracy:",meanAndStandardError(topTen))
         print(topTen)
-        return 
+        return
 
     d = len(examples[0][0][0])
 
@@ -59,7 +59,7 @@ def learnToRank(examples, folds = 0):
 
         maximumPositive = tf.reduce_logsumexp(input_tensor=positiveScores)
         maximumOverall = tf.reduce_logsumexp(input_tensor=scores)
-        
+
         loss += maximumOverall - maximumPositive
 
     print(loss)
@@ -74,7 +74,7 @@ def learnToRank(examples, folds = 0):
             if j%1000 == 0:
                 print(j,l,parameters)
     return parameters
-        
+
 if __name__ == '__main__':
     learnToRank([([[1,2],[0,4]],
                   [[2,4],[9,3]]),
