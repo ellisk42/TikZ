@@ -27,22 +27,27 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
                for s in sources ]
     source = "\n\n\n".join(sources)
     source = '''
-\\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
+\\documentclass[tikz]{standalone}
 \\usetikzlibrary{decorations.pathmorphing}
 \\usetikzlibrary{arrows.meta}
 \\begin{document}
 %s
 \\end{document}
-''' % (resolution, resolution, source)
+''' % (source)
 
     fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
 
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
-    os.system("cd /tmp; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % temporaryName)
+    os.system("cd /tmp; echo X|pdflatex %s 2> /dev/null > /dev/null" % temporaryName)
+    # creates the pdf document
 
     temporaryPrefix = temporaryName[:-4]
     temporaryImages = [temporaryPrefix + ".png"]
+    o_file = "{}-%0".format(temporaryPrefix) + str(len(str(len(sources) - 1))) + "d.png"
+    png_command = "convert -density 300 -size %sx%s %s %s" % (resolution, resolution, temporaryPrefix+'.pdf', o_file)
+    os.system("cd /tmp; %s" % png_command)
+
     if len(sources) > 1:
         pattern = "%s-%0"+str(len(str(len(sources) - 1)))+"d.png"
         temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
@@ -75,7 +80,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             (width, height) = im.size
             if width != resolution or height != resolution:
                 im = im.resize((resolution,resolution))
-            if im.mode == 'RGBA' or im.mode == '1':
+            if im.mode == 'RGBA' or im.mode == '1' or im.mode == 'L':
                 im = im.convert('L')
                 scale = 255.0
             elif im.mode == 'I': # why God does this happen
