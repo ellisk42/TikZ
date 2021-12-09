@@ -865,10 +865,11 @@ class DistanceModel():
 
     def loadCheckpoint(self):
         print("Loading distance checkpoint from",self.checkpointPath)
-        with self.session.graph.as_default():
-            saver = tf.compat.v1.train.Saver()
-            saver.restore(self.session, self.checkpointPath)
-        
+        print("psych!")
+        # with self.session.graph.as_default():
+        #     saver = tf.compat.v1.train.Saver()
+        #     saver.restore(self.session, self.checkpointPath)
+
     def train(self, numberOfExamples, restore = False):
         assert self.arguments.noisy
         targetImages,targetPrograms = loadExamples(numberOfExamples, self.arguments.trainingData)
@@ -1297,9 +1298,10 @@ class SearchModel():
         with open(path,'wb') as handle:
             pickle.dump(dict(fileAndParticles), handle)
         print("Dumped search results to %s"%path)
-        
+
 def handleTest(a):
     (f,arguments,model) = a
+    print(arguments.noisy)
     if arguments.noisy:
         targetImage = loadImage(f)
     else:
@@ -1440,11 +1442,14 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
 
     arguments.trainingData = "syntheticContinuousTrainingData.tar" if arguments.continuous else "syntheticTrainingData.tar"
-    
+
     if arguments.task == 'showSynthetic':
         print("not implemented")
     elif arguments.task == 'test':
         fs = picturesInDirectory(arguments.test)
+        print("arguments")
+        print(arguments)
+        print("/arguments")
         model = SearchModel(arguments)
         if arguments.cores == 1:
             gt = list(map(handleTest, [ (f,arguments,model) for f in fs ]))
