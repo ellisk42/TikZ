@@ -55,7 +55,7 @@ class Architecture():
                                      padding = "same")
 
         numberOfFilters = self.numberOfFilters
-        kernelSizes = self.kernelSizes[1:]        
+        kernelSizes = self.kernelSizes[1:]
         poolSizes = self.poolSizes[1:]
         poolStrides = self.poolStrides[1:]
         nextInput = c1
