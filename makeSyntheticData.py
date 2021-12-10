@@ -276,6 +276,8 @@ if __name__ == "__main__":
         startingPoint += examplesPerBatch
     print(offsetsAndCounts)
     workers = int(totalNumberOfExamples / examplesPerBatch)
+
+    workers=1 # outputName doesn't make it across the Pool boundary...
     if workers > 1:
         if workers > 10: workers = 10
         Pool(workers).map(handleGeneration, offsetsAndCounts)
