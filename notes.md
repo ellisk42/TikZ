@@ -45,3 +45,7 @@ That will save an image with all your changes, so from there on out
 you can run
 
     docker run -it --entrypoint bash -w /app/TikZ -v"$PWD":/transfer-volume ellisk-graphics-updated
+
+
+I had to change the BatchIterator down to a batchsize of 1, otherwise,
+it would run out of memory and fail in the docker container.
