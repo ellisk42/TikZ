@@ -26,13 +26,17 @@ https://github.com/ianhuang0630/TikZ/commit/21ecc4e9beb800e15f0c6c6f91f5ab525418
 before I upped the limit
 
 
-Then you can synthesize data.  You need to do more than 100 or the
+Then you can synthesize data.  You need to do more than 100 or it
+won't create a tar file (which is used later to train the model).
+However, if it wasn't divisible by 10 I ran into some problem on the
+python3 version.  I'm not exactly sure why--I didn't look into it too
+much.
 
-    python makeSyntheticData.py 101
+    python makeSyntheticData.py 110
 
 Then train the proposal distribution
 
-    python recognitionModel.py train --noisy  --attention 16 -n 101
+    python recognitionModel.py train --noisy  --attention 16 -n 110
 
 
 
