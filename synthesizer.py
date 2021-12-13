@@ -373,7 +373,9 @@ def viewSynthesisResults(arguments):
             #showImage(fastRender(syntaxTree.convertToSequence()) + loadImage(f)*0.5 + fastRender(result.parse))
             programFeatures[f] = syntaxTree.features()
 
+
         if arguments.extrapolate:
+            os.mkdir("extrapolations/")
             extrapolations = proposeExtrapolations(programs)
             if extrapolations:
                 framedExtrapolations = [1 - frameImageNicely(loadImage(f))] + \
