@@ -57,8 +57,8 @@ class SynthesisJob():
     def subsumes(self,other):
         assert self.originalDrawing == other.originalDrawing
         if self.incremental: return False # ??? need to understand this better...
-        return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect #and not self.incremental 
-    
+        return self.incremental == other.incremental and self.maximumDepth >= other.maximumDepth and self.canLoop >= other.canLoop and self.canReflect >= other.canReflect #and not self.incremental
+
     def execute(self, timeout = 60, parallelSolving = 1):
         if self.incremental: return self.executeIncrementally(timeout = timeout, parallelSolving = parallelSolving)
         else: return self.executeJoint(timeout = timeout, parallelSolving = parallelSolving)
@@ -71,7 +71,7 @@ class SynthesisJob():
                                    CPUs = parallelSolving,
                                    timeout = timeout)
         elapsedTime = time.time() - startTime
-        
+
         return SynthesisResult(self,
                                time = elapsedTime,
                                source = result[1] if result != None else None,
@@ -123,7 +123,7 @@ class SynthesisJob():
                                        time = time.time() - startTime,
                                        source = [ s[1] for s in list(jobResults.values()) if s != None ],
                                        program = None,
-                                       cost = None) 
+                                       cost = None)
             parsedOutput = parseSketchOutput(jobResults[k][1])
             xs,ys = parsedOutput.usedCoefficients()
             xCoefficients = xCoefficients|xs
@@ -152,7 +152,7 @@ class SynthesisJob():
                                source = [ s for _,s in list(jobResults.values()) ],
                                program = optimalProgram,
                                cost = optimalCost)
-                
+
 def invokeExecuteMethod(k, timeout = 60, parallelSolving = 1):
     try:
         return k.execute(timeout = timeout, parallelSolving = parallelSolving)
@@ -206,7 +206,7 @@ def synthesizeTopK(k):
         name = 'groundTruthSynthesisResults.p'
     else:
         name = 'top%dSynthesisResults.p'%k
-    
+
     jobs = expertSynthesisJobs(k) if k > 0 else []
     # synthesized from the ground truth?
     if k == 0:
@@ -219,10 +219,10 @@ def synthesizeTopK(k):
                     jobs.append(SynthesisJob(sequence,k,usePrior = False))
     else:
         print("top jobs",len(jobs))
-        
+
     print("# jobs",len(jobs))
     flushEverything()
-                    
+
     results = parallelExecute(jobs) + results
     with open(name,'wb') as handle:
         pickle.dump(results, handle)
@@ -247,9 +247,9 @@ def makePolicyTrainingData():
     with open(fn,'wb') as handle:
         pickle.dump(results, handle)
     print(" [+] Dumped results to %s."%fn)
-    
-             
-        
+
+
+
 
 def viewSynthesisResults(arguments):
     results = pickle.load(open(arguments.name,'rb'))
@@ -300,22 +300,22 @@ def viewSynthesisResults(arguments):
                                  #(92,0),
                                  #(95,8)
     ]
-    
+
     #interestingExtrapolations = list(range(100))
-                                 
+
 
     latex = []
     extrapolationMatrix = []
 
     programFeatures = {}
 
-    for expertIndex in list(range(100)):        
+    for expertIndex in list(range(100)):
         f = 'drawings/expert-%d.png'%expertIndex
         parse = getGroundTruthParse(f)
         if parse == None:
             print("No ground truth for %d"%expertIndex)
             assert False
-            
+
         relevantResults = [ r for r in results if r.job.originalDrawing == f and r.cost != None ]
         if relevantResults == []:
             print("No synthesis result for %s"%f)
@@ -384,8 +384,8 @@ def viewSynthesisResults(arguments):
                 print("Saving extrapolation column to",'extrapolations/expert-%d-extrapolation.png'%expertIndex)
                 saveMatrixAsImage(a,'extrapolations/expert-%d-extrapolation.png'%expertIndex)
 
-            
-        
+
+
         if not arguments.extrapolate:
             rightEntryOfTable = '''
         \\begin{minipage}{10cm}
@@ -397,7 +397,7 @@ def viewSynthesisResults(arguments):
         else:
             rightEntryOfTable = ""
         if False and extrapolations != [] and arguments.extrapolate:
-            
+
             #print e
             rightEntryOfTable = '\\includegraphics[width = 5cm]{../TikZ/extrapolations/expert-%d-extrapolation.png}'%expertIndex
         if rightEntryOfTable != "":
@@ -409,7 +409,7 @@ def viewSynthesisResults(arguments):
     \\includegraphics[width = 5cm]{../TikZ/drawings/expert-%d.png}&
             %s&
     %s
-    \\end{tabular}        
+    \\end{tabular}
             '''%(expertIndex, parseImage, rightEntryOfTable))
             print()
 
@@ -430,7 +430,7 @@ def viewSynthesisResults(arguments):
             bigMatrix[0:r.shape[0],256*j:256*(j+1)] = r
         saveMatrixAsImage(bigMatrix,'extrapolations/allTheExtrapolations.png')
 
-        
+
 def rankUsingPrograms():
     results = pickle.load(open(arguments.name,'rb'))
     print(" [+] Loaded %d synthesis results from %s."%(len(results),arguments.name))
@@ -452,7 +452,7 @@ def rankUsingPrograms():
                 'logPrior': p.sequence().logPrior(),
                 'logLikelihood': p.logLikelihood}
         return mergeDictionaries(parseFeatures,programFeatures)
-    
+
     k = arguments.learnToRank
     topParticles = [loadTopParticles('drawings/expert-%d-parses'%j,k)
                     for j in range(100) ]
@@ -471,7 +471,7 @@ def rankUsingPrograms():
     featureIndices = list(set([ f
                                 for pn in learningProblems
                                 for exs in pn
-                                for ex in exs 
+                                for ex in exs
                                 for f in list(ex.keys()) ]))
     def dictionaryToVector(featureMap):
         return [ featureMap.get(f,0.0) for f in featureIndices ]
@@ -487,7 +487,7 @@ def rankUsingPrograms():
     oldAccuracy = 0
     for j,tp in enumerate(topParticles):
         if tp == []: continue
-        
+
         gt = getGroundTruthParse('drawings/expert-%d.png'%j)
         # the_top_particles_according_to_the_learned_weights
         featureVectors = np.array([ dictionaryToVector(featuresOfParticle(p))
@@ -512,20 +512,20 @@ def rankUsingPrograms():
         visualization[:,256] = 0.5
         visualization[:,256*2] = 0.5
         visualization = 255*visualization
-        
+
         if not oldPredictionCorrect and programPredictionCorrect:
             fp = "../TikZpaper/figures/programSuccess%d.png"%j
             print("Great success! see %s"%fp)
             saveMatrixAsImage(visualization,fp)
 
-            
+
         if oldPredictionCorrect and not programPredictionCorrect:
             print("Minor setback!")
             print(particleScores)
-            
 
-            
-            
+
+
+
     print(programAccuracy,"vs",oldAccuracy)
 
 def induceAbstractions():
@@ -545,13 +545,13 @@ def induceAbstractions():
         if p1 == None:
             print("No synthesis result for %d"%i)
             continue
-        
+
         print("Trying to induce abstractions using:")
         print(p1.pretty())
         for j in range(i+1,100):
             p2 = getProgram(j)
             if p2 == None: continue
-            
+
             try:
                 a,e = p1.abstract(p2,Environment())
                 print("SUCCESS:")
@@ -593,8 +593,8 @@ def induceAbstractions():
             abstractionMatrix.append(np.concatenate(samples,axis = 1))
     #.showImage(np.concatenate(abstractionMatrix,axis = 0),)
     saveMatrixAsImage(255*np.concatenate(abstractionMatrix,axis = 0),'abstractions.png')
-            
-        
+
+
 def analyzeSynthesisTime():
     results = pickle.load(open(arguments.name,'rb'))
     print(" [+] Loaded %d synthesis results from %s."%(len(results),arguments.name))
@@ -605,7 +605,7 @@ def analyzeSynthesisTime():
         if not hasattr(r,'time'):
             print("missing time attribute...",r,r.__class__.__name__)
             continue
-        
+
         if isinstance(r.time,list): times.append(sum(r.time))
         else: times.append(r.time)
         traceSizes.append(len(r.parse.lines))
@@ -675,7 +675,7 @@ if __name__ == '__main__':
                 for o in s.source:
                     print(o)
                     print(str(parseSketchOutput(o)))
-                    print() 
+                    print()
                 print("Pretty printed merged output:")
                 print(s.program.pretty())
             else:
@@ -691,4 +691,3 @@ if __name__ == '__main__':
             print("Synthesis time:",r.time)
             print("Program:")
             print(r.program.pretty())
-                     
