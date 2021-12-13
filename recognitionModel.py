@@ -847,7 +847,7 @@ class DistanceModel():
         # self.session.run(initializer)
         # initializer.feed_dict = {self.currentPlaceholder: currentBatch,
                                  # self.goalPlaceholder: goalBatch}
-        return self.session.run(initializer, self.distanceFunction,
+        return self.session.run(self.distanceFunction,
                                 feed_dict = {self.currentPlaceholder: currentBatch,
                                              self.goalPlaceholder: goalBatch})
 
