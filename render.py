@@ -36,17 +36,18 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
 ''' % (source)
 
     fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
+    tempdir = os.path.dirname(temporaryName)
 
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
-    os.system("cd /tmp; echo X|pdflatex %s 2> /dev/null > /dev/null" % temporaryName)
+    os.system("cd %s; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % (tempdir,temporaryName))
     # creates the pdf document
 
     temporaryPrefix = temporaryName[:-4]
     temporaryImages = [temporaryPrefix + ".png"]
     o_file = "{}-%0".format(temporaryPrefix) + str(len(str(len(sources) - 1))) + "d.png"
     png_command = "convert -density 300 -size %sx%s %s %s" % (resolution, resolution, temporaryPrefix+'.pdf', o_file)
-    os.system("cd /tmp; %s" % png_command)
+    os.system("cd %s; %s" % (tempdir,png_command))
 
     if len(sources) > 1:
         pattern = "%s-%0"+str(len(str(len(sources) - 1)))+"d.png"
@@ -58,14 +59,14 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
             if not all([os.path.isfile(t) for t in temporaryImages ]):
                 print("ERROR: didn't get any files without zero prefixes either. Here is the latex output:")
-                
+
                 raise Exception('No image output from latex process. prefix = %s, len(sources) = %d, fs = \n%s\n,checks = \n%s\n'%(temporaryPrefix,
                                                                                                                                    len(sources),
                                                                                                                                    "\n".join(temporaryImages),
                                                                                                                                    "\n".join(map(str,[os.path.isfile(t) for t in temporaryImages ]))))
             else:
                 print("Got it without zero prefixes")
-                
+
     if showImage:
         for temporaryImage in temporaryImages:
             os.system("feh %s" % temporaryImage)
@@ -80,7 +81,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             (width, height) = im.size
             if width != resolution or height != resolution:
                 im = im.resize((resolution,resolution))
-            if im.mode == 'RGBA' or im.mode == '1' or im.mode == 'L':
+            if im.mode == 'RGBA' or im.mode == '1' or im.mode == 'L' or im.mode == 'LA':
                 im = im.convert('L')
                 scale = 255.0
             elif im.mode == 'I': # why God does this happen
@@ -107,7 +108,7 @@ def animateMatrices(matrices,outputFilename = None):
         # return the artists set
         return im,
     # kick off the animation
-    ani = animation.FuncAnimation(fig, updatefig, frames=list(range(len(matrices))), 
+    ani = animation.FuncAnimation(fig, updatefig, frames=list(range(len(matrices))),
                               interval=50, blit=True)
     if outputFilename != None:
         ani.save(outputFilename, dpi = 80,writer = 'imagemagick')
