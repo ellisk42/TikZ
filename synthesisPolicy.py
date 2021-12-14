@@ -91,7 +91,7 @@ class SynthesisPolicy():#nn.Module):
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print("TIMEOUT",sequence)
+            print("TIMEOUT")
             assert False
         successes = [ results[j].cost != None and results[j].cost <= minimumCost + 1 for j in jobs ]
         p0 = sum([ p for success, p in zip(successes, probabilities) if success])
@@ -102,7 +102,7 @@ class SynthesisPolicy():#nn.Module):
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print("TIMEOUT",sequence)
+            print("TIMEOUT", len(jobs))
             assert False
         scores = self.scoreJobs(jobs)
         z = lse(scores)
