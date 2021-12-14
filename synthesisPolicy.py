@@ -381,8 +381,12 @@ class SynthesisPolicy():#nn.Module):
 
 
 def loadPolicyData():
-    with open('policyTrainingData.p','rb') as handle:
-        results = pickle.load(handle)
+    from os.path import exists
+    if os.path.exists('policyTrainingData.p'):
+        with open('policyTrainingData.p','rb') as handle:
+            results = pickle.load(handle)
+    else:
+        results = []
 
     resultsArray = []
 
