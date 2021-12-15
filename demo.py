@@ -2,23 +2,23 @@ import os
 import sys
 
 def eprint(s):
-    print "[DEMO] %s"%s
+    print("[DEMO] %s"%s)
 
 def execute(k,n):
-    print "[EXECUTING] %s:"%n
-    print "\t%s"%k
+    print("[EXECUTING] %s:"%n)
+    print("\t%s"%k)
     os.system(k + " 2>&1 | awk '{print \" [%s] \" $0}'"%n)
 
 def getIndex(f):
     import filecmp
     try: return int(f)
     except:
-        for j in xrange(100):
+        for j in range(100):
             if filecmp.cmp(f,"drawings/expert-%d.png"%j):
                 return j
     return None
-            
-    
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "TikZ demo ^_^")
@@ -45,7 +45,7 @@ if __name__ == "__main__":
                         help="timeout for the synthesizer measured in seconds",
                         default=None)
     arguments = parser.parse_args()
-    
+
     n = getIndex(arguments.image)
     imageFilename = "drawings/expert-%d.png"%n
     parseFileName = imageFilename[:-4] + "-parses"
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         eprint("Clearing parse directory: %s"%parseFileName)
         execute("rm %s/*.png %s/particle*.p"%(parseFileName,parseFileName),
                 "RM")
-        execute("python recognitionModel.py test  -t %s -b %d -l 0 --proposalCoefficient 1 --parentCoefficient --distanceCoefficient 5 --distance --mistakePenalty 10 --attention 16 --noisy --quiet "%
+        execute("python3 recognitionModel.py test  -t %s -b %d -l 0 --proposalCoefficient 1 --parentCoefficient --distanceCoefficient 5 --distance --mistakePenalty 10 --attention 16 --noisy --quiet --unguided "%
               (imageFilename,
                arguments.particles),
             "NEURALNET")
@@ -84,5 +84,5 @@ if __name__ == "__main__":
         else:
             outputDirectory = "--programOutputDirectory %s"%arguments.programOutputDirectory
 
-        execute("python synthesisPolicy.py %s %s %s -f basic --folds 1 --regularize 0.1 --load --evaluate %s "%(outputDirectory, extra,timeout,synthesisTarget),
+        execute("python3 synthesisPolicy.py %s %s %s -f basic --folds 1 --regularize 0.1 --load --evaluate %s "%(outputDirectory, extra,timeout,synthesisTarget),
                 "SYNTHESIZER")

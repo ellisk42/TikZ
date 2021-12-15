@@ -17,9 +17,9 @@ def makeDistanceExamples(targets,programs, continuous = False, reportTime = Fals
 
     for target, program in zip(targets, programs):
         if not isinstance(program, Sequence):
-            print "Fatal error: one of the entries of programs was not a sequence"
-            print "programs = ",programs
-            print "program = ",program
+            print("Fatal error: one of the entries of programs was not a sequence")
+            print("programs = ",programs)
+            print("program = ",program)
             assert False
         # on policy examples
         for j in range(len(program)+1):
@@ -37,11 +37,11 @@ def makeDistanceExamples(targets,programs, continuous = False, reportTime = Fals
 
         for _ in range(10):
             exampleTargets.append(target)
-            prefixSize = choice(range(len(program) + 1))
+            prefixSize = choice(list(range(len(program) + 1)))
             stuff = program.lines
             if random() < 0.4: stuff = np.random.permutation(stuff).tolist()
             mutant = Sequence(stuff[:prefixSize])
-            for _ in range(choice(range(max(prefixSize,1)))):
+            for _ in range(choice(list(range(max(prefixSize,1))))):
                 mutant = mutant.mutate(canRemove = False)
             exampleImages.append(mutant.draw())
             if not continuous:
@@ -56,15 +56,15 @@ def makeDistanceExamples(targets,programs, continuous = False, reportTime = Fals
     exampleTargets = augmentData(np.array(exampleTargets))
     if False:
         for j in range(len(extraCurrent)):
-            print extraTarget[j]
-            print extraCurrent[j]
+            print(extraTarget[j])
+            print(extraCurrent[j])
             showImage(np.concatenate((exampleTargets[j],exampleImages[j]),
                                      axis = 0))
-            print
-            print 
+            print()
+            print() 
     t = np.stack([np.array(extraTarget), np.array(extraCurrent)],axis = 1)
 
-    if reportTime: print "Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime)
+    if reportTime: print("Generated examples from %d programs in %f seconds"%(len(programs),time() - startTime))
     return exampleTargets, np.array(exampleImages), t
 
 def smoothDistance(p, q, tolerance = 0.5):
@@ -97,8 +97,8 @@ def smoothDistance(p, q, tolerance = 0.5):
     # adjacency matrix
     adjacency = ([ [ d(a,b) for b in q.lines ]
                    for a in p.lines ])
-    print "adjacency matrix:"
-    print adjacency
+    print("adjacency matrix:")
+    print(adjacency)
 
     def minimumCostAlignment(pIndex, availableQ):
         if pIndex == len(p):
@@ -128,7 +128,7 @@ def smoothDistance(p, q, tolerance = 0.5):
         return bestCost
 
     startTime = time()
-    mc = minimumCostAlignment(0,range(len(q)))
-    print "Calculated minimum cost alignment in %f sec."%(time() - startTime)
-    print "mc = ",mc
+    mc = minimumCostAlignment(0,list(range(len(q))))
+    print("Calculated minimum cost alignment in %f sec."%(time() - startTime))
+    print("mc = ",mc)
     return mc

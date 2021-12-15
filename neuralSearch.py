@@ -4,7 +4,6 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Variable
 import torch.optim as optimization
 import torch.cuda as cuda
 
@@ -18,7 +17,7 @@ class LineDecoder(nn.Module):
 
         assert "START" in lexicon
         assert "END" in lexicon
-        
+
         self.lexicon = lexicon
         self.model = nn.GRU(H,H, layers)
 
@@ -27,7 +26,7 @@ class LineDecoder(nn.Module):
 
         self.layers = layers
         self.h0 = nn.Linear(seedDimensionality, H*layers)
-                                
+
 
         self.H = H
 
@@ -41,12 +40,12 @@ class LineDecoder(nn.Module):
 
     def targetsOfSymbols(self, symbols):
         B = 1
-        t = torch.LongTensor(B,len(symbols))
-        for j,s in enumerate(symbols):
-            t[0,j] = self.lexicon.index(s)
-        if GPU: t = t.cuda()
-        return Variable(t)
-        
+        t = torch.LongTensor(B, len(symbols))
+        for j, s in enumerate(symbols):
+            t[0, j] = self.lexicon.index(s)
+        if GPU:
+            t = t.cuda()
+        return t
 
     def loss(self, target, seed):
         numberOfTargets = len(target)
@@ -75,16 +74,16 @@ class LineDecoder(nn.Module):
 
             c = torch.multinomial(distribution,1)[0]
             if self.lexicon[c] == "END": break
-            
+
             accumulator.append(self.lexicon[c])
-            
+
         return accumulator[1:]
 
     def beam(self, seed, maximumLength, beamSize):
         h = self.h0(seed).view(self.layers, 1, self.H)
 
         B = [(0.0,["START"],h)]
-        
+
         for _ in range(maximumLength):
             expanded = False
             new = []
@@ -107,7 +106,7 @@ class LineDecoder(nn.Module):
         B = [ (ll,sequence[1:-1]) for ll,sequence,h in sorted(B,reverse = True)[:beamSize]
               if sequence[-1] == "END"]
         return B
-        
+
 
 class LineEncoder(nn.Module):
     def __init__(self, lexicon, H = 32, layers = 1, seedDimensionality = 32):
@@ -120,31 +119,32 @@ class LineEncoder(nn.Module):
 
         self.layers = layers
         self.h0 = nn.Linear(seedDimensionality, H*layers)
-                                
+
         self.H = H
 
     def forward(self, inputs, seed):
         B = inputs.size(0)
         assert B == seed.size(0)
-        
+
         encoded = self.encoder(inputs).permute(1,0,2)
         hidden = self.h0(seed).view(self.layers, B, self.H)
-        
+
         output, hidden = self.model(encoded, hidden)
-        
+
         return hidden.view(B,-1)
 
     def tensorOfSymbols(self, symbols):
         B = 1
-        t = torch.LongTensor(B,len(symbols))
-        for j,s in enumerate(symbols):
-            t[0,j] = self.lexicon.index(s)
-        if GPU: t = t.cuda()
-        return Variable(t)
+        t = torch.LongTensor(B, len(symbols))
+        for j, s in enumerate(symbols):
+            t[0, j] = self.lexicon.index(s)
+        if GPU:
+            t = t.cuda()
+        return t
 
     def encoding(self, symbols, seed):
         return self(self.tensorOfSymbols(symbols), seed)
-            
+
 
 class SearchPolicy(nn.Module):
     def __init__(self, lexicon):
@@ -166,15 +166,15 @@ class SearchPolicy(nn.Module):
         self.environmentScore = nn.Linear(H,1)
 
         self.H = H
-        
-        
+
+
 
     def encodeEnvironment(self, environment, seed):
         return self.lineEncoder.encoding(["START"] + environment, seed)
 
     def environmentLogLikelihoods(self, environments, problem):
         environmentEncodings = [ self.encodeEnvironment(e, problem)
-                                 for e in environments ] 
+                                 for e in environments ]
         environmentScores = [ self.environmentScore(e)
                               for e in environmentEncodings ]
         return F.log_softmax(torch.cat(environmentScores).view(-1))
@@ -191,7 +191,7 @@ class SearchPolicy(nn.Module):
 
         e = self.encodeEnvironment(example.environments[0], problem)
         seed = self.makeSeed(problem = problem, environment = e)
-        
+
         return self.lineDecoder.loss(example.target + ["END"], seed) + environmentLoss
 
     def makeOracleExamples(self, program, problem):
@@ -203,7 +203,7 @@ class SearchPolicy(nn.Module):
             environments = [environment] + environments
             ex = PolicyTrainingExample(problem, target, environments)
             examples.append(ex)
-            
+
         return examples
 
     def mayBeAppliedChange(self, initialProgram, environment, line):
@@ -255,25 +255,25 @@ class SearchPolicy(nn.Module):
             #newFrontier = removeDuplicateStrings(newFrontier)
             newFrontier = [(self.value(problem,f),f) for f in newFrontier ]
             newFrontier.sort(reverse = True)
-            print "New frontier ( > 0):"
+            print("New frontier ( > 0):")
             for v,f in newFrontier:
-                if v > 0.0: print "V = ",v,"\t",f
+                if v > 0.0: print("V = ",v,"\t",f)
             if self.solvesTask(problem, f):
-                print "SOLVED TASK!"
-                return 
-            print "(end of new frontier)"
-            print 
+                print("SOLVED TASK!")
+                return
+            print("(end of new frontier)")
+            print()
             # import pdb
             # pdb.set_trace()
-            
+
             frontier = [ f for v,f in newFrontier[:size] ]
 
 
-            print "Step %d of graph search:"%step
-            for f in frontier: print f
-            print "(end of step)"
-            print 
-        
+            print("Step %d of graph search:"%step)
+            for f in frontier: print(f)
+            print("(end of step)")
+            print()
+
 
     def sampleOneStep(self, problem, initialProgram):
         problem = self.residual(problem, self.evaluate(initialProgram))
@@ -282,7 +282,7 @@ class SearchPolicy(nn.Module):
         try:
             return self.applyChange(initialProgram, e, l)
         except: return initialProgram
-        
+
 
 class PolicyTrainingExample():
     def __init__(self, problem, target, environments):
@@ -290,5 +290,3 @@ class PolicyTrainingExample():
     def __str__(self):
         return "PolicyTrainingExample(problem = %s, target = %s, environments = %s)"%(self.problem, self.target, self.environments)
     def __repr__(self): return str(self)
-
- 

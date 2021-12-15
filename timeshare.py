@@ -25,11 +25,11 @@ class TimeshareTask():
         if not self.running:
             self.process = Process(target = executeInProcessGroup, args = (self,))
             self.process.start()
-            print "timeshare child PID:",self.process.pid
+            print("timeshare child PID:",self.process.pid)
             os.setpgid(self.process.pid,self.process.pid)
-            print "timeshare process group",os.getpgid(self.process.pid)
+            print("timeshare process group",os.getpgid(self.process.pid))
             assert os.getpgid(self.process.pid) == self.process.pid
-            print "my process group",os.getpgrp(),"which should be",os.getpgid(0)
+            print("my process group",os.getpgrp(),"which should be",os.getpgid(0))
             assert os.getpgid(self.process.pid) != os.getpgid(0)
             self.running = True
         else:
@@ -70,7 +70,7 @@ def executeTimeshareTasks(tasks, dt = 1, exponent = 1, minimumSlice = 0.05, glob
         
         numberOfActiveSlices = len([ s for s in shares if s >= minimumSlice ])
         
-        print "Time-sharing between %d tasks with weights: %s"%(len(tasks),shares)
+        print("Time-sharing between %d tasks with weights: %s"%(len(tasks),shares))
         for share,task in zip(shares,tasks):
             if share < minimumSlice: continue
             # This can happen if the caller decides to explicitly mark something is finished
@@ -79,8 +79,8 @@ def executeTimeshareTasks(tasks, dt = 1, exponent = 1, minimumSlice = 0.05, glob
             # Setting the share to None will cause us to block until the process finishes
             # This is the same as saying that if we are spending everything on one process that just run it until the end
             if numberOfActiveSlices == 1: share = None
-            print "Executing task:",task.arguments[0],"for",share,"sec"
-            if share == None: print "Blocking until process finishes..."
+            print("Executing task:",task.arguments[0],"for",share,"sec")
+            if share == None: print("Blocking until process finishes...")
             result = task.execute(share)
             if result == "still running": continue
             elif result == "finished": assert False
@@ -88,10 +88,10 @@ def executeTimeshareTasks(tasks, dt = 1, exponent = 1, minimumSlice = 0.05, glob
         tasks = [ t for t in tasks if not t.finished ]
 
         sliceTotalTime = time.time() - sliceStartTime
-        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        print("Finished giving all of the tasks a slice. Took %f sec, efficiency = %d"%(sliceTotalTime,int(100*dt/sliceTotalTime)))
         if exponent > 1:
             dt = dt*exponent
-            print "Grew dt to",dt
+            print("Grew dt to",dt)
 
 def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeout = None):
     startTime = time.time()
@@ -126,7 +126,7 @@ def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeou
             # This can happen if the caller decides to explicitly mark something is finished
             if task.finished: continue
             
-            print "Executing task:",[str(a) for a in task.arguments],"for",share,"sec"
+            print("Executing task:",[str(a) for a in task.arguments],"for",share,"sec")
             result = task.execute(share)
             if result == "still running": continue
             elif result == "finished": assert False
@@ -136,7 +136,7 @@ def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeou
             if task.timeout != None and totalTime >= task.timeout:
                 task.finished = True
                 task.cleanup()
-                print "(task %s timed out)"%(task.arguments)
+                print("(task %s timed out)"%(task.arguments))
 
         if any(t.finished for t in tasks):
             tasksAndRuntimes = [ (t,r) for t,r in zip(tasks,totalRunTime) if not t.finished ]
@@ -147,7 +147,7 @@ def executeTimeshareTasksFairly(tasks, dt = 1, minimumSlice = 0.05, globalTimeou
             i = 0
 
         sliceTotalTime = time.time() - sliceStartTime
-        print "Finished giving all of the tasks a slice. Took %f sec, efficiency = %d%%"%(sliceTotalTime,int(100*dt/sliceTotalTime))
+        print("Finished giving all of the tasks a slice. Took %f sec, efficiency = %d%%"%(sliceTotalTime,int(100*dt/sliceTotalTime)))
         
     
 if __name__ == "__main__":
@@ -160,4 +160,4 @@ if __name__ == "__main__":
                                                              timeout = 2)],
                                               dt = 1,
                                               minimumSlice = 0.15):
-        print result
+        print(result)

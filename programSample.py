@@ -5,7 +5,7 @@ from CRP import *
 
 from dispatch import dispatch
 
-import cPickle as pickle
+import pickle as pickle
 import random
 
 class SampleEnvironment():
@@ -26,11 +26,11 @@ class SampleEnvironment():
                                  self.rl.copy())
 
 def sampleLinearExpression(coefficientRestaurant, freeVariables):
-    if freeVariables == [] or random.random() < 0.3: return LinearExpression(0,None,random.choice(range(1,15)))
+    if freeVariables == [] or random.random() < 0.3: return LinearExpression(0,None,random.choice(list(range(1,15))))
 
     return LinearExpression(coefficientRestaurant.sampleNew(),
                             random.choice(freeVariables),
-                            random.choice(range(1,15)))
+                            random.choice(list(range(1,15))))
 def samplePoint(e):
     return (sampleLinearExpression(e.rx,e.freeVariables),sampleLinearExpression(e.ry,e.freeVariables))
 
@@ -61,21 +61,21 @@ def samplePrimitive(e):
 def sampleLoop(e):
     b = sampleLinearExpression(e.rl, e.freeVariables)
     if b.m == 0:
-        b.b = random.choice(range(3,5))
+        b.b = random.choice(list(range(3,5)))
     else:
-        b.b = random.choice(range(1,4))
+        b.b = random.choice(list(range(1,4)))
     return Loop(chr(ord('i') + len(e.freeVariables)),
                 b,
                 Block([]),
                 boundary = Block([]))
 def sampleReflection(e):
     return Reflection(random.choice(['x','y']),
-                      random.choice(range(1,20)),
+                      random.choice(list(range(1,20))),
                       Block([]))
 
 @dispatch(SampleEnvironment,Block)
 def mutateProgram(e,p):
-    n = random.choice(range(len(p.items)+1))
+    n = random.choice(list(range(len(p.items)+1)))
     if n < len(p.items) and not isinstance(p.items[n],Primitive):
         new = mutateProgram(e,p.items[n])
         return Block(p.items[:n] + [new] + p.items[n+1:])
@@ -122,7 +122,7 @@ def sampleManyPrograms(seed):
     ps = []
     while time() - start < timeout*60*60:
         ps += [ pickle.dumps(p,protocol =  -1) for p in randomPrograms() ]
-    print "Returning",len(ps),"random programs"
+    print("Returning",len(ps),"random programs")
     return ps
 
 
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     from multiprocessing import Pool
     C = 40
     T = 0.1
-    results = Pool(C).map(sampleManyPrograms, range(C))
+    results = Pool(C).map(sampleManyPrograms, list(range(C)))
     ps = []
     for r in results: ps += r
     
@@ -138,4 +138,4 @@ if __name__ == "__main__":
 
     with open('randomlyGeneratedPrograms.p','wb') as handle:
         pickle.dump(ps, handle, protocol = -1)
-    print "Collected",len(ps),"random programs altogether"
+    print("Collected",len(ps),"random programs altogether")

@@ -225,7 +225,7 @@ bit renderSpecification(SHAPEVARIABLES) {
         fd = tempfile.NamedTemporaryFile(mode = 'w',suffix = '.failure',delete = False,dir = './parsingErrors')
         fd.write(output)
         fd.close()
-        print "WARNING: Could not parse body. Leaving the unparsable body in %s"%(fd.name)
+        print("WARNING: Could not parse body. Leaving the unparsable body in %s"%(fd.name))
         
         # print body
     # parseSketchOutput(body)

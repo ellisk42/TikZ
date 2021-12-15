@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Variable
 import torch.optim as optimization
 import torch.cuda as cuda
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -27,7 +26,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                    "line","arrow = True","arrow = False","solid = True","solid = False",
                    "for",
                    "reflect","x","y",
-                   "i","j","None"] + map(str,range(-5,20))
+                   "i","j","None"] + list(map(str,list(range(-5,20))))
         super(GraphicsSearchPolicy,self).__init__(LEXICON)
 
         self.circleEncoder = nn.Linear(2, self.H)
@@ -36,16 +35,22 @@ class GraphicsSearchPolicy(SearchPolicy):
 
     def encodeProblem(self, s):
         if s == []:
-            t = torch.from_numpy(np.zeros((self.H,1))).float()
-            return Variable(t.cuda() if GPU else t)
-        encodings = [ self.circleEncoder(Variable(t.cuda() if GPU else t)).clamp(min = 0) \
-                      for c in s\
-                      for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()] ]
-        interactions = [self.interactionEncoder1(torch.cat([x,y],dim = 0)).clamp(min = 0)
-                        for i,x in enumerate(encodings)
-                        for j,y in enumerate(encodings)]
-        interactions = [self.interactionEncoder2(interaction).clamp(min = 0)
-                        for interaction in interactions ]
+            t = torch.from_numpy(np.zeros((self.H, 1))).float()
+            return (t.cuda() if GPU else t)
+        encodings = [
+            self.circleEncoder((t.cuda() if GPU else t)).clamp(min=0)
+            for c in s
+            for t in [torch.from_numpy(np.array([c.center.x, c.center.y])).float()]
+        ]
+        interactions = [
+            self.interactionEncoder1(torch.cat([x, y], dim=0)).clamp(min=0)
+            for i, x in enumerate(encodings)
+            for j, y in enumerate(encodings)
+        ]
+        interactions = [
+            self.interactionEncoder2(interaction).clamp(min=0)
+            for interaction in interactions
+        ]
         return sum(interactions)
 
     def candidateEnvironments(self, program):
@@ -62,7 +67,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                               coordinate = program.coordinate)
 
         assert isinstance(program, Block)
-        
+
         if environment == []:
             return Block([self.parseLine(line)] + program.items)
         # Figure out what it is that's being indexed into
@@ -74,7 +79,7 @@ class GraphicsSearchPolicy(SearchPolicy):
                 newItems[j] = lp
                 return Block(newItems)
         raise Exception('Environment indexes nonexistent context')
-    
+
     def Oracle(self, program): return list(Oracle(program))
 
     def evaluate(self, program):
@@ -123,11 +128,11 @@ class GraphicsSearchPolicy(SearchPolicy):
             finish(l)
             return Reflection(body = Block([]), axis = a, coordinate = c)
         raise Exception('parsing line '+k)
-            
 
-    
-        
-        
+
+
+
+
 @dispatch(Block)
 def Oracle(b):
     for j,x in enumerate(b.items):
@@ -147,7 +152,7 @@ def Oracle(l):
 def Oracle(l):
     for program, environment, line in Oracle(l.body):
         yield Reflection(axis = l.axis, coordinate = l.coordinate, body = program), environment, line
-    
+
 
 
 @dispatch(Loop)
@@ -185,7 +190,7 @@ def candidateEnvironments(b):
 @dispatch(Primitive)
 def candidateEnvironments(_):
     return
-    yield 
+    yield
 @dispatch(Loop)
 def candidateEnvironments(l):
     this = serializeLine(l)
@@ -199,24 +204,24 @@ def candidateEnvironments(r):
 
 def simpleSceneSample():
     def isolatedCircle():
-        x = random.choice(range(1,16))
-        y = random.choice(range(1,16))
+        x = random.choice(list(range(1,16)))
+        y = random.choice(list(range(1,16)))
         return Primitive('circle', LinearExpression(0,None,x), LinearExpression(0,None,y))
 
     MINIMUMATOMS = 1
     MAXIMUMATOMS = 1
-    primitives = [isolatedCircle() for _ in range(random.choice(range(MINIMUMATOMS,MAXIMUMATOMS+1))) ]
+    primitives = [isolatedCircle() for _ in range(random.choice(list(range(MINIMUMATOMS,MAXIMUMATOMS+1)))) ]
     loopIterations = random.choice([4])
 
     while True:
-        bx = random.choice(range(1,16))
-        mx = random.choice(range(-5,6))
+        bx = random.choice(list(range(1,16)))
+        mx = random.choice(list(range(-5,6)))
         if all([x > 0 and x < 16 for j in range(loopIterations) for x in [mx*j + bx] ]): break
     while True:
-        by = random.choice(range(1,16))
-        my = random.choice(range(-5,6))
+        by = random.choice(list(range(1,16)))
+        my = random.choice(list(range(-5,6)))
         if my == 0 and mx == 0: continue
-        
+
         if all([y > 0 and y < 16 for j in range(loopIterations) for y in [my*j + by] ]): break
 
 
@@ -226,32 +231,32 @@ def simpleSceneSample():
                                      LinearExpression(mx,'j' if mx else None,bx),
                                      LinearExpression(my,'j' if my else None,by))]))
     return Block([l] + primitives)
-    
-    
+
+
 if __name__ == "__main__":
     p = GraphicsSearchPolicy()
 
     if os.path.isfile('checkpoints/neuralSearch.p'):
         p.load_state_dict(torch.load('checkpoints/neuralSearch.p'))
-        print "Resuming state from",'checkpoints/neuralSearch.p'
-        
+        print("Resuming state from",'checkpoints/neuralSearch.p')
+
     if GPU:
-        print "Using the GPU"
+        print("Using the GPU")
         p.cuda()
 
     o = optimization.Adam(p.parameters(), lr = 0.001)
-    
+
     step = 0
     losses = []
     while True:
         step += 1
 
-        
+
         program = simpleSceneSample()
         scene = set(program.convertToSequence().lines)
 
         examples = p.makeOracleExamples(program, scene)
-        
+
         for example in examples:
             o.zero_grad()
             loss = p.loss(example)
@@ -260,25 +265,24 @@ if __name__ == "__main__":
             losses.append(loss.data[0])
 
         if step%100 == 0:
-            print "LOSS:", step,'\t',sum(losses)/len(losses)
+            print("LOSS:", step,'\t',sum(losses)/len(losses))
             losses = []
         if step%5000 == 0:
             torch.save(p.state_dict(),'checkpoints/neuralSearch.p')
-            print scene
-            print program.pretty()
-            print p.Oracle(program)
+            print(scene)
+            print(program.pretty())
+            print(p.Oracle(program))
             p0 = Block([])
             p.beamSearchGraph(scene, p0, 30, 3)
             continue
             for _ in range(5):
                 p0 = p.sampleOneStep(scene, p0)
-                print p0
+                print(p0)
                 try:
                     denotation = p.evaluate(p0)
                 except EvaluationError:
-                    print "Error evaluating that program"
+                    print("Error evaluating that program")
                     break
                 if len(scene - denotation) == 0:
-                    print "Nothing left to explain."
+                    print("Nothing left to explain.")
                     break
-                

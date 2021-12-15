@@ -14,7 +14,7 @@ class BatchIterator():
             testingCount = int(tensors[0].shape[0]*testingFraction)
             self.testingTensors = [ t[0:testingCount,...] for t in self.tensors ]
             self.tensors = [ t[testingCount:(t.shape[0]),...] for t in self.tensors ]
-            print "Holding out %d examples"%testingCount
+            print("Holding out %d examples"%testingCount)
             self.testingSetSize = testingCount
         
         self.startingIndex = 0
@@ -24,7 +24,7 @@ class BatchIterator():
 
     def shuffle(self):
         # side-by-side shuffle of the data
-        permutation = np.random.permutation(range(self.tensors[0].shape[0]))
+        permutation = np.random.permutation(list(range(self.tensors[0].shape[0])))
         self.tensors = [ t[permutation] for t in self.tensors ]
 
     def registerPlaceholders(self,placeholders):
@@ -32,9 +32,9 @@ class BatchIterator():
 
     def processTensor(self,t):
         if not isinstance(t[0],str): return t
-        return np.array(map(self.process, list(t)))
+        return np.array(list(map(self.process, list(t))))
     
-    def next(self):
+    def __next__(self):
         endingIndex = self.startingIndex + self.batchSize
         if endingIndex > self.trainingSetSize:
             endingIndex = self.trainingSetSize
@@ -44,7 +44,7 @@ class BatchIterator():
         return batch
 
     def nextFeed(self):
-        return dict(zip(self.placeholders, self.next()))
+        return dict(list(zip(self.placeholders, next(self))))
 
     def epochFeeds(self):
         while True:
@@ -55,7 +55,7 @@ class BatchIterator():
                 break
     def epochExamples(self):
         while True:
-            yield self.next()
+            yield next(self)
             if self.startingIndex == 0:
                 # rerandomize
                 self.shuffle()
@@ -69,13 +69,13 @@ class BatchIterator():
         return [ self.processTensor(t[start:(start+size),...]) for t in self.testingTensors ]
     
     def testingFeed(self):
-        return dict(zip(self.placeholders, self.testingExamples()))
+        return dict(list(zip(self.placeholders, self.testingExamples())))
 
     def testingFeeds(self):
         '''Gives you feeds for smaller batches of the testing examples'''
         testingIndex = 0
         while True:
-            yield dict(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize)))
+            yield dict(list(zip(self.placeholders, self.testingSlice(testingIndex, self.batchSize))))
             testingIndex += self.batchSize
             if testingIndex >= self.testingSetSize: break
     def testingExamples(self):

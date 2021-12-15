@@ -17,7 +17,7 @@ else:
 examples = loadTrainingExamples.loadTar()
 j = 0
 for k in examples:
-    print k
+    print(k)
     if k.endswith('.p'):
         saveMatrixAsImage(255*(1 - pickle.load(io.BytesIO(examples[k])).draw()), '%s/trainA/%d.png'%(outputDirectory,j))
         saveMatrixAsImage(255*(1 - pickle.load(io.BytesIO(examples[k])).draw()), '%s/testA/%d.png'%(outputDirectory,j))

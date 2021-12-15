@@ -27,40 +27,46 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
                for s in sources ]
     source = "\n\n\n".join(sources)
     source = '''
-\\documentclass[convert={density=300,size=%dx%d,outext=.png},tikz]{standalone}
+\\documentclass[tikz]{standalone}
 \\usetikzlibrary{decorations.pathmorphing}
 \\usetikzlibrary{arrows.meta}
 \\begin{document}
 %s
 \\end{document}
-''' % (resolution, resolution, source)
+''' % (source)
 
     fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
+    tempdir = os.path.dirname(temporaryName)
 
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
-    os.system("cd /tmp; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % temporaryName)
+    os.system("cd %s; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % (tempdir,temporaryName))
+    # creates the pdf document
 
     temporaryPrefix = temporaryName[:-4]
     temporaryImages = [temporaryPrefix + ".png"]
+    o_file = "{}-%0".format(temporaryPrefix) + str(len(str(len(sources) - 1))) + "d.png"
+    png_command = "convert -density 300 -size %sx%s %s %s" % (resolution, resolution, temporaryPrefix+'.pdf', o_file)
+    os.system("cd %s; %s" % (tempdir,png_command))
+
     if len(sources) > 1:
         pattern = "%s-%0"+str(len(str(len(sources) - 1)))+"d.png"
         temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
         if not all([os.path.isfile(t) for t in temporaryImages ]):
-            print "WARNING: didn't render to zero prefixed filenames. Trying without prefixes:"
+            print("WARNING: didn't render to zero prefixed filenames. Trying without prefixes:")
             # for sketch2
             pattern = "%s-%d.png"
             temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
             if not all([os.path.isfile(t) for t in temporaryImages ]):
-                print "ERROR: didn't get any files without zero prefixes either. Here is the latex output:"
-                
+                print("ERROR: didn't get any files without zero prefixes either. Here is the latex output:")
+
                 raise Exception('No image output from latex process. prefix = %s, len(sources) = %d, fs = \n%s\n,checks = \n%s\n'%(temporaryPrefix,
                                                                                                                                    len(sources),
                                                                                                                                    "\n".join(temporaryImages),
                                                                                                                                    "\n".join(map(str,[os.path.isfile(t) for t in temporaryImages ]))))
             else:
-                print "Got it without zero prefixes"
-                
+                print("Got it without zero prefixes")
+
     if showImage:
         for temporaryImage in temporaryImages:
             os.system("feh %s" % temporaryImage)
@@ -75,7 +81,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             (width, height) = im.size
             if width != resolution or height != resolution:
                 im = im.resize((resolution,resolution))
-            if im.mode == 'RGBA' or im.mode == '1':
+            if im.mode == 'RGBA' or im.mode == '1' or im.mode == 'L' or im.mode == 'LA':
                 im = im.convert('L')
                 scale = 255.0
             elif im.mode == 'I': # why God does this happen
@@ -102,7 +108,7 @@ def animateMatrices(matrices,outputFilename = None):
         # return the artists set
         return im,
     # kick off the animation
-    ani = animation.FuncAnimation(fig, updatefig, frames=range(len(matrices)), 
+    ani = animation.FuncAnimation(fig, updatefig, frames=list(range(len(matrices))),
                               interval=50, blit=True)
     if outputFilename != None:
         ani.save(outputFilename, dpi = 80,writer = 'imagemagick')
@@ -114,7 +120,7 @@ if __name__ == "__main__":
     \\node[pencildraw,draw,circle,inner sep=0pt,minimum size = 2cm,ultra thick] at (7,5) {};
     \\draw[line width = 0.1cm,dashed,-{>[scale = 1.5]}] (4,5) -- (6,5);
 '''
-    print render([challenge]*5,showImage = False,yieldsPixels = True)[0]
+    print(render([challenge]*5,showImage = False,yieldsPixels = True)[0])
     # inputFile = sys.argv[1]
     # outputFile = sys.argv[2]
     # i = sys.stdin if inputFile == '-' else open(inputFile, "r")

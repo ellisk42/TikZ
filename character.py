@@ -24,7 +24,7 @@ def loadSamples(d):
 
     if True:
         for n in namesWeCareAbout:
-            print n
+            print(n)
             showImage(examples[n][0])
     pickle.dump(examples,open('characters.p','wb'))
 

@@ -24,9 +24,9 @@ def makeImageArray(l):
     for j,c in enumerate(l):
         for k,i in enumerate(c):
             a[j*w:(j+1)*w, k*h:(k+1)*h] = i
-    for j in xrange(1, nx):
+    for j in range(1, nx):
         a[w*j,:] = 0.5
-    for j in xrange(1, ny):
+    for j in range(1, ny):
         a[:,h*j] = 0.5
 
     return a
@@ -53,7 +53,7 @@ def loadImage(n):
     p = Image.open(io.BytesIO(IMAGEBYTES[n]))
     # most of the time is spent in here for some reason
     return image2array(p)
-def loadImages(ns): return map(lambda n: loadImage(n),ns)
+def loadImages(ns): return [loadImage(n) for n in ns]
 
 def cacheImage(n,content): IMAGEBYTES[n] = content
 
@@ -77,19 +77,19 @@ def indent(s):
 def crossEntropyWithMask(labels, masks, predictions):
     import tensorflow as tf
     crossEntropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels = labels,logits = predictions)
-    print "crossEntropy = ",crossEntropy
+    print("crossEntropy = ",crossEntropy)
     # zero out anything that is not in the mask
     masked = tf.multiply(crossEntropy,mask)
-    print "masked = ",masked
-    l = tf.reduce_sum(masked)
-    print "l = ",l
+    print("masked = ",masked)
+    l = tf.reduce_sum(input_tensor=masked)
+    print("l = ",l)
     return l
 
 def linesIntersect(p1,q1,p2,q2,precision = 1):
     for p in [p1,p2,q1,q2]:
         p.x = round(p.x,precision)
         p.y = round(p.y,precision)
-    return linesIntersect_(p1,q1,p2,q2)    
+    return linesIntersect_(p1,q1,p2,q2)
 def linesIntersect_(p1,q1,p2,q2):
     def onSegment(p,q,r):
         return q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x) and q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y)
@@ -110,16 +110,16 @@ def linesIntersect_(p1,q1,p2,q2):
     # Special Cases
     # p1, q1 and p2 are colinear and p2 lies on segment p1q1
     if (o1 == 0 and onSegment(p1, p2, q1)): return True
- 
+
     # p1, q1 and p2 are colinear and q2 lies on segment p1q1
     if (o2 == 0 and onSegment(p1, q2, q1)): return True
- 
+
     # p2, q2 and p1 are colinear and p1 lies on segment p2q2
     if (o3 == 0 and onSegment(p2, p1, q2)): return True
- 
+
     # p2, q2 and q1 are colinear and q1 lies on segment p2q2
     if (o4 == 0 and onSegment(p2, q1, q2)): return True
- 
+
     return False
 
 def truncatedNormal(lower = None,upper = None):
@@ -138,7 +138,7 @@ def isFinite(x):
 def lse(x,y):
     if not isFinite(x): return y
     if not isFinite(y): return x
-    
+
     if x > y:
         return x + math.log(1 + math.exp(y - x))
     else:
@@ -148,7 +148,7 @@ def lseList(l):
     a = l[0]
     for x in l[1:]: a = lse(a,x)
     return a
-    
+
 def sampleLogMultinomial(logLikelihoods):
     z = lseList(logLikelihoods)
     ps = [math.exp(p - z) for p in logLikelihoods ]
@@ -168,7 +168,7 @@ def perturbNoisyIntensities(b):
     p[p > 1] = 1.0
     return p
 
-    
+
 def perturbOffset(b):
     p = np.copy(b)
     w = 4
@@ -186,10 +186,10 @@ def perturbSaltAndPepper(p,n = 10):
             y = int(random()*h)
             p[j,x,y] = 1 - p[j,x,y]
     return p
-    
+
 
 def augmentData(b): return perturbSaltAndPepper(perturbOffset(perturbNoisyIntensities(b)))
-    
+
 def translateArray(a,dx,dy):
     return np.roll(np.roll(a,dx,axis = 1),dy,axis = 0)
 
@@ -219,11 +219,11 @@ def frameImageNicely(x):
     import scipy.ndimage
     return scipy.ndimage.zoom(z,256.0/(2*b+l))
 
-        
+
 
 def mergeDictionaries(a,b):
     return dict([ (k,a.get(k,0) + b.get(k,0))
-                  for k in set(a.keys() + b.keys()) ])
+                  for k in set(list(a.keys()) + list(b.keys())) ])
 
 def picturesInDirectory(d):
     if d.endswith('.png'): return [d]
@@ -241,7 +241,7 @@ def snd(x): return x[1]
 def flattenImageOutput(c1):
     import tensorflow as tf
     c1d = int(c1.shape[1]*c1.shape[2]*c1.shape[3])
-    print "fully connected input dimensionality:",c1d
+    print("fully connected input dimensionality:",c1d)
 
     f1 = tf.reshape(c1, [-1, c1d])
     return f1
@@ -253,7 +253,7 @@ def applyLinearTransformation(t,p):
 
 def invertTransformation(t):
     return np.linalg.inv(np.concatenate([t.reshape((2,3)),np.array([0,0,1.0]).reshape((1,3))]))[[0,1],:]
-    
+
 def integrateNormalDensity(lb,ub,mu = 0,sigma = 1):
     from scipy.stats import norm
     assert not (ub < lb)
@@ -265,7 +265,7 @@ def integrateNormalDensity(lb,ub,mu = 0,sigma = 1):
 def removeDuplicateStrings(xs):
     t = {}
     for x in xs: t[str(x)] = x
-    return t.values()
+    return list(t.values())
 
 def reflectPoint(a,r,px,py):
     if a == 'x': return (r - px,py)
@@ -288,14 +288,14 @@ def interleaveGenerators(generators):
 
 def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False):
     if folds == 1:
-        print "crossValidate: Not doing cross validation because I only have one fold."
+        print("crossValidate: Not doing cross validation because I only have one fold.")
         yield fullDataSet, fullDataSet
     else:
         n = len(fullDataSet)
         seed(randomSeed)
-        if doNotPermute: indices = range(n)
-        else: indices = randomlyPermuteList(range(n))
-        
+        if doNotPermute: indices = list(range(n))
+        else: indices = randomlyPermuteList(list(range(n)))
+
         smallTestSize = int(math.floor(n/float(folds)))
         bigTestSize = int(math.ceil(n/float(folds)))
         numberOfBig = n - folds*smallTestSize
@@ -318,17 +318,17 @@ def crossValidate(fullDataSet, folds = 10, randomSeed = 0, doNotPermute = False)
 def parallelMap(numberOfCPUs, f, *xs):
     from pathos.multiprocessing import ProcessingPool as Pool
 
-    numberOfCPUs = min(numberOfCPUs,len(zip(*xs)))
-    
-    if numberOfCPUs == 1: return map(f,*xs)
+    numberOfCPUs = min(numberOfCPUs,len(list(zip(*xs))))
+
+    if numberOfCPUs == 1: return list(map(f,*xs))
     def safeCall(x):
         try:
             y = f(*x)
             return y
         except Exception as e:
-            print "Exception in worker during parallel map:\n%s"%(traceback.format_exc())
+            print("Exception in worker during parallel map:\n%s"%(traceback.format_exc()))
             raise e
-    return Pool(numberOfCPUs).map(safeCall,zip(*xs))
+    return Pool(numberOfCPUs).map(safeCall,list(zip(*xs)))
 
 def allSame(l,k):
     v = k(l[0])
@@ -337,8 +337,8 @@ def allSame(l,k):
     return True
 
 if __name__ == "__main__":
-    for x in interleaveGenerators([iter(range(9)),iter(xrange(3))]):
-        print x
+    for x in interleaveGenerators([iter(list(range(9))),iter(range(3))]):
+        print(x)
     assert False
-    for train, test in crossValidate(range(98),20,doNotPermute = True):
-        print train, test
+    for train, test in crossValidate(list(range(98)),20,doNotPermute = True):
+        print(train, test)

@@ -63,7 +63,7 @@ if __name__ == '__main__':
         batch = jobs[:100]
         jobs = jobs[100:]
 
-        print "%d jobs remaining"%len(jobs)
+        print("%d jobs remaining"%len(jobs))
 
         result = worker.learnedDistances(np.array([x for x,_ in batch ]),
                                          np.array([x for _,x in batch ]))
@@ -78,8 +78,8 @@ if __name__ == '__main__':
         matrix[x,y] += d
 
     matrix = matrix + matrix.T
-    print "MATRIX:"
-    print matrix.tolist()
+    print("MATRIX:")
+    print(matrix.tolist())
     
 
 
@@ -91,19 +91,19 @@ def analyzeFeatures(featureMaps):
     import matplotlib.image as image
 
     # collect together a whole of the different names for features
-    featureNames = list(set([ k for f in featureMaps.values() for k in f ]))
+    featureNames = list(set([ k for f in list(featureMaps.values()) for k in f ]))
 
-    imageNames = featureMaps.keys()
+    imageNames = list(featureMaps.keys())
 
     # Convert feature maps into vectors
     featureVectors = [ [ featureMaps[k].get(name,0) for name in featureNames ]
                        for k in imageNames ]
 
-    print "Feature vectors:"
+    print("Feature vectors:")
     for j,n in enumerate(imageNames):
-        print n
-        print featureMaps[n]
-        print featureVectors[j]
+        print(n)
+        print(featureMaps[n])
+        print(featureVectors[j])
 
     # Figure out things that are close / far as measured by different metrics
     percentile = 80
@@ -132,9 +132,9 @@ def analyzeFeatures(featureMaps):
     for programSet,programName in programOptions:
         for imageSet,imageName in imageOptions:
             overlap = programSet&imageSet
-            print programName,'&',imageName,'have overlap',len(overlap)
+            print(programName,'&',imageName,'have overlap',len(overlap))
             overlap = list(sorted(list(overlap)))
-            indices = np.random.choice(range(len(overlap)),size = min(100,len(overlap)),replace = False)
+            indices = np.random.choice(list(range(len(overlap))),size = min(100,len(overlap)),replace = False)
             overlap = [overlap[j] for j in indices ]
             
             matrix = 1 - np.concatenate([ np.concatenate((loadImage(n1),loadImage(n2)), axis = 0) for n1,n2 in overlap ],axis = 1)
@@ -149,32 +149,32 @@ def analyzeFeatures(featureMaps):
         if algorithm == 0:
             learner = PCA()
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors)))
-            print learner.explained_variance_ratio_
+            print(learner.explained_variance_ratio_)
         if algorithm == 1:
             learner = NMF(2)
             transformedFeatures = learner.fit_transform(preprocessing.scale(np.array(featureVectors),
                                                                             with_mean = False))
         if algorithm == 2:
             imageNames = ["drawings/expert-%d.png"%j for j in range(100) ]
-            distances = learnedDistanceMatrix(map(loadImage,imageNames))
+            distances = learnedDistanceMatrix(list(map(loadImage,imageNames)))
             learner = MDS(dissimilarity = 'precomputed')
             transformedFeatures = learner.fit_transform(distances)
             
 
-        print transformedFeatures
+        print(transformedFeatures)
         maximumExtent = max([transformedFeatures[:,0].max() - transformedFeatures[:,0].min(),
                              transformedFeatures[:,1].max() - transformedFeatures[:,1].min()])
-        print maximumExtent
+        print(maximumExtent)
         w = 0.1*maximumExtent
         
         if algorithm < 2:
-            print learner.components_
+            print(learner.components_)
             for dimension in range(2):
                 coefficients = learner.components_[dimension]
-                print "Dimension %d:"%(dimension+1)
+                print("Dimension %d:"%(dimension+1))
                 for j,n in enumerate(featureNames):
-                    print n,'\t',learner.components_[dimension,j]
-                print 
+                    print(n,'\t',learner.components_[dimension,j])
+                print() 
 
         showProbability = []
         for j in range(len(imageNames)):

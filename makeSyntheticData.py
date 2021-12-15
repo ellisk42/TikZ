@@ -14,7 +14,7 @@ CANONICAL = True
 def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     """sample should return a program"""
     programs = [sample() for _ in range(k)]
-    print "Sampled %d programs."%k
+    print("Sampled %d programs."%k)
     # remove all of the labels - we will render them separately
     noLabels = [ Sequence([ l for l in p.lines if not isinstance(l,Label) ])
                  for p in programs ]
@@ -23,11 +23,11 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
     noisyTargets = [ p.noisyTikZ() for p in noLabels ]
     distinctPrograms = list(set(noisyTargets))
     pixels = render(distinctPrograms, yieldsPixels = True)
-    print "Rendered %d images for %s."%(len(distinctPrograms),filePrefix)
+    print("Rendered %d images for %s."%(len(distinctPrograms),filePrefix))
 
     #pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
-    pixels = dict(zip(distinctPrograms,pixels))
-    
+    pixels = dict(list(zip(distinctPrograms,pixels)))
+
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
         unlabeledPixels = 1 - pixels[noisyTargets[j]]
@@ -42,7 +42,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
 
         if False:
             Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
-            
+
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     cs = [c for c in things if isinstance(c,Circle) ]
@@ -71,7 +71,7 @@ def proposeAttachmentLines(objects):
         for k in range(j + 1,len(attachmentSets)):
             for (x1,y1,o1) in attachmentSets[j]:
                 for (x2,y2,o2) in attachmentSets[k]:
-                    
+
                     candidate = None
                     isAligned = True
                     if x2 == x1 and y1 != y2 and o1 == 'v' and o2 == 'v':
@@ -81,7 +81,7 @@ def proposeAttachmentLines(objects):
                     else:
                         candidate = (x1,y1,x2,y2)
                         isAligned = False
-                        
+
                     if candidate != None:
                         l = Line.absolute((candidate[0]),
                                           (candidate[1]),
@@ -103,7 +103,7 @@ def samplePoint(objects):
     xs = list(set([ x for o in objects for x in o.usedXCoordinates() ]))
     ys = list(set([ y for o in objects for y in o.usedYCoordinates() ]))
     if ls != [] and random() < 0.1: return choice(ls)
-    option = choice(range(3))
+    option = choice(list(range(3)))
     if option == 0 and len(xs) > 0:
         return AbsolutePoint((choice(xs)),(randomCoordinate()))
     if option == 1 and len(ys) > 0:
@@ -142,7 +142,7 @@ def sampleLabel(objects):
     l = Label.sample()
     l.p = samplePoint(objects)
     return l
-                                
+
 
 def sampleLine(objects, attachedLines = []):
     concentration = 2.0
@@ -185,7 +185,7 @@ def sampleWithoutIntersection(n, existingObjects, f):
         attemptsSoFar += 1
         if attemptsSoFar > maximumAttempts:
             break
-        
+
         newObject = f()
         if not any([o.intersects(newObject) for o in existingObjects ]):
             existingObjects += [newObject]
@@ -205,19 +205,23 @@ def multipleObjects(rectangles = 0,lines = 0,circles = 0,labels = 0):
 def randomScene(maximumNumberOfObjects):
     def sampler():
         while True:
-            n = choice(range(maximumNumberOfObjects)) + 1
+            n = choice(list(range(maximumNumberOfObjects))) + 1
             if NIPSPRIMITIVES():
-                shapeIdentities = [choice(range(3)) for _ in range(n) ]
+                shapeIdentities = [choice(list(range(3))) for _ in range(n) ]
             else:
-                shapeIdentities = [choice(range(4)) for _ in range(n) ]
+                shapeIdentities = [choice(list(range(4))) for _ in range(n) ]
                 numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
                 # make it so that there are not too many labels
-                if numberOfLabels > n/2: continue
-            
-            return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
-                                   lines = len([x for x in shapeIdentities if x == 1 ]),
-                                   circles = len([x for x in shapeIdentities if x == 2 ]),
-                                   labels = len([x for x in shapeIdentities if x == 3 ]))()
+                if numberOfLabels > n // 2:
+                    continue
+
+            return multipleObjects(
+                rectangles=len([x for x in shapeIdentities if x == 0]),
+                lines=len([x for x in shapeIdentities if x == 1]),
+                circles=len([x for x in shapeIdentities if x == 2]),
+                labels=len([x for x in shapeIdentities if x == 3]),
+            )()
+
     return sampler
 
 def handleGeneration(arguments):
@@ -226,12 +230,18 @@ def handleGeneration(arguments):
     # IMPORTANT!
     # You *do not* want directories with an enormous number of files in them
     # pack it all up into a directory that we will tar together later
-    
-    os.system('mkdir %s/%d'%(outputName,startingPoint))
-    makeSyntheticData("%s/%d/%s"%(outputName,startingPoint,n), generators[n], k = k, offset = startingPoint)
-    print "Generated %d training sequences into %s/%d"%(k,outputName,startingPoint)
-    
-if __name__ == '__main__':
+
+    os.system("mkdir %s/%d" % (outputName, startingPoint))
+    makeSyntheticData(
+        "%s/%d/%s" % (outputName, int(startingPoint), n),
+        generators[n],
+        k=k,
+        offset=int(startingPoint),
+    )
+    print("Generated %d training sequences into %s/%d" % (k, outputName, startingPoint))
+
+
+if __name__ == "__main__":
     if not NIPSPRIMITIVES():
         loadCharacters()
 
@@ -248,10 +258,14 @@ if __name__ == '__main__':
         totalNumberOfExamples = int(sys.argv[1])
     else:
         totalNumberOfExamples = 100000
-    examplesPerBatch = totalNumberOfExamples/10 if totalNumberOfExamples > 100 else totalNumberOfExamples
+    examplesPerBatch = (
+        totalNumberOfExamples // 10
+        if totalNumberOfExamples > 100
+        else totalNumberOfExamples
+    )
     # this keeps any particular directory from getting too big
     if examplesPerBatch > 1000: examplesPerBatch = 1000
-    
+
     os.system('rm -r %s %s.tar ; mkdir %s'%(outputName,outputName,outputName))
     n = "randomScene"
     startingPoint = 0
@@ -260,16 +274,18 @@ if __name__ == '__main__':
         kp = min(totalNumberOfExamples - startingPoint,examplesPerBatch)
         offsetsAndCounts.append((n,startingPoint,kp))
         startingPoint += examplesPerBatch
-    print offsetsAndCounts
-    workers = totalNumberOfExamples/examplesPerBatch
+    print(offsetsAndCounts)
+    workers = int(totalNumberOfExamples / examplesPerBatch)
+
+    workers=1 # outputName doesn't make it across the Pool boundary...
     if workers > 1:
         if workers > 10: workers = 10
         Pool(workers).map(handleGeneration, offsetsAndCounts)
     else:
-        map(handleGeneration, offsetsAndCounts)
+        list(map(handleGeneration, offsetsAndCounts))
 
     if totalNumberOfExamples > 100:
-        print "Generated files, building archive..."
+        print("Generated files, building archive...")
         os.system('tar cvf %s.tar -T /dev/null'%outputName)
 
         for _,startingPoint,_ in offsetsAndCounts:
@@ -278,4 +294,4 @@ if __name__ == '__main__':
         #         os.system('rm -r syntheticTrainingData/%d'%startingPoint)
 
         # os.system('rm -r syntheticTrainingData')
-        print "Done. You should see everything in %s.tar if you had at least 100 examples."%(outputName)
+        print("Done. You should see everything in %s.tar if you had at least 100 examples."%(outputName))

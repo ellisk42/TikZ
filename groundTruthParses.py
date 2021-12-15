@@ -135,17 +135,17 @@ def prettyGroundTruth(j):
     stuff = stuff.replace(', arrow = False','')
     stuff = stuff.replace(', solid = True','')
     stuff = stuff.replace('((','(').replace('))',')').replace('), ',',').replace(',(',',')
-    print stuff
+    print(stuff)
     
 
 if __name__ == '__main__':
     if False:
-        print '\n\n'.join(['\n'.join(groundTruth['drawings/expert-%d.png'%j]) for j in  [29,52,38,75,72]])
+        print('\n\n'.join(['\n'.join(groundTruth['drawings/expert-%d.png'%j]) for j in  [29,52,38,75,72]]))
         assert False
         for k in groundTruthSequence:
             x = np.zeros((256*2,256))
-            print k
-            print groundTruthSequence[k]
+            print(k)
+            print(groundTruthSequence[k])
             x[0:256,:] = loadImage(k)
             x[256:,:] = groundTruthSequence[k].draw()
             showImage(x)

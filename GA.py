@@ -23,15 +23,15 @@ class GeneticAlgorithm():
         bestHistory = []
 
         for g in range(generations):
-            print "Generation",g
+            print("Generation",g)
 
-            print "Expanding population via mutation"
+            print("Expanding population via mutation")
             expandedPopulation = [ child
                                    for parent in population
                                    for child in [ self.mutate(parent) for _ in range(branchingFactor) ] ]
-            print "Computing fitness"
+            print("Computing fitness")
             expandedFitness = self.mapFitness(expandedPopulation)
-            print "Done with fitness"
+            print("Done with fitness")
             expandedPopulation = set(zip(expandedFitness, expandedPopulation))
             
             population = sorted(list(expandedPopulation))
@@ -42,14 +42,14 @@ class GeneticAlgorithm():
             if population[0][0] > bestFitness:
                 bestFitness = population[0][0]
                 bestIndividual = population[0][1]
-                print "Found a new best individual:"
-                print bestIndividual
-                print "Fitness:",bestFitness
+                print("Found a new best individual:")
+                print(bestIndividual)
+                print("Fitness:",bestFitness)
                 bestHistory.append(bestIndividual)
             population = [ individual[1] for individual in population ]
 
             if bestFitness > -1.0:
-                print "Terminating early"
+                print("Terminating early")
                 break
             
         return bestIndividual, bestHistory

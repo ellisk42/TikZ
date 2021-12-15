@@ -3,7 +3,8 @@ from utilities import sampleLogMultinomial
 import numpy as np
 from random import choice
 import tensorflow as tf
-import tensorflow.contrib.rnn as rnn
+# import tensorflow.contrib.rnn as rnn
+import tensorflow.python.ops.rnn as rnn
 from tensorflow.python.ops import array_ops
 
 
@@ -20,21 +21,21 @@ class RecurrentNetwork():
     def __init__(self, numberOfUnits, dictionarySize, maximumLength, inputFeatures = None, alwaysProvideInput = False):
         self.model = rnn.LSTMCell(numberOfUnits)
         
-        self.loadingMatrix = tf.Variable(tf.random_uniform([numberOfUnits,dictionarySize],-1.0,1.0),name = 'LOADINGMATRIX')
+        self.loadingMatrix = tf.Variable(tf.random.uniform([numberOfUnits,dictionarySize],-1.0,1.0),name = 'LOADINGMATRIX')
 
-        self.lengthPlaceholder = tf.placeholder(tf.int32, shape = [None],name = 'LENGTH')
+        self.lengthPlaceholder = tf.compat.v1.placeholder(tf.int32, shape = [None],name = 'LENGTH')
 
         self.maximumLength = maximumLength
         self.dictionarySize = dictionarySize
 
         if inputFeatures != None:
-            self.transformedInputFeatures = [ tf.layers.dense(inputs = inputFeatures,
+            self.transformedInputFeatures = [ tf.compat.v1.layers.dense(inputs = inputFeatures,
                                                          units = s,
                                                          activation = tf.nn.tanh)
                                          for s in self.model.state_size ]
             self.transformedInputFeatures = rnn.LSTMStateTuple(*self.transformedInputFeatures)
             if alwaysProvideInput:
-                self.alwaysProvidedInput = tf.layers.dense(inputs = inputFeatures,
+                self.alwaysProvidedInput = tf.compat.v1.layers.dense(inputs = inputFeatures,
                                                       units = numberOfUnits,
                                                       activation = tf.nn.tanh)
             else: self.alwaysProvidedInput = None
@@ -43,15 +44,15 @@ class RecurrentNetwork():
             self.alwaysProvidedInput = None
 
         # Unrolls some number of steps maximumLength
-        self.inputPlaceholder = tf.placeholder(tf.int32, shape = [None,maximumLength],name = 'INPUT')
-        embeddedInputs = tf.nn.embedding_lookup(tf.transpose(self.loadingMatrix),self.inputPlaceholder)
+        self.inputPlaceholder = tf.compat.v1.placeholder(tf.int32, shape = [None,maximumLength],name = 'INPUT')
+        embeddedInputs = tf.nn.embedding_lookup(params=tf.transpose(a=self.loadingMatrix),ids=self.inputPlaceholder)
         if alwaysProvideInput:
             # alwaysProvidedInput: [None,numberOfUnits]
             # we want to duplicate it along the time axis to get [None,numberOfTimesSteps,numberOfUnits]
             alwaysProvidedInput2 = tf.reshape(self.alwaysProvidedInput,[-1,1,numberOfUnits])
             alwaysProvidedInput3 = tf.tile(alwaysProvidedInput2, [1,maximumLength,1])
             embeddedInputs = embeddedInputs + alwaysProvidedInput3
-        self.outputs, self.states = tf.nn.dynamic_rnn(self.model,
+        self.outputs, self.states = tf.compat.v1.nn.dynamic_rnn(self.model,
                                                       inputs = embeddedInputs,
                                                       dtype = tf.float32,
                                                       sequence_length = self.lengthPlaceholder,
@@ -59,13 +60,13 @@ class RecurrentNetwork():
         # projectedOutputs: None x timeSteps x dictionarySize
         projectedOutputs = tf.tensordot(self.outputs, self.loadingMatrix, axes = [[2],[0]])
         self.outputDistribution = tf.nn.log_softmax(projectedOutputs)
-        self.hardOutputs = tf.cast(tf.argmax(projectedOutputs,dimension = 2),tf.int32)
+        self.hardOutputs = tf.cast(tf.argmax(input=projectedOutputs,axis = 2),tf.int32)
 
         # A small graph for running the recurrence network forward one step
-        self.statePlaceholders = [ tf.placeholder(tf.float32, [None,numberOfUnits], name = 'state0'),
-                                   tf.placeholder(tf.float32, [None,numberOfUnits], name = 'state1')]
-        self.oneInputPlaceholder = tf.placeholder(tf.int32, shape = [None], name = 'inputForOneStep')
-        projectedInputs = tf.nn.embedding_lookup(tf.transpose(self.loadingMatrix),self.oneInputPlaceholder)
+        self.statePlaceholders = [ tf.compat.v1.placeholder(tf.float32, [None,numberOfUnits], name = 'state0'),
+                                   tf.compat.v1.placeholder(tf.float32, [None,numberOfUnits], name = 'state1')]
+        self.oneInputPlaceholder = tf.compat.v1.placeholder(tf.int32, shape = [None], name = 'inputForOneStep')
+        projectedInputs = tf.nn.embedding_lookup(params=tf.transpose(a=self.loadingMatrix),ids=self.oneInputPlaceholder)
         if alwaysProvideInput: projectedInputs = projectedInputs + self.alwaysProvidedInput
         self.oneOutput, self.oneNewState = self.model(projectedInputs,
                                                       rnn.LSTMStateTuple(*self.statePlaceholders))
@@ -82,9 +83,9 @@ class RecurrentNetwork():
         # l:labels
         # l:None,L
         # reduce across each time step
-        l = tf.reduce_sum(l,axis = -1)
+        l = tf.reduce_sum(input_tensor=l,axis = -1)
         # reduce across each example
-        return tf.reduce_mean(l)
+        return tf.reduce_mean(input_tensor=l)
 
     def decodesIntoAccuracy(self, labels, perSymbol = True):
         # as the dimensions None x L
@@ -95,7 +96,7 @@ class RecurrentNetwork():
                                         tf.sequence_mask(self.lengthPlaceholder, maxlen = self.maximumLength))
 
         # Some across all of the time steps to get the total number of predictions correct in each batch entry
-        accuracyVector = tf.reduce_sum(tf.cast(accuracyMatrix,tf.int32),axis = 1)
+        accuracyVector = tf.reduce_sum(input_tensor=tf.cast(accuracyMatrix,tf.int32),axis = 1)
         if perSymbol:
             # Now normalize it by the sequence length and take the average
             accuracyVector = tf.divide(tf.cast(accuracyVector,tf.float32),
@@ -103,7 +104,7 @@ class RecurrentNetwork():
         if not perSymbol:
             # accuracy is measured per sequence
             accuracyVector = tf.cast(tf.equal(accuracyVector,self.lengthPlaceholder),tf.float32)
-        return tf.reduce_mean(accuracyVector)
+        return tf.reduce_mean(input_tensor=accuracyVector)
     
     def decodingTrainingFeed(self, sequences, labels = None):
         '''
@@ -149,7 +150,7 @@ class RecurrentNetwork():
 
         for j in range(self.maximumLength):
             mostRecentOutput = 0 if j == 0 else sequenceSoFar[-1]
-            feed = dict(baseFeed.iteritems())
+            feed = dict(iter(baseFeed.items()))
             feed.update({self.statePlaceholders[0]: s0,
                          self.statePlaceholders[1]: s1,
                          self.oneInputPlaceholder: np.array([mostRecentOutput])})
@@ -232,17 +233,17 @@ class RecurrentNetwork():
 if __name__ == '__main__':
     VOCABULARYSIZE = 3
     L = 8
-    hint = tf.placeholder(tf.float32, shape = [None,1],name = 'HINT')        
+    hint = tf.compat.v1.placeholder(tf.float32, shape = [None,1],name = 'HINT')        
     m = RecurrentNetwork(5,VOCABULARYSIZE,L,hint,alwaysProvideInput = True)
-    labels = tf.placeholder(tf.int32, shape = [None,L],name = 'LABELS')
+    labels = tf.compat.v1.placeholder(tf.int32, shape = [None,L],name = 'LABELS')
 
     accuracy = m.decodesIntoAccuracy(labels,False)
 
     loss = m.decodesIntoLoss(labels)
-    Optimizer = tf.train.AdamOptimizer(learning_rate = 10**-4).minimize(loss)
+    Optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate = 10**-4).minimize(loss)
 
-    with tf.Session() as session:
-        session.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as session:
+        session.run(tf.compat.v1.global_variables_initializer())
 
         for i in range(10000):
             sequences = [sampleSequence() for _ in range(100) ]
@@ -252,9 +253,9 @@ if __name__ == '__main__':
             l,a,_ = session.run([loss,accuracy,Optimizer],
                               feed)
             if i%1000 == 0:
-                print i,l,a
+                print(i,l,a)
         for h in [1.0,2.0]:
-            print "Sampling h = %s"%h
+            print("Sampling h = %s"%h)
             samples = [ tuple(m.sample(session,
                                        stopSymbol = 0,
                                        baseFeed = {hint: np.array([[h]])}))
@@ -262,9 +263,9 @@ if __name__ == '__main__':
             histogram = {}
             for s in samples: histogram[s] = histogram.get(s,0) + 1
             histogram = sorted([(histogram[s],s) for s in histogram ])
-            print "\n".join(map(str,histogram[-10:]))
+            print("\n".join(map(str,histogram[-10:])))
 
-            print "Beaming h = %s"%h
+            print("Beaming h = %s"%h)
             b = m.beam(session, k = 3, stopSymbol = 0, maximumLength = 20,
                        baseFeed = {hint: np.array([h])})
-            print "\n".join(map(str,b))
+            print("\n".join(map(str,b)))

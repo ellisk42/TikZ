@@ -12,7 +12,7 @@ class ChineseRestaurant():
         self.n += 1
 
         a = 0
-        for k,v in self.tables.iteritems():
+        for k,v in self.tables.items():
             if u < v + a:
                 self.tables[k] += 1
                 return k
@@ -26,7 +26,7 @@ class ChineseRestaurant():
         u = random.random()*(self.n)
 
         a = 0
-        for k,v in self.tables.iteritems():
+        for k,v in self.tables.items():
             if u < v + a: return k
             a += v
 
@@ -41,7 +41,7 @@ class ChineseRestaurant():
 
 
 if __name__ == "__main__":
-    r = ChineseRestaurant(1.0,lambda : random.choice(range(1000)))
+    r = ChineseRestaurant(1.0,lambda : random.choice(list(range(1000))))
 
     s1 = []
     for _ in range(100):
@@ -54,6 +54,6 @@ if __name__ == "__main__":
     for _ in range(100): s2.append(r.sampleExisting())
     s2 = dict([ (s, s2.count(s)) for s in set(s2) ])
     
-    print list(sorted(s1.iteritems(),key = lambda kf: -kf[1]))
-    print list(sorted(s2.iteritems(),key = lambda kf: -kf[1]))
+    print(list(sorted(iter(s1.items()),key = lambda kf: -kf[1])))
+    print(list(sorted(iter(s2.items()),key = lambda kf: -kf[1])))
     

@@ -166,7 +166,7 @@ class RelativeExpression():
                     's':'South'}
     def __init__(self, index, orientation):
         self.index = index
-        assert orientation in RelativeExpression.orientations.keys()
+        assert orientation in list(RelativeExpression.orientations.keys())
         self.orientation = orientation
     def __str__(self):
         return '%s(%d)'%(RelativeExpression.orientations[self.orientation],self.index)
@@ -254,8 +254,8 @@ class Primitive():
     @staticmethod
     def enumerate(environment):
         if any([isinstance(x,Circle) for x in environment.difference ]):
-            for x in LinearExpression.enumerate(environment.variableRanges.keys()):
-                for y in LinearExpression.enumerate(environment.variableRanges.keys()):
+            for x in LinearExpression.enumerate(list(environment.variableRanges.keys())):
+                for y in LinearExpression.enumerate(list(environment.variableRanges.keys())):
                     yield Primitive("circle",x,y)
     def enumerateNeighbors(self,e):
         return
@@ -523,7 +523,7 @@ class Loop():
         vs = ['i','j']
         if len(environment.variableRanges) < 2:
             v = vs[len(environment.variableRanges)]
-            for bound in LinearExpression.enumerate(environment.variableRanges.keys(),
+            for bound in LinearExpression.enumerate(list(environment.variableRanges.keys()),
                                                     maximumIntercept = 4,
                                                     maximumSlope = 2):
                 if bound.m == 0 and bound.b < 2: continue
@@ -581,7 +581,7 @@ class Block():
         candidates = [self] + list(self.hoistReflection())
         sequences = [k.convertToSequence() for k in candidates ]
         distances = [target - s for s in sequences ]
-        best = min(range(len(distances)),key = lambda k: distances[k])
+        best = min(list(range(len(distances))),key = lambda k: distances[k])
         if distances[best] == distance: return self
         return candidates[best].fixReflections(target)
 
@@ -781,10 +781,10 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
 
         m = re.search('int\[[0-9]\] coefficients([1|2]) = {([,0-9\-]+)};',l)
         if m:
-            coefficients[int(m.group(1))] = map(int,m.group(2).split(","))
+            coefficients[int(m.group(1))] = list(map(int,m.group(2).split(",")))
         
         # apply the environment
-        for v in sorted(environment.keys(), key = lambda v: -len(v)):
+        for v in sorted(list(environment.keys()), key = lambda v: -len(v)):
             l = l.replace(v,environment[v])
 
         # Apply the coefficients
@@ -812,9 +812,9 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
         m = re.search(pattern,l)
         if m:
             if False:
-                print "Reading line!"
-                print l
-                for index in range(5): print "index",index,"\t",m.group(index),'\t',parseExpression(m.group(index))
+                print("Reading line!")
+                print(l)
+                for index in range(5): print("index",index,"\t",m.group(index),'\t',parseExpression(m.group(index)))
             commands += [Primitive('line',
                                    parseExpression(m.group(1)),
                                    parseExpression(m.group(2)),
@@ -859,9 +859,9 @@ def parseSketchOutput(output, environment = None, loopDepth = 0, coefficients = 
             body = parseSketchOutput(body, environment, loopDepth + 1, coefficients)
             v = ['i','j'][loopDepth]
             if v == 'j' and boundary != None and False:
-                print "INNERLOOP"
-                print '\n'.join(output)
-                print "ENDOFINNERLOOP"
+                print("INNERLOOP")
+                print('\n'.join(output))
+                print("ENDOFINNERLOOP")
             commands += [Loop(v, bound, body, boundary)]
             continue
 
@@ -902,7 +902,7 @@ def parseExpression(e):
         if offset == None: offset = 0
         if variable == None:
             print("FATAL: parsing expression: could not find variable.")
-            print e
+            print(e)
             print("^^^^")
             assert False
         #print "Parsed into:",LinearExpression(factor,variable,offset)
@@ -1143,19 +1143,19 @@ void render (int shapeIdentity, int cx, int cy, int lx1, int ly1, int lx2, int l
 
 if __name__ == '__main__':
     p2 = parseSketchOutput(icingLines)
-    print p2.pretty()
+    print(p2.pretty())
     assert False
     p1 = parseSketchOutput(icingCircles)
     p3 = Block(p1.items + p2.items)
-    print p3
+    print(p3)
     for r in p3.rewrites():
-        print r.pretty()
-        print "CHILDREN:"
+        print(r.pretty())
+        print("CHILDREN:")
         for c in r.rewrites():
-            print c.pretty()
-            print c
+            print(c.pretty())
+            print(c)
             showImage(c.convertToSequence().draw())
-        print "ENDOFCHILDREN"
+        print("ENDOFCHILDREN")
         
     assert False
     start = Block([Loop('j',LinearExpression(0,None,3),
@@ -1164,12 +1164,12 @@ if __name__ == '__main__':
                    Loop('j',LinearExpression(0,None,2),
                         Block([Primitive('y',LinearExpression(9,'j',4))]))])
     for r in start.rewrites():
-        print r
+        print(r)
     e = parseSketchOutput(icingModelOutput)
 #    e = [circle(4,10)] + [ _i for i in range(0,3) for _i in ([line(3*i + 1,4,3*i + 1,2,arrow = True,solid = True)] + reflect(y = 6)([circle(3*i + 1,1)] + [line(4,9,3*i + 1,6,arrow = True,solid = True)])) ]
-    print e.pretty()
+    print(e.pretty())
     for h in e.hoistReflection():
-        print h
+        print(h)
         showImage(fastRender(h.convertToSequence()))
 #    print len(e)
     # print e

@@ -2,7 +2,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plot
 
-xs = range(1,36)
+xs = list(range(1,36))
 
 MAXIMUMY = None
 
@@ -41,8 +41,8 @@ def showFigure(y):
     plot.ylabel(y)
     plot.xticks(xs,
                 ['1'] + ['']*10 + ['12'] + ['']*11 + ['24'] + ['']*10 + ['36'])
-    ys = range(-1,int(MAXIMUMY + 1))
-    print MAXIMUMY
+    ys = list(range(-1,int(MAXIMUMY + 1)))
+    print(MAXIMUMY)
     plot.ylim(ymin = -1)
     #plot.axvline(x = 12,ymin = 0,ymax = 24,color = 'k')
     # plot.annotate("Within-sample generalization",
@@ -92,5 +92,5 @@ for t in times:
     timeAverage += [average(averages)]
     timeError += [standardError(averages)]
 plot.figure()
-plot.bar(range(3),timeAverage,align = 'center',yerr = timeError)
+plot.bar(list(range(3)),timeAverage,align = 'center',yerr = timeError)
 plot.show()

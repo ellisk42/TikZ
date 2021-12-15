@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optimization
 import torch.nn.functional as F
-from torch.autograd import Variable
 import torchvision.transforms as T
 
 
@@ -25,7 +24,7 @@ import re
 def binary(x,f):
     if not f: x = -x
     return (F.sigmoid(x) + 0.0001).log()
-    
+
 def lse(xs):
     largest = xs[0].data[0]
     for x in xs:
@@ -50,8 +49,10 @@ class SynthesisPolicy():#nn.Module):
         self.inputDimensionality = len(SynthesisPolicy.featureExtractor(Sequence([])))
         self.outputDimensionality = 6
 
-        self.parameters = Variable(torch.randn(self.outputDimensionality,self.inputDimensionality),
-                                   requires_grad = True)
+        self.parameters = torch.Tensor(
+            torch.randn(self.outputDimensionality, self.inputDimensionality),
+            requires_grad=True,
+        )
 
     def zeroParameters(self):
         self.parameters.data.zero_()
@@ -60,15 +61,15 @@ class SynthesisPolicy():#nn.Module):
         return (self.parameters*self.parameters).sum()
 
     def save(self,f):
-        print " [+] Saving model to",f
+        print(" [+] Saving model to",f)
         torch.save(self.parameters,f)
     def load(self,f):
-        print " [+] Loading model from",f
+        print(" [+] Loading model from",f)
         self.parameters = torch.load(f)
 
     def scoreJobs(self,jobs):
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-        f = Variable(f)
+        f = torch.FloatTensor(f)
         y = self.parameters.matmul(f)
         z = lse([y[3],y[4],y[5]])
         scores = []
@@ -84,46 +85,46 @@ class SynthesisPolicy():#nn.Module):
         return [ (score - z).exp() for score in scores ]
 
     def expectedTime(self,results):
-        jobs = results.keys()
+        jobs = list(results.keys())
         probabilities = self.jobProbabilities(jobs)
         t0 = sum([ results[job].time * p for job, p in zip(jobs, probabilities) ])
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print "TIMEOUT",sequence
+            print("TIMEOUT")
             assert False
         successes = [ results[j].cost != None and results[j].cost <= minimumCost + 1 for j in jobs ]
         p0 = sum([ p for success, p in zip(successes, probabilities) if success])
         return (t0 + 1.0).log() - (p0 + 0.001).log() #t0/(p0 + 0.0001)
 
     def biasOptimalTime(self,results, inverseTemperature = 1):
-        jobs = results.keys()
+        jobs = list(results.keys())
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print "TIMEOUT",sequence
+            print("TIMEOUT", len(jobs))
             assert False
         scores = self.scoreJobs(jobs)
         z = lse(scores)
-        
+
         logTimes = [ math.log(results[j].time) - s + z
                      for j,s in zip(jobs, scores)
                      if results[j].cost != None and results[j].cost <= minimumCost + 1 ]
         #bestTime = min(times, key = lambda t: t.data[0])
         bestTime = softMinimum(logTimes, inverseTemperature)
-        
+
         return bestTime
 
     def deepCoderLoss(self, results):
-        jobs = results.keys()
+        jobs = list(results.keys())
         TIMEOUT = 999
         minimumCost = min([ results[j].cost for j in jobs if results[j].cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print "TIMEOUT",sequence
+            print("TIMEOUT",sequence)
             assert False
-        
+
         # Find the winning program
-        bestResult = min(results.values(),key = lambda r: r.cost if r.cost != None else TIMEOUT)
+        bestResult = min(list(results.values()),key = lambda r: r.cost if r.cost != None else TIMEOUT)
         incremental = bestResult.job.incremental
         p = bestResult.program
         depth = p.depth()
@@ -134,9 +135,9 @@ class SynthesisPolicy():#nn.Module):
             if isinstance(k,Loop): loops = True
             elif isinstance(k,Reflection): reflects = True
             if loops and reflects: break
-        
+
         f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-        f = Variable(f)
+        f = torch.FloatTensor(f)
         y = self.parameters.matmul(f)
         #z = lse([y[3],y[4],y[5]])
 
@@ -159,7 +160,7 @@ class SynthesisPolicy():#nn.Module):
                 loss = sum(self.deepCoderLoss(results) for results in data)
                 testingLoss = sum(self.deepCoderLoss(results) for results in data).data[0] if testingData != [] else 0.0
             else:
-                print "unknown loss function",L
+                print("unknown loss function",L)
                 assert False
             regularizedLoss = loss + regularize * self.l2parameters()
             o.zero_grad()
@@ -167,7 +168,7 @@ class SynthesisPolicy():#nn.Module):
             o.step()
 
 
-            
+
             dt = (time.time() - startTime)/(60*60)
             timePerIteration = dt/s
             timePerFold = timePerIteration*numberOfIterations
@@ -175,7 +176,7 @@ class SynthesisPolicy():#nn.Module):
             ETA = timePerFold * foldsRemaining + ETAthis
             if testingData != []: testingLoss = testingLoss * len(data) / len(testingData)
             if s%10 == 0:
-                print "%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA)
+                print("%d/%d : training loss = %.2f : testing loss = %.2f : ETA this fold = %.2f hours : ETA all folds = %.2f hours"%(s,numberOfIterations,loss.data[0],testingLoss,ETAthis,ETA))
 
     def reinforce(self,data):
         o = optimization.Adam([self.parameters],lr = 0.001)
@@ -183,15 +184,15 @@ class SynthesisPolicy():#nn.Module):
         for s in range(100):
             L = sum([ R*ll for results in data for (R,ll) in [self.rollout(results,True)] ])
             L = L/len(data)
-            print L
-            print self.parameters
-            print self.parameters.grad
+            print(L)
+            print(self.parameters)
+            print(self.parameters.grad)
             o.zero_grad()
             L.backward()
             o.step()
-        
-        
-            
+
+
+
 
     @staticmethod
     def featureExtractor(sequence):
@@ -212,19 +213,19 @@ class SynthesisPolicy():#nn.Module):
         if arguments.features == 'nothing':
             return np.array([1])
         assert False
-        
+
 
     def rollout(self, results, returnLogLikelihood = False, L = 'expected'):
-        jobs = results.keys()
+        jobs = list(results.keys())
         jobLogLikelihood = {}
         for j,s in zip(jobs,self.scoreJobs(jobs)):
             jobLogLikelihood[j] = s
-        
+
         history = []
         TIMEOUT = 999
-        minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
+        minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
         if minimumCost == TIMEOUT:
-            print "TIMEOUT",sequence
+            print("TIMEOUT",sequence)
             assert False
 
         if L == 'bias':
@@ -240,17 +241,19 @@ class SynthesisPolicy():#nn.Module):
                 resourceDistribution = [ math.exp(jobLogLikelihood[j].data[0] - z) for j in candidates ]
                 timeToFinishEachCandidate = [ (results[j].time - jobProgress[j])/w
                                               for w,j in zip(resourceDistribution,candidates) ]
-                (dt,nextResult) = min(zip(timeToFinishEachCandidate, candidates))
+                (dt,nextResult) = min(list(zip(timeToFinishEachCandidate, candidates)))
                 T += dt
                 if results[nextResult].cost != None and results[nextResult].cost <= minimumCost + 1: return T
                 finishedJobs.append(nextResult)
                 for candidate, weight in zip(candidates,resourceDistribution):
                     jobProgress[candidate] += weight*dt
-                
+
         if L == 'DC':
             assert not returnLogLikelihood
-            f = torch.from_numpy(SynthesisPolicy.featureExtractor(jobs[0].parse)).float()
-            f = Variable(f)
+            f = torch.from_numpy(
+                SynthesisPolicy.featureExtractor(jobs[0].parse)
+            ).float()
+            f = torch.FloatTensor(f)
             y = F.sigmoid(self.parameters.matmul(f))
             incrementalScore = y.data[0]
             loopScore = y.data[1]
@@ -289,28 +292,28 @@ class SynthesisPolicy():#nn.Module):
                     T += result.time
                     if result.cost != None and result.cost <= minimumCost + 1: return T
 
-            print "Could not get minimum cost for the following problem:",minimumCost
-            for k,v in results.iteritems():
-                print k,v.cost
+            print("Could not get minimum cost for the following problem:",minimumCost)
+            for k,v in results.items():
+                print(k,v.cost)
             assert False
-            
-            
+
+
 
         time = 0
         trajectoryLogProbability = 0
         while True:
             candidates = [ j
-                           for j,_ in results.iteritems()
+                           for j,_ in results.items()
                            if not any([ str(j) == str(o) or (results[o].cost != None and o.subsumes(j))
                                         for o in history ])]
             if candidates == []:
-                print "Minimum cost",minimumCost
-                print "All of the results..."
-                for j,r in sorted(results.iteritems(), key = lambda (j,r): str(j)):
-                    print j,r.cost,r.time
-                print "history:"
+                print("Minimum cost",minimumCost)
+                print("All of the results...")
+                for j,r in sorted(iter(results.items()), key = lambda j_r: str(j_r[0])):
+                    print(j,r.cost,r.time)
+                print("history:")
                 for h in sorted(history,key = str):
-                    print h,'\t',results[j].cost
+                    print(h,'\t',results[j].cost)
                 assert False
             job = candidates[sampleLogMultinomial([ jobLogLikelihood[j].data[0] for j in candidates ])]
             sample = results[job]
@@ -356,30 +359,34 @@ class SynthesisPolicy():#nn.Module):
                 if outputDirectory is not None:
                     fn = "%s/program_%d.txt"%(outputDirectory,resultIndex)
                     result.exportToFile(fn)
-                    print "Exported program to",fn
+                    print("Exported program to",fn)
                     resultIndex += 1
                 if verbose:
-                    print 
-                    print " [+] Found the following program:"
-                    print result.program.pretty()
-                    print
-                    print 
+                    print()
+                    print(" [+] Found the following program:")
+                    print(result.program.pretty())
+                    print()
+                    print()
                 if bestResult == None or bestResult.cost > result.cost:
                     bestResult = result
                 if result.cost <= optimalCost + 1 and globalTimeout is None: break
                 for t in tasks:
-                    if result.job.subsumes(t.arguments[0]): t.finished = True            
+                    if result.job.subsumes(t.arguments[0]): t.finished = True
         for t in tasks: t.cleanup()
         if outputDirectory is not None and bestResult is not None:
             fn = "%s/best.txt"%(outputDirectory)
-            print "Exporting best program to",fn
+            print("Exporting best program to",fn)
             bestResult.exportToFile(fn)
         return bestResult
 
-            
+
 def loadPolicyData():
-    with open('policyTrainingData.p','rb') as handle:
-        results = pickle.load(handle)
+    from os.path import exists
+    if os.path.exists('policyTrainingData.p'):
+        with open('policyTrainingData.p','rb') as handle:
+            results = pickle.load(handle)
+    else:
+        results = []
 
     resultsArray = []
 
@@ -388,12 +395,12 @@ def loadPolicyData():
     for j in range(100):
         drawing = 'drawings/expert-%d.png'%j
         resultsArray.append(dict([ (r.job, r) for r in results if isinstance(r,SynthesisResult) and r.job.originalDrawing == drawing ]))
-        print " [+] Got %d results for %s"%(len(resultsArray[-1]), drawing)
+        print(" [+] Got %d results for %s"%(len(resultsArray[-1]), drawing))
 
         # Removed those cases where we have a cost but no program This
         # bug has been fixed, but when using old data files we don't
         # want to include these
-        for job, result in resultsArray[-1].iteritems():
+        for job, result in resultsArray[-1].items():
             if not job.incremental and result.cost != None and result.source == None:
                 result.cost = None
                 legacyFixUp = True
@@ -401,32 +408,32 @@ def loadPolicyData():
             if result.cost != None:
                 newProgram = result.program.removeDeadCode()
                 if newProgram.pretty() != result.program.pretty():
-                    print "WARNING: detected dead code in %d"%j
-                    print result.program.pretty()
+                    print("WARNING: detected dead code in %d"%j)
+                    print(result.program.pretty())
                     result.program = newProgram
                     result.cost = result.program.totalCost()
 
-        
+
 
         # Check that the subsumption trick can never cause us to not get an optimal program
-        for job1, result1 in resultsArray[-1].iteritems():
-            for job2, result2 in resultsArray[-1].iteritems():            
+        for job1, result1 in resultsArray[-1].items():
+            for job2, result2 in resultsArray[-1].items():
                 if job1.subsumes(job2): # job1 is more general which implies that either there is no result or it is better than the result for job2
                     if not (result1.cost == None or result2.cost == None or result1.cost <= result2.cost):
-                        print job1,'\t',result1.cost
-                        print result1.program.pretty()
-                        print job2,'\t',result2.cost
-                        print result2.program.pretty()
+                        print(job1,'\t',result1.cost)
+                        print(result1.program.pretty())
+                        print(job2,'\t',result2.cost)
+                        print(result2.program.pretty())
                     assert result1.cost == None or result2.cost == None or result1.cost <= result2.cost
-        
+
     if legacyFixUp:
-        print ""
-        print " [?] WARNING: Fixed up legacy file."
+        print("")
+        print(" [?] WARNING: Fixed up legacy file.")
 
     return resultsArray
 
- 
-            
+
+
 
 
 def analyzePossibleFeatures(data):
@@ -451,29 +458,29 @@ def analyzePossibleFeatures(data):
         reflectingProblems.append((bestJob.parse,'reflect' in best))
         deepProblems.append((bestJob.parse,bestProgram.depth() > 2))
 
-    print "Looping problems:",len(iterativeProblems)
-    print "Reflecting problems:",len(reflectingProblems)
-    print "Deep problems:",len(deepProblems)
+    print("Looping problems:",len(iterativeProblems))
+    print("Reflecting problems:",len(reflectingProblems))
+    print("Deep problems:",len(deepProblems))
 
     iterativeScores = [ (flag, (len(x) + len(y))/float(len(parse)))
                         for parse, flag in iterativeProblems
                         for (x,y) in [parse.usedDisplacements()] ]
-    
+
 TIMEOUT = 10**6
 def bestPossibleTime(results):
-    minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
-    return (min([ r.time for r in results.values() if r.cost != None and r.cost <= minimumCost + 1 ] + [TIMEOUT]))
+    minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
+    return (min([ r.time for r in list(results.values()) if r.cost != None and r.cost <= minimumCost + 1 ] + [TIMEOUT]))
 def exactTime(results):
-    minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
-    return (min([ r.time for j,r in results.iteritems()
+    minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
+    return (min([ r.time for j,r in results.items()
                           if j.incremental == False and j.canLoop and j.canReflect and j.maximumDepth == 3  and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
 def incrementalTime(results):
-    minimumCost = min([ r.cost for r in results.values() if r.cost != None ] + [TIMEOUT])
-    return (min([ r.time for j,r in results.iteritems()
+    minimumCost = min([ r.cost for r in list(results.values()) if r.cost != None ] + [TIMEOUT])
+    return (min([ r.time for j,r in results.items()
                           if j.incremental and j.canLoop and j.canReflect and j.maximumDepth == 3 and r.cost != None and r.cost <= minimumCost + 1] + [TIMEOUT]))
 
-    
-        
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description = 'training and evaluation of synthesis policies')
@@ -499,17 +506,17 @@ if __name__ == '__main__':
     data = loadPolicyData()
     if arguments.evaluate is None:
         data = [results for results in data
-                if any([r.cost != None for r in results.values() ]) ]
-        print "Pruned down to %d problems"%len(data)
+                if any([r.cost != None for r in list(results.values()) ]) ]
+        print("Pruned down to %d problems"%len(data))
     totalFailures = 100 - len(data)
 
 
-    print "Features:",arguments.features
+    print("Features:",arguments.features)
     modes = arguments.mode.split('+')
     policyRollouts = {}
     # Map from problem index to which model should be used for that problem
     testingModels = {}
-    
+
     for mode in modes:
         policy = []
         numberOfFolds = arguments.folds
@@ -517,13 +524,13 @@ if __name__ == '__main__':
         for train, test in crossValidate(data, numberOfFolds, randomSeed = 42):
             path = 'checkpoints/policy_%s_%s_%s%d_%d.pt'%(arguments.features,mode,
                                                           '' if arguments.regularize == 0 else 'regularize%f_'%arguments.regularize,
-                                                          foldCounter,arguments.folds)            
+                                                          foldCounter,arguments.folds)
             foldCounter += 1
-            print "Fold %d..."%foldCounter
+            print("Fold %d..."%foldCounter)
             model = SynthesisPolicy()
             if arguments.load:
                 model.load(path)
-                print " [+] Successfully loaded model from %s"%path
+                print(" [+] Successfully loaded model from %s"%path)
             else:
                 model.learn(train,L = mode,
                             foldsRemaining = numberOfFolds - foldCounter,
@@ -531,14 +538,14 @@ if __name__ == '__main__':
                             numberOfIterations = arguments.steps,
                             regularize = arguments.regularize)
                 if arguments.save:
-                    model.save(path)            
+                    model.save(path)
             if arguments.evaluate is None:
                 policy += [ model.rollout(r,L = mode) for r in test for _ in  range(10 if mode == 'expected' else 1) ]
             else:
                 assert arguments.load
                 for r in test:
                     testingModels[data.index(r)] = model
-                
+
         policyRollouts[mode] = policy
 
 
@@ -547,7 +554,7 @@ if __name__ == '__main__':
             thingsToEvaluate = list(range(100))
         else:
             thingsToEvaluate = [arguments.evaluate]
-        
+
         def policyEvaluator(problemIndex):
             try:
                 problemIndex = int(problemIndex)
@@ -558,54 +565,54 @@ if __name__ == '__main__':
                 try:
                     problemIndex = int(re.search("expert-(\d+)-p",problemIndex).group(1))
                 except: problemIndex = None
-                    
+
             if problemIndex is not None:
-                costs = [ r.cost for _,r in data[problemIndex].iteritems() if r.cost != None ]
+                costs = [ r.cost for _,r in data[problemIndex].items() if r.cost != None ]
                 if costs == []: return None
                 bestCost = min(costs)
                 model = testingModels[problemIndex]
-                jobs = data[problemIndex].keys()
-                job2w = dict(zip(jobs,
-                                 np.exp(normalizeLogs(np.array([ s.data[0] for s in model.scoreJobs(jobs) ])))))
-                print "Best cost:",bestCost
-                print "Results:"
-                for j,r in data[problemIndex].iteritems():
-                    print j
-                    print "COST =",r.cost,"\tTIME =",r.time,"\tWEIGHT =",job2w[j]
-                    print
+                jobs = list(data[problemIndex].keys())
+                job2w = dict(list(zip(jobs,
+                                 np.exp(normalizeLogs(np.array([ s.data[0] for s in model.scoreJobs(jobs) ]))))))
+                print("Best cost:",bestCost)
+                print("Results:")
+                for j,r in data[problemIndex].items():
+                    print(j)
+                    print("COST =",r.cost,"\tTIME =",r.time,"\tWEIGHT =",job2w[j])
+                    print()
 
                 theoretical = model.rollout(data[problemIndex], L = mode)
-                print "Theoretical time:",theoretical
+                print("Theoretical time:",theoretical)
             else:
                 bestCost = 0
                 model = testingModels[0] # arbitrary
                 theoretical = None
-                
-            
+
+
             startTime = time.time()
             result = model.timeshare(problemIndex, bestCost, globalTimeout = arguments.timeout, verbose=True,
                                      parse=parse,
                                      outputDirectory=arguments.programOutputDirectory)
             actualTime = time.time() - startTime
-            print "Total time:",actualTime
+            print("Total time:",actualTime)
 
             if arguments.extrapolate:
-                print "Extrapolating into",arguments.extrapolate
+                print("Extrapolating into",arguments.extrapolate)
                 exportExtrapolations([result.program], arguments.extrapolate,
                                      "drawings/expert-%d.png"%problemIndex)
             return (actualTime,theoretical)
-        
+
         discrepancies = parallelMap(1, policyEvaluator,thingsToEvaluate)
         # print "DISCREPANCIES:",discrepancies
         # with open('discrepancies.p','wb') as handle:
         #     pickle.dump(discrepancies, handle)
         sys.exit(0)
-        
-        
-    
-    optimistic = map(bestPossibleTime, data)
-    exact = map(exactTime,data)
-    incremental = map(incrementalTime,data)
+
+
+
+    optimistic = list(map(bestPossibleTime, data))
+    exact = list(map(exactTime,data))
+    incremental = list(map(incrementalTime,data))
 
     randomModel = SynthesisPolicy()
     randomModel.zeroParameters()
@@ -615,7 +622,7 @@ if __name__ == '__main__':
     if 'DC' in policyRollouts: modelsToCompare.append((policyRollouts['DC'], 'DC'))
     modelsToCompare.append((optimistic,'oracle'))
     if 'bias' in policyRollouts: modelsToCompare.append((policyRollouts['bias'], 'learned policy (ours)'))
-    
+
     bins = np.logspace(0,6,30)
     figure = plot.figure(figsize = (8,1.6))
     plot.gca().set_xlabel('time (sec)',fontsize = 9)
@@ -634,20 +641,20 @@ if __name__ == '__main__':
         #plot.legend(fontsize = 9)
         plot.title(l,fontsize = 9)
         # Remove timeouts
-        print l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times"
+        print(l,"timeouts or gives the wrong answer",len([y for y in ys if y == TIMEOUT ]),"times")
         median = np.median(ys)
-        print l," median",median
+        print(l," median",median)
         ys = [y for y in ys if y != TIMEOUT ]
-        print l," mean",np.mean(ys)
+        print(l," mean",np.mean(ys))
 
-        print l," : solved within a minute:",len([y for y in ys if y <= 60.0 ])
+        print(l," : solved within a minute:",len([y for y in ys if y <= 60.0 ]))
 
         plot.axvline(median, color='r', linestyle='dashed', linewidth=2)
         plot.text(median * 1.5,
                   plot.gca().get_ylim()[1]*0.7,
                   'median: %ds'%(int(median)),
                   fontsize = 7)#, rotation = 90)
-        
+
 
     #plot.plot()
     figure.text(0.5, 0.04, 'time (sec)', ha='center', va='center',
@@ -658,5 +665,3 @@ if __name__ == '__main__':
     plot.savefig(figureFilename)
     os.system('convert -trim %s %s'%(figureFilename,figureFilename))
     os.system('feh %s'%figureFilename)
-    
-    
